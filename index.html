@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>車検・整備・カスタム ご相談窓口</title>
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- LIFF SDK -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body { background-color: #1a1a1a; color: #eee; font-family: 'Helvetica Neue', Arial, sans-serif; }
@@ -28,11 +30,13 @@
     </div>
 
     <div class="card p-4">
+        <!-- 進捗バー -->
         <div class="progress mb-4">
             <div id="progressBar" class="progress-bar" role="progressbar" style="width: 33%;"></div>
         </div>
 
         <form id="diagnosisForm">
+            <!-- 質問1: 基本情報 -->
             <div id="step1" class="step-section">
                 <div class="step-title">Q1. お客様の情報を教えてください</div>
                 
@@ -50,6 +54,7 @@
                 <button type="button" class="btn btn-primary w-100 py-2" onclick="nextStep(2)">次へ進む</button>
             </div>
 
+            <!-- 質問2: ご相談内容 -->
             <div id="step2" class="step-section d-none">
                 <div class="step-title">Q2. 本日のご相談内容はどちらでしょうか？</div>
                 
@@ -70,6 +75,7 @@
                 </div>
             </div>
 
+            <!-- 質問3: 次回車検時期 -->
             <div id="step3" class="step-section d-none">
                 <div class="step-title">Q3. あなたのお車の「次回車検」の年月を教えてください</div>
                 <div style="color: #e67e22; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px;">🔔 ※車検のうっかり忘れ防止に！満了日の2ヶ月前にLINEで個別にお知らせをお届けします。</div>
@@ -78,12 +84,14 @@
                     <div class="col-6">
                         <label for="shakenYear" class="form-label">年</label>
                         <select id="shakenYear" class="form-select bg-dark text-white border-secondary" style="padding: 10px;" onchange="updateMonths()">
-                            </select>
+                            <!-- JavaScriptで自動生成 -->
+                        </select>
                     </div>
                     <div class="col-6">
                         <label for="shakenMonth" class="form-label">月</label>
                         <select id="shakenMonth" class="form-select bg-dark text-white border-secondary" style="padding: 10px;">
-                            </select>
+                            <!-- 年に応じて自動切り替え -->
+                        </select>
                     </div>
                 </div>
 
@@ -99,4 +107,137 @@
             </div>
         </form>
 
+        <!-- 完了画面 -->
         <div id="thankYouSection" class="text-center d-none py-4">
+            <div class="mb-3" style="font-size: 3rem; color: #e67e22;">✓</div>
+            <h5>ご回答ありがとうございました！</h5>
+            <p class="text-muted small mt-3">ご相談データがストリートハウス湾岸通りへ送信されました。内容を確認し、スタッフよりLINEメッセージにて折り返しご連絡いたします。</p>
+            <div class="alert alert-secondary small text-start mt-4 bg-dark text-light border-secondary" style="font-size: 0.85rem;">
+                車検年月の登録に基づき、<strong>車検満了日の2ヶ月前</strong>など、最適なタイミングで事前のご案内をお送りさせていただきます。どうぞ安心してお待ちください。
+            </div>
+            <button class="btn btn-secondary w-100 mt-3" onclick="liff.closeWindow()">画面を閉じる</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 現在の基準年月（2026年5月）を取得
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+
+    function getReiwaString(year) {
+        const reiwaYear = year - 2018;
+        return `令和${reiwaYear}年`;
+    }
+
+    window.onload = function() {
+        const yearSelect = document.getElementById('shakenYear');
+        yearSelect.innerHTML = '<option value="">-- 年を選択 --</option>';
+        
+        for (let i = 0; i < 4; i++) {
+            const y = currentYear + i;
+            const option = document.createElement('option');
+            option.value = y;
+            option.textContent = `${y}年（${getReiwaString(y)}）`;
+            yearSelect.appendChild(option);
+        }
+        updateMonths();
+    };
+
+    // 年月連動システム
+    function updateMonths() {
+        const yearSelect = document.getElementById('shakenYear');
+        const monthSelect = document.getElementById('shakenMonth');
+        const selectedYear = parseInt(yearSelect.value);
+        
+        monthSelect.innerHTML = '<option value="">-- 月を選択 --</option>';
+        
+        if (!selectedYear) return;
+
+        let startMonth = 1;
+        let endMonth = 12;
+
+        if (selectedYear === currentYear) {
+            startMonth = currentMonth;
+        } else if (selectedYear === currentYear + 3) {
+            endMonth = currentMonth;
+        }
+
+        for (let m = startMonth; m <= endMonth; m++) {
+            const option = document.createElement('option');
+            option.value = `${m}月`;
+            option.textContent = `${m}月`;
+            monthSelect.appendChild(option);
+        }
+    }
+
+    // LIFF初期化
+    liff.init({ liffId: "2010239091-K5EeUmBh" }).then(() => {
+        if (liff.isLoggedIn()) {
+            liff.getProfile().then(profile => {
+                document.getElementById('userName').value = profile.displayName;
+            });
+        } else {
+            liff.login();
+        }
+    }).catch((err) => {
+        console.error('LIFF Initialization failed', err);
+    });
+
+    // ステップ切り替え（★お名前のエラーガードを完全に削除しました）
+    function nextStep(step) {
+        if (step === 2) {
+            const name = document.getElementById('userName').value.trim();
+            if (!name) { alert('お名前を入力してください。'); return; }
+        }
+        
+        document.querySelectorAll('.step-section').forEach(el => el.classList.add('d-none'));
+        document.getElementById(`step${step}`).classList.remove('d-none');
+        
+        const progressPercent = step === 2 ? 66 : 100;
+        document.getElementById('progressBar').style.width = `${progressPercent}%`;
+    }
+
+    function prevStep(step) {
+        document.querySelectorAll('.step-section').forEach(el => el.classList.add('d-none'));
+        document.getElementById(`step${step}`).classList.remove('d-none');
+        
+        const progressPercent = step === 1 ? 33 : 66;
+        document.getElementById('progressBar').style.width = `${progressPercent}%`;
+    }
+
+    // チャットへメッセージ送信
+    function submitDiagnosis() {
+        const name = document.getElementById('userName').value;
+        const car = document.getElementById('carName').value || "未入力";
+        const type = document.getElementById('consultType').value;
+        const yearVal = document.getElementById('shakenYear').value;
+        const month = document.getElementById('shakenMonth').value;
+        const msg = document.getElementById('userMessage').value || "特になし";
+        
+        if (!yearVal || !month) {
+            alert('次回車検の「年」と「月」をどちらも必ず選択してください。');
+            return;
+        }
+
+        const yearText = `${yearVal}年（${getReiwaString(parseInt(yearVal))}）`;
+        const textMessage = `【受付：ご相談・車検登録】\n\n・お名前: ${name}\n・お車の名前: ${car}\n・本日のご相談: ${type}\n・次回車検時期: ${yearText} ${month}\n・ご要望・症状:\n  ${msg}`;
+
+        liff.sendMessages([{
+            type: 'text',
+            text: textMessage
+        }]).then(() => {
+            document.getElementById('diagnosisForm').classList.add('d-none');
+            document.getElementById('progressBar').parentElement.classList.add('d-none');
+            document.getElementById('thankYouSection').classList.remove('d-none');
+        }).catch((err) => {
+            alert('送信に失敗しました。公式アカウントのチャット画面からもう一度お試しください。');
+            console.error(err);
+        });
+    }
+</script>
+
+</body>
+</html>
