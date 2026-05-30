@@ -1,0 +1,382 @@
+<!DOCTYPE html><html lang="ja"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>愛車のご相談・見積もり診断</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root {
+            --primary-color: #005bac; /* 信頼のブルー */
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: #fff;
+            min-height: 100vh;
+            box-sizing: border-box;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        /* プログレスバー */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            height: 6px;
+            border-radius: 3px;
+            margin-bottom: 25px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 16%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        /* ステップ（画面切替）の制御 */
+        .step {
+            display: none;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        .step.active {
+            display: flex;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            text-align: center;
+            line-height: 1.4;
+        }
+        /* 入力フォームのデザイン */
+        .form-group {
+            margin-bottom: 25px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            color: #444;
+        }
+        .form-control {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: #fff;
+        }
+        .form-control:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        /* ボタン・選択肢のデザイン */
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        .option-btn {
+            background-color: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+        .option-btn:active {
+            background-color: #f0f6fb;
+            border-color: var(--primary-color);
+            transform: scale(0.98);
+        }
+        .option-btn.selected {
+            background-color: #e6f0f9;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        /* 複数選択（チェックボックス風） */
+        .checkbox-list .option-btn {
+            justify-content: space-between;
+        }
+        .checkbox-list .option-btn::after {
+            content: '◯';
+            color: #ccc;
+        }
+        .checkbox-list .option-btn.selected::after {
+            content: '✓';
+            color: var(--primary-color);
+        }
+        /* 下部ナビゲーションボタン */
+        .nav-buttons {
+            margin-top: auto;
+            display: flex;
+            gap: 10px;
+            padding-top: 20px;
+        }
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+        }
+        .btn-back {
+            background-color: #e0e0e0;
+            color: #666;
+        }
+        .btn-next {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .btn-submit {
+            background-color: #005bac;
+            color: #fff;
+            width: 100%;
+        }
+        /* 完了画面 */
+        .thanks-msg {
+            text-align: center;
+            margin-top: 40px;
+        }
+        .thanks-icon {
+            font-size: 4rem;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+    </style></head><body><div class="container">
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- Q1. お客様情報（お名前・車検年月） -->
+    <div class="step active" id="step1">
+        <h2>Q1. あなたの情報を<br>教えてください</h2>
+        <div class="form-group">
+            <label for="userName">お名前（LINE名が自動入力されます）</label>
+            <input type="text" id="userName" class="form-control" placeholder="お名前を入力">
+        </div>
+        <div class="form-group">
+            <label for="shakenDate">次回の車検年月（だいたいでOK）</label>
+            <input type="month" id="shakenDate" class="form-control">
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-next" onclick="saveStep1()">次へ</button>
+        </div>
+    </div>
+
+    <!-- Q2. ご用件 -->
+    <div class="step" id="step2">
+        <h2>Q2. 本日のご相談内容は<br>どちらでしょうか？</h2>
+        <div class="options-list">
+            <button class="option-btn" onclick="selectSingle(2, '車検の見積もり・予約')">🚗 車検の見積もり・予約</button>
+            <button class="option-btn" onclick="selectSingle(2, '定期点検・オイル交換')">🔧 定期点検・オイル交換</button>
+            <button class="option-btn" onclick="selectSingle(2, 'キズ・ヘコミの修理（板金）')">✨ キズ・ヘコミの修理</button>
+            <button class="option-btn" onclick="selectSingle(2, '異音・トラブルの点検修理')">⚠️ 異音・トラブルの点検</button>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-back" onclick="prevStep(1)">戻る</button>
+        </div>
+    </div>
+
+    <!-- Q3. 車種タイプ -->
+    <div class="step" id="step3">
+        <h2>Q3. お乗りの（または検討中の）<br>お車はどのタイプですか？</h2>
+        <div class="options-list">
+            <button class="option-btn" onclick="selectSingle(3, '軽自動車')">🚙 軽自動車</button>
+            <button class="option-btn" onclick="selectSingle(3, 'コンパクトカー・コンパクトSUV')">🚗 コンパクトカー</button>
+            <button class="option-btn" onclick="selectSingle(3, 'ミニバン・大型SUV')">🚐 ミニバン・大型SUV</button>
+            <button class="option-btn" onclick="selectSingle(3, 'セダン・クーペ・その他')">🏎️ セダン・クーペ・その他</button>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-back" onclick="prevStep(2)">戻る</button>
+        </div>
+    </div>
+
+    <!-- Q4. 希望時期 -->
+    <div class="step" id="step4">
+        <h2>Q4. ご来店・作業のご希望時期は<br>いつ頃をお考えですか？</h2>
+        <div class="options-list">
+            <button class="option-btn" onclick="selectSingle(4, '今すぐ（1週間以内）')">🏃 今すぐ（1週間以内）</button>
+            <button class="option-btn" onclick="selectSingle(4, '今月中くらい')">📅 今月中くらい</button>
+            <button class="option-btn" onclick="selectSingle(4, '来月〜2ヶ月以内')">⏳ 来月〜2ヶ月以内</button>
+            <button class="option-btn" onclick="selectSingle(4, 'まずは見積もり・相談のみ')">💬 まずは見積もり・相談のみ</button>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-back" onclick="prevStep(3)">戻る</button>
+        </div>
+    </div>
+
+    <!-- Q5. 気になる症状（複数選択） -->
+    <div class="step" id="step5">
+        <h2>Q5. 特に気になる部分や<br>ご要望はありますか？（複数可）</h2>
+        <div class="options-list checkbox-list">
+            <button class="option-btn" onclick="toggleMulti(this, '費用をできるだけ抑えたい')">💰 費用をできるだけ抑えたい</button>
+            <button class="option-btn" onclick="toggleMulti(this, '代車を無料で借りたい')">🚗 代車を無料で借りたい</button>
+            <button class="option-btn" onclick="toggleMulti(this, 'ブレーキやエンジン音が気になる')">📢 異音やブレーキが気になる</button>
+            <button class="option-btn" onclick="toggleMulti(this, 'エアコンの効きや臭いが気になる')">❄️ エアコンの効き・臭い</button>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-back" onclick="prevStep(4)">戻る</button>
+            <button class="btn btn-next" onclick="nextStep(6)">次へ</button>
+        </div>
+    </div>
+
+    <!-- Q6. 完了画面 -->
+    <div class="step" id="step6">
+        <div class="thanks-msg">
+            <div class="thanks-icon">🛠️</div>
+            <h2>ご入力ありがとうございました！</h2>
+            <p style="color:#666; font-size:0.9rem; margin-bottom:30px;">下のボタンを押すと、この条件がLINEトークに送信され、スタッフより概算見積もりや空き状況をご案内いたします。</p>
+            <button class="btn btn-submit" onclick="submitData()">この条件で相談・見積もりする</button>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn btn-back" onclick="prevStep(5)">戻る</button>
+        </div>
+    </div></div><script>
+    // 回答データを格納するオブジェクト
+    let answers = {
+        name: '',
+        shaken: '',
+        purpose: '',
+        carType: '',
+        timing: '',
+        requests: []
+    };
+
+    // 初期化：LIFFの起動とユーザー情報の取得
+    document.addEventListener("DOMContentLoaded", function() {
+        liff.init({ liffId: "ユーザー毎のLIFF_IDをここに設定" })
+            .then(() => {
+                console.log("LIFF 初期化成功");
+                // LINEにログインしていればプロフィール（名前）を取得して自動入力
+                if (liff.isLoggedIn()) {
+                    liff.getProfile().then(profile => {
+                        document.getElementById('userName').value = profile.displayName;
+                    }).catch(err => console.error("プロフィール取得失敗", err));
+                }
+            })
+            .catch((err) => {
+                console.error("LIFF 初期化失敗", err);
+            });
+    });
+
+    // ステップ1（名前・車検年月）の保存と次へ
+    function saveStep1() {
+        const nameVal = document.getElementById('userName').value.trim();
+        const shakenVal = document.getElementById('shakenDate').value;
+
+        if(!nameVal) {
+            alert('お名前を入力してください。');
+            return;
+        }
+        
+        answers.name = nameVal;
+        
+        if(shakenVal) {
+            // 「2026-05」を「2026年05月」の形式に変換
+            const parts = shakenVal.split('-');
+            answers.shaken = `${parts[0]}年${parts[1]}月`;
+        } else {
+            answers.shaken = '不明・未入力';
+        }
+
+        nextStep(2);
+    }
+
+    // 単一選択ボタンの処理
+    function selectSingle(currentStep, value) {
+        if(currentStep === 2) answers.purpose = value;
+        if(currentStep === 3) answers.carType = value;
+        if(currentStep === 4) answers.timing = value;
+
+        const stepDiv = document.getElementById(`step${currentStep}`);
+        const buttons = stepDiv.querySelectorAll('.option-btn');
+        buttons.forEach(btn => btn.classList.remove('selected'));
+        event.currentTarget.classList.add('selected');
+
+        setTimeout(() => {
+            nextStep(currentStep + 1);
+        }, 200);
+    }
+
+    // 複数選択ボタンの処理
+    function toggleMulti(element, value) {
+        element.classList.toggle('selected');
+        const index = answers.requests.indexOf(value);
+        if (index > -1) {
+            answers.requests.splice(index, 1);
+        } else {
+            answers.requests.push(value);
+        }
+    }
+
+    // 画面遷移コントロール
+    function nextStep(stepNum) {
+        document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+        document.getElementById(`step${stepNum}`).classList.add('active');
+        
+        const percent = (stepNum / 6) * 100;
+        document.getElementById('progressBar').style.width = `${percent}%`;
+    }
+
+    function prevStep(stepNum) {
+        document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+        document.getElementById(`step${stepNum}`).classList.add('active');
+        
+        const percent = (stepNum / 6) * 100;
+        document.getElementById('progressBar').style.width = `${percent}%`;
+    }
+
+    // LINEへデータを送信して画面を閉じる
+    function submitData() {
+        const reqText = answers.requests.length > 0 ? answers.requests.join(', ') : '特になし';
+        
+        // LINEのトーク画面に自動投稿するテキストを作成
+        const messageText = `【整備・見積もり診断リクエスト】\n` +
+                            `■お名前: ${answers.name} 様\n` +
+                            `■次回の車検: ${answers.shaken}\n` +
+                            `■ご相談内容: ${answers.purpose}\n` +
+                            `■お車のタイプ: ${answers.carType}\n` +
+                            `■ご希望の時期: ${answers.timing}\n` +
+                            `■ご要望・気になる点: ${reqText}\n` +
+                            `予約の空き状況や、概算の見積もりを教えてください！`;
+
+        // LIFF経由でメッセージを送信
+        if (liff.isInClient()) {
+            liff.sendMessages([{
+                type: 'text',
+                text: messageText
+            }]).then(() => {
+                liff.closeWindow();
+            }).catch((err) => {
+                alert('メッセージの送信に失敗しました: ' + err);
+            });
+        } else {
+            alert("LINEアプリ以外で開いているため、本来はここでチャットに以下の内容が送信されて画面が閉じます：\n\n" + messageText);
+        }
+    }</script></body></html>
