@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>STREET HOUSE 杵築｜管理ダッシュボード</title>
+
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --side: #111827;
+      --side2: #1f2937;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --blue: #1e3a8a;
+      --green: #16a34a;
+      --red: #dc2626;
+      --orange: #ea580c;
+      --amber: #f59e0b;
+      --slate: #475569;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", Arial, sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font-family: inherit;
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 260px;
+      background: var(--side);
+      color: #fff;
+      position: fixed;
+      inset: 0 auto 0 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .brand {
+      padding: 22px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #e67e22, #8e4409);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      color: #9ca3af;
+      font-size: 11px;
+    }
+
+    .nav {
+      padding: 14px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav button {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: #d1d5db;
+      text-align: left;
+      padding: 12px 13px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .nav button:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .nav button.active {
+      background: #ffffff;
+      color: var(--side);
+    }
+
+    .side-footer {
+      margin-top: auto;
+      padding: 16px 18px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      color: #9ca3af;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .main {
+      margin-left: 260px;
+      width: calc(100% - 260px);
+      min-height: 100vh;
+    }
+
+    .topbar {
+      height: 68px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .topbar p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .content {
+      padding: 26px;
+      max-width: 1500px;
+    }
+
+    .section {
+      display: none;
+    }
+
+    .section.active {
+      display: block;
+      animation: fadeIn 0.18s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .grid4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-pad {
+      padding: 18px;
+    }
+
+    .kpi {
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kpi span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .kpi strong {
+      font-size: 28px;
+      letter-spacing: -0.5px;
+    }
+
+    .kpi small {
+      color: var(--muted);
+      display: block;
+      margin-top: 6px;
+    }
+
+    .icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 21px;
+      flex: 0 0 auto;
+    }
+
+    .bg-blue { background: #dbeafe; color: #1e40af; }
+    .bg-red { background: #fee2e2; color: #b91c1c; }
+    .bg-green { background: #dcfce7; color: #15803d; }
+    .bg-amber { background: #fef3c7; color: #b45309; }
+    .bg-orange { background: #ffedd5; color: #c2410c; }
+    .bg-slate { background: #e2e8f0; color: #334155; }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 0;
+      margin-bottom: 12px;
+    }
+
+    .panel-title h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .panel-title p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 11px;
+      text-align: left;
+      background: #f8fafc;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 11px 12px;
+      white-space: nowrap;
+    }
+
+    td {
+      border-bottom: 1px solid #eef2f7;
+      padding: 12px;
+      vertical-align: top;
+    }
+
+    tr:hover td {
+      background: #fcfcfd;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-red { background: #fee2e2; color: #b91c1c; }
+    .badge-orange { background: #ffedd5; color: #c2410c; }
+    .badge-slate { background: #e2e8f0; color: #334155; }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .toolbar-left,
+    .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 11px;
+      padding: 10px 13px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-slate { background: #e2e8f0; color: #334155; }
+    .btn-dark { background: var(--side); color: #fff; }
+
+    .btn:hover {
+      filter: brightness(0.96);
+    }
+
+    input,
+    select,
+    textarea {
+      border: 1px solid #d1d5db;
+      border-radius: 11px;
+      padding: 10px 11px;
+      background: #fff;
+      color: #111827;
+      outline: none;
+      font-size: 13px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(30,58,138,0.12);
+    }
+
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .input-sm {
+      min-width: 170px;
+    }
+
+    .token-box {
+      display: none;
+      padding: 14px;
+      border-radius: 14px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      margin-bottom: 16px;
+    }
+
+    .token-box.active {
+      display: block;
+    }
+
+    .token-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .token-row input {
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .alert {
+      display: none;
+      padding: 13px 14px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert-error {
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .alert-ok {
+      background: #dcfce7;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+      padding: 0 18px 18px;
+    }
+
+    .list-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 13px;
+      background: #fff;
+    }
+
+    .list-item-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .list-item strong {
+      font-size: 14px;
+    }
+
+    .message-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      border-radius: 12px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      color: #334155;
+      font-size: 12px;
+      max-width: 520px;
+    }
+
+    .day-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .day-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .day-card h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    .day-card label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 800;
+    }
+
+    .day-card input[type="time"],
+    .day-card input[type="text"] {
+      width: 100%;
+      margin-bottom: 7px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+
+    .form-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .form-field input,
+    .form-field select {
+      width: 100%;
+    }
+
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .mobile-menu {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      .mobile-menu {
+        display: inline-flex;
+      }
+
+      .grid4,
+      .grid3,
+      .grid2,
+      .day-grid,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .content {
+        padding: 16px;
+      }
+
+      .topbar {
+        padding: 0 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <div class="brand-row">
+          <div class="logo">SH</div>
+          <div>
+            <h1>STREET HOUSE 杵築<br>管理ダッシュボード</h1>
+            <p>LINE公式 DEMO / ksh_demo_</p>
+          </div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button id="nav-dashboard" class="active" onclick="switchTab('dashboard')">📊 ダッシュボード</button>
+        <button id="nav-inquiries" onclick="switchTab('inquiries')">📝 相談一覧</button>
+        <button id="nav-reservations" onclick="switchTab('reservations')">📅 入庫スケジュール</button>
+        <button id="nav-customers" onclick="switchTab('customers')">👥 顧客・車両管理</button>
+        <button id="nav-triggers" onclick="switchTab('triggers')">🔔 未来の売上トリガー</button>
+        <button id="nav-settings" onclick="switchTab('settings')">⚙️ 店舗設定</button>
+      </nav>
+
+      <div class="side-footer">
+        Worker:<br>
+        ksh-line-demo-api<br><br>
+        Supabase:<br>
+        ksh_demo_ 系のみ操作
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <button class="btn btn-slate mobile-menu" onclick="toggleSidebar()">☰</button>
+          <h2 id="pageTitle">ダッシュボード</h2>
+          <p id="pageDesc">本日の相談・入庫予定・未来の売上候補を確認します。</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-slate" onclick="toggleTokenBox()">認証設定</button>
+          <button class="btn btn-primary" onclick="refreshCurrentTab()">更新</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div id="tokenBox" class="token-box">
+          <strong>ダッシュボード認証トークン</strong>
+          <div class="small muted">
+            DEMO用です。本番ではCloudflare Accessなどのログイン制限を追加してください。
+          </div>
+          <div class="token-row">
+            <input id="tokenInput" type="text" placeholder="DASHBOARD_TOKEN" />
+            <button class="btn btn-primary" onclick="saveToken()">保存</button>
+            <button class="btn btn-slate" onclick="resetToken()">初期値に戻す</button>
+          </div>
+        </div>
+
+        <div id="alertBox" class="alert"></div>
+
+        <!-- DASHBOARD -->
+        <section id="section-dashboard" class="section active">
+          <div class="grid4">
+            <div class="card kpi">
+              <div>
+                <span>本日の相談</span>
+                <strong id="kpiTodayInquiries">-</strong>
+                <small>LIFFからの相談数</small>
+              </div>
+              <div class="icon bg-blue">📝</div>
+            </div>
+
+            <div class="card kpi">
+              <div>
+                <span>本日の入庫予定</span>
+                <strong id="kpiTodayReservations">-</strong>
+                <small>予約・入庫予定</small>
+              </div>
+              <div class="icon bg-green">📅</div>
+            </div>
+
+            <div class="card kpi">
+              <div>
+                <span>未対応相談</span>
+                <strong id="kpiPendingInquiries">-</strong>
+                <small>新規・確認中・見積もり中</small>
+              </div>
+              <div class="icon bg-red">⚠️</div>
+            </div>
+
+            <div class="card kpi">
+              <div>
+                <span>今月の見込み売上</span>
+                <strong id="kpiMonthlyAmount">-</strong>
+                <small>相談ベースの概算</small>
+              </div>
+              <div class="icon bg-amber">¥</div>
+            </div>
+          </div>
+
+          <div style="height:16px"></div>
+
+          <div class="grid2">
+            <div class="card">
+              <div class="panel-title">
+                <div>
+                  <h3>最近の相談</h3>
+                  <p>新しい相談から順に表示</p>
+                </div>
+                <button class="btn btn-slate" onclick="switchTab('inquiries')">詳細</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>日時</th>
+                      <th>顧客</th>
+                      <th>車両</th>
+                      <th>内容</th>
+                      <th>状態</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboardRecentInquiries"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="panel-title">
+                <div>
+                  <h3>本日の入庫予定</h3>
+                  <p>今日の予約・入庫予定</p>
+                </div>
+                <button class="btn btn-slate" onclick="switchTab('reservations')">詳細</button>
+              </div>
+              <div id="dashboardTodayReservations" class="list"></div>
+            </div>
+          </div>
+
+          <div style="height:16px"></div>
+
+          <div class="grid3">
+            <div class="card kpi">
+              <div>
+                <span>LINE顧客数</span>
+                <strong id="kpiLineMembers">-</strong>
+                <small>登録済み顧客</small>
+              </div>
+              <div class="icon bg-green">💬</div>
+            </div>
+
+            <div class="card kpi">
+              <div>
+                <span>未来の売上候補</span>
+                <strong id="kpiFutureTriggers">-</strong>
+                <small>車検・オイル・休眠</small>
+              </div>
+              <div class="icon bg-orange">🔔</div>
+            </div>
+
+            <div class="card kpi">
+              <div>
+                <span>通知候補</span>
+                <strong id="kpiReminderQueue">-</strong>
+                <small>LINE送信候補</small>
+              </div>
+              <div class="icon bg-slate">📨</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- INQUIRIES -->
+        <section id="section-inquiries" class="section">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <select id="inquiryStatusFilter" onchange="loadInquiries()">
+                <option value="">すべての状態</option>
+                <option value="新規相談">新規相談</option>
+                <option value="確認中">確認中</option>
+                <option value="見積もり中">見積もり中</option>
+                <option value="見積もり後未返信">見積もり後未返信</option>
+                <option value="入庫予約済み">入庫予約済み</option>
+                <option value="作業完了">作業完了</option>
+                <option value="保留">保留</option>
+              </select>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-primary" onclick="loadInquiries()">相談一覧を更新</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="panel-title">
+              <div>
+                <h3>相談一覧</h3>
+                <p>LIFFフォームから入った相談を管理します。</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>受付日時</th>
+                    <th>顧客</th>
+                    <th>車両</th>
+                    <th>相談内容</th>
+                    <th>希望入庫日</th>
+                    <th>状態</th>
+                    <th>優先度</th>
+                    <th>店舗メモ</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="inquiryTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- RESERVATIONS -->
+        <section id="section-reservations" class="section">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input id="reservationFrom" type="date" />
+              <input id="reservationTo" type="date" />
+              <button class="btn btn-primary" onclick="loadReservations()">表示</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="panel-title">
+              <div>
+                <h3>入庫スケジュール</h3>
+                <p>予約・入庫予定を確認します。</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>日付</th>
+                    <th>時間</th>
+                    <th>顧客</th>
+                    <th>車両</th>
+                    <th>作業内容</th>
+                    <th>状態</th>
+                    <th>見込み金額</th>
+                    <th>メモ</th>
+                  </tr>
+                </thead>
+                <tbody id="reservationTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- CUSTOMERS -->
+        <section id="section-customers" class="section">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話で検索" />
+              <button class="btn btn-primary" onclick="loadCustomers()">検索</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="panel-title">
+              <div>
+                <h3>顧客・車両管理</h3>
+                <p>LINE顧客と車両情報を確認します。</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>顧客</th>
+                    <th>電話</th>
+                    <th>LINE</th>
+                    <th>ステータス</th>
+                    <th>車両</th>
+                    <th>次回車検</th>
+                    <th>最終来店</th>
+                  </tr>
+                </thead>
+                <tbody id="customerTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TRIGGERS -->
+        <section id="section-triggers" class="section">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <button class="btn btn-primary" onclick="loadTriggers()">トリガー更新</button>
+              <button class="btn btn-orange" onclick="generateReminders()">通知候補を生成</button>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="card">
+              <div class="panel-title">
+                <div>
+                  <h3>未来の売上トリガー</h3>
+                  <p>車検・オイル交換・休眠顧客を自動抽出</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>種別</th>
+                      <th>顧客</th>
+                      <th>車両</th>
+                      <th>日付</th>
+                      <th>理由</th>
+                    </tr>
+                  </thead>
+                  <tbody id="triggerTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="panel-title">
+                <div>
+                  <h3>LINE通知候補</h3>
+                  <p>送信前のメッセージ候補</p>
+                </div>
+              </div>
+              <div id="reminderList" class="list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section id="section-settings" class="section">
+          <div class="grid2">
+            <div class="card card-pad">
+              <h3 style="margin-top:0">曜日別の営業設定</h3>
+              <p class="small muted">定休日にチェックを入れると、LIFFの入庫希望日カレンダーで選択できなくなります。</p>
+
+              <div id="businessDaysGrid" class="day-grid"></div>
+
+              <div style="margin-top:14px">
+                <button class="btn btn-primary" onclick="saveBusinessDays()">営業設定を保存</button>
+              </div>
+            </div>
+
+            <div class="card card-pad">
+              <h3 style="margin-top:0">臨時休み・特別営業日</h3>
+              <p class="small muted">年末年始・イベント・急な休みを登録できます。</p>
+
+              <div class="form-grid">
+                <div class="form-field">
+                  <label>日付</label>
+                  <input id="specialDate" type="date" />
+                </div>
+                <div class="form-field">
+                  <label>区分</label>
+                  <select id="specialIsClosed">
+                    <option value="true">臨時休業</option>
+                    <option value="false">特別営業</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>理由</label>
+                  <input id="specialReason" type="text" placeholder="例：臨時休業" />
+                </div>
+                <div class="form-field">
+                  <button class="btn btn-green" onclick="addSpecialDay()">追加</button>
+                </div>
+              </div>
+
+              <div style="height:14px"></div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>日付</th>
+                      <th>区分</th>
+                      <th>理由</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="specialDaysTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
+    const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
+
+    let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
+    let currentTab = "dashboard";
+
+    let dashboardCache = null;
+    let inquiriesCache = [];
+    let customersCache = [];
+    let triggersCache = [];
+    let remindersCache = [];
+    let businessDaysCache = [];
+    let specialDaysCache = [];
+
+    const pageMeta = {
+      dashboard: {
+        title: "ダッシュボード",
+        desc: "本日の相談・入庫予定・未来の売上候補を確認します。"
+      },
+      inquiries: {
+        title: "相談一覧",
+        desc: "LIFFから入った相談を管理します。"
+      },
+      reservations: {
+        title: "入庫スケジュール",
+        desc: "入庫予定・作業予定を確認します。"
+      },
+      customers: {
+        title: "顧客・車両管理",
+        desc: "LINE顧客と車両情報を確認します。"
+      },
+      triggers: {
+        title: "未来の売上トリガー",
+        desc: "車検・オイル交換・休眠顧客の営業候補を確認します。"
+      },
+      settings: {
+        title: "店舗設定",
+        desc: "定休日・臨時休みを管理します。"
+      }
+    };
+
+    window.addEventListener("load", async () => {
+      document.getElementById("tokenInput").value = dashboardToken;
+      initReservationDates();
+      await loadDashboard();
+    });
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("open");
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+
+      document.querySelectorAll(".section").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".nav button").forEach(el => el.classList.remove("active"));
+
+      document.getElementById(`section-${tab}`).classList.add("active");
+      document.getElementById(`nav-${tab}`).classList.add("active");
+
+      document.getElementById("pageTitle").textContent = pageMeta[tab].title;
+      document.getElementById("pageDesc").textContent = pageMeta[tab].desc;
+
+      document.getElementById("sidebar").classList.remove("open");
+
+      if (tab === "dashboard") loadDashboard();
+      if (tab === "inquiries") loadInquiries();
+      if (tab === "reservations") loadReservations();
+      if (tab === "customers") loadCustomers();
+      if (tab === "triggers") loadTriggers();
+      if (tab === "settings") loadSettings();
+    }
+
+    function refreshCurrentTab() {
+      switchTab(currentTab);
+    }
+
+    function toggleTokenBox() {
+      document.getElementById("tokenBox").classList.toggle("active");
+    }
+
+    function saveToken() {
+      dashboardToken = document.getElementById("tokenInput").value.trim();
+      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      showOk("認証トークンを保存しました。");
+    }
+
+    function resetToken() {
+      dashboardToken = DEFAULT_DASHBOARD_TOKEN;
+      document.getElementById("tokenInput").value = dashboardToken;
+      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      showOk("認証トークンを初期値に戻しました。");
+    }
+
+    async function api(path, options = {}) {
+      const url = `${WORKER_API_BASE}${path}`;
+
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Dashboard-Token": dashboardToken,
+        ...(options.headers || {})
+      };
+
+      const response = await fetch(url, {
+        ...options,
+        headers
+      });
+
+      const text = await response.text();
+      let data = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { ok: false, message: text };
+      }
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.message || `API error: ${response.status}`);
+      }
+
+      return data;
+    }
+
+    async function loadDashboard() {
+      setLoading(true);
+      clearAlert();
+
+      try {
+        const data = await api("/api/dashboard");
+        dashboardCache = data;
+
+        const s = data.summary || {};
+
+        setText("kpiTodayInquiries", `${s.today_inquiries ?? 0}件`);
+        setText("kpiTodayReservations", `${s.today_reservations ?? 0}件`);
+        setText("kpiPendingInquiries", `${s.pending_inquiries ?? 0}件`);
+        setText("kpiMonthlyAmount", yen(s.monthly_estimated_amount || 0));
+        setText("kpiLineMembers", `${s.line_members ?? 0}名`);
+        setText("kpiFutureTriggers", `${s.future_triggers ?? 0}件`);
+        setText("kpiReminderQueue", `${(data.reminderQueue || []).length}件`);
+
+        renderDashboardRecentInquiries(data.recentInquiries || []);
+        renderDashboardTodayReservations(data.todayReservations || []);
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderDashboardRecentInquiries(rows) {
+      const body = document.getElementById("dashboardRecentInquiries");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="5" class="muted">相談はありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.slice(0, 8).map(row => `
+        <tr>
+          <td>${escapeHtml(formatDateTime(row.created_at))}</td>
+          <td>
+            <strong>${escapeHtml(row.customer_name_snapshot || row.customer?.name || "未入力")}</strong><br>
+            <span class="muted small">${escapeHtml(row.phone_snapshot || row.customer?.phone || "")}</span>
+          </td>
+          <td>${escapeHtml(row.car_name_snapshot || row.vehicle?.car_name || "未入力")}</td>
+          <td>${badgeConsult(row.consult_type)}</td>
+          <td>${badgeStatus(row.status)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderDashboardTodayReservations(rows) {
+      const box = document.getElementById("dashboardTodayReservations");
+
+      if (!rows.length) {
+        box.innerHTML = `<div class="list-item muted">本日の入庫予定はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = rows.map(row => `
+        <div class="list-item">
+          <div class="list-item-head">
+            <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0,5) : "時間未定")} / ${escapeHtml(row.work_type || "")}</strong>
+            ${badgeStatus(row.status)}
+          </div>
+          <div class="small">
+            ${escapeHtml(row.customer?.name || "未入力")} / ${escapeHtml(row.vehicle?.car_name || "車両未入力")}
+          </div>
+          <div class="muted small">${escapeHtml(row.memo || "")}</div>
+        </div>
+      `).join("");
+    }
+
+    async function loadInquiries() {
+      setLoading(true);
+      clearAlert();
+
+      try {
+        const status = document.getElementById("inquiryStatusFilter").value;
+        const path = status
+          ? `/api/inquiries?limit=200&status=${encodeURIComponent(status)}`
+          : `/api/inquiries?limit=200`;
+
+        const data = await api(path);
+        inquiriesCache = data.inquiries || [];
+        renderInquiries(inquiriesCache);
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderInquiries(rows) {
+      const body = document.getElementById("inquiryTableBody");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="9" class="muted">相談はありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(row => `
+        <tr>
+          <td>${escapeHtml(formatDateTime(row.created_at))}</td>
+          <td>
+            <strong>${escapeHtml(row.customer_name_snapshot || row.customer?.name || "未入力")}</strong><br>
+            <span class="muted small">${escapeHtml(row.phone_snapshot || row.customer?.phone || "")}</span>
+          </td>
+          <td>
+            ${escapeHtml(row.car_name_snapshot || row.vehicle?.car_name || "未入力")}<br>
+            <span class="muted small">${escapeHtml(row.vehicle?.plate_last4 ? "下4桁 " + row.vehicle.plate_last4 : "")}</span>
+          </td>
+          <td>
+            ${badgeConsult(row.consult_type)}
+            <div class="message-box" style="margin-top:8px">${escapeHtml(row.message || "内容なし")}</div>
+          </td>
+          <td>${escapeHtml(row.preferred_visit_date ? formatDate(row.preferred_visit_date) : "未入力")}</td>
+          <td>
+            <select id="status-${row.id}">
+              ${statusOptions(row.status)}
+            </select>
+          </td>
+          <td>
+            <select id="priority-${row.id}">
+              ${priorityOptions(row.priority)}
+            </select>
+          </td>
+          <td>
+            <textarea id="memo-${row.id}" placeholder="店舗メモ">${escapeHtml(row.shop_memo || "")}</textarea>
+          </td>
+          <td>
+            <button class="btn btn-primary" onclick="updateInquiry('${row.id}')">保存</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function updateInquiry(id) {
+      clearAlert();
+
+      try {
+        const payload = {
+          status: document.getElementById(`status-${id}`).value,
+          priority: document.getElementById(`priority-${id}`).value,
+          shopMemo: document.getElementById(`memo-${id}`).value
+        };
+
+        await api(`/api/inquiries/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+
+        showOk("相談情報を更新しました。");
+        await loadInquiries();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    async function loadReservations() {
+      setLoading(true);
+      clearAlert();
+
+      try {
+        const from = document.getElementById("reservationFrom").value;
+        const to = document.getElementById("reservationTo").value;
+
+        const data = await api(`/api/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+        renderReservations(data.reservations || []);
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderReservations(rows) {
+      const body = document.getElementById("reservationTableBody");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="8" class="muted">入庫予定はありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(row => `
+        <tr>
+          <td>${escapeHtml(formatDate(row.reservation_date))}</td>
+          <td>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0,5) : "未定")}</td>
+          <td>${escapeHtml(row.customer?.name || "未入力")}</td>
+          <td>${escapeHtml(row.vehicle?.car_name || "未入力")}</td>
+          <td>${escapeHtml(row.work_type || "")}</td>
+          <td>${badgeStatus(row.status)}</td>
+          <td>${yen(row.estimated_amount || 0)}</td>
+          <td>${escapeHtml(row.memo || "")}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadCustomers() {
+      setLoading(true);
+      clearAlert();
+
+      try {
+        const keyword = document.getElementById("customerKeyword").value.trim();
+        const data = await api(`/api/customers?keyword=${encodeURIComponent(keyword)}&limit=300`);
+        customersCache = data.customers || [];
+        renderCustomers(customersCache);
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderCustomers(rows) {
+      const body = document.getElementById("customerTableBody");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="7" class="muted">顧客はありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(customer => {
+        const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+        const vehicleText = vehicles.length
+          ? vehicles.map(v => `${v.car_name || v.maker || ""} ${v.model || ""}`).join("<br>")
+          : "未入力";
+
+        const shakenText = vehicles.length
+          ? vehicles.map(v => v.next_shaken_date ? formatDate(v.next_shaken_date) : "未入力").join("<br>")
+          : "未入力";
+
+        return `
+          <tr>
+            <td>
+              <strong>${escapeHtml(customer.name || "未入力")}</strong><br>
+              <span class="muted small">${escapeHtml(customer.line_display_name || "")}</span>
+            </td>
+            <td>${escapeHtml(customer.phone || "未入力")}</td>
+            <td>
+              <span class="muted small">${escapeHtml(customer.line_user_id || "未連携")}</span>
+            </td>
+            <td>${badgeStatus(customer.status || "見込み客")}</td>
+            <td>${vehicleText}</td>
+            <td>${shakenText}</td>
+            <td>${escapeHtml(customer.last_visit_date ? formatDate(customer.last_visit_date) : "未入力")}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadTriggers() {
+      setLoading(true);
+      clearAlert();
+
+      try {
+        const data = await api("/api/triggers");
+        triggersCache = data.salesTriggers || [];
+        remindersCache = data.reminderQueue || [];
+
+        renderTriggers(triggersCache);
+        renderReminders(remindersCache);
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderTriggers(rows) {
+      const body = document.getElementById("triggerTableBody");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="5" class="muted">売上トリガーはありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(row => `
+        <tr>
+          <td>${badgeTrigger(row.trigger_type)}</td>
+          <td>${escapeHtml(row.customer_name || "未入力")}</td>
+          <td>${escapeHtml(row.vehicle_name || "未入力")}</td>
+          <td>${escapeHtml(row.trigger_date ? formatDate(row.trigger_date) : "")}</td>
+          <td>
+            ${escapeHtml(row.reason || "")}
+            <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function renderReminders(rows) {
+      const box = document.getElementById("reminderList");
+
+      if (!rows.length) {
+        box.innerHTML = `<div class="list-item muted">通知候補はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = rows.map(row => `
+        <div class="list-item">
+          <div class="list-item-head">
+            <strong>${escapeHtml(row.customer?.name || "未入力")} / ${escapeHtml(row.reminder_type || "")}</strong>
+            ${badgeStatus(row.status)}
+          </div>
+          <div class="small muted">
+            対象日：${escapeHtml(row.target_date ? formatDate(row.target_date) : "")}
+            / 車両：${escapeHtml(row.vehicle?.car_name || "未入力")}
+          </div>
+          <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
+          <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+            <button class="btn btn-slate" onclick="copyTextById('${row.id}')">文面コピー</button>
+            <button class="btn btn-green" onclick="sendReminderLine('${row.id}')">LINE送信</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function generateReminders() {
+      clearAlert();
+
+      try {
+        const data = await api("/api/reminders/generate", { method: "POST" });
+        showOk(`通知候補を生成しました。件数：${data.generated || 0}`);
+        await loadTriggers();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    async function copyTextById(id) {
+      const row = remindersCache.find(r => r.id === id);
+      if (!row) return;
+
+      await navigator.clipboard.writeText(row.message_preview || "");
+      showOk("メッセージ文面をコピーしました。");
+    }
+
+    async function sendReminderLine(id) {
+      clearAlert();
+
+      const row = remindersCache.find(r => r.id === id);
+      if (!row) return;
+
+      const lineUserId = row.customer?.line_user_id || "";
+      const customerId = row.customer_id || "";
+      const message = row.message_preview || "";
+
+      if (!lineUserId) {
+        showError("この顧客はLINEユーザーIDがないため、直接送信できません。文面コピーを使ってください。");
+        return;
+      }
+
+      if (!confirm("このLINEメッセージを送信しますか？")) return;
+
+      try {
+        await api("/api/line/push", {
+          method: "POST",
+          body: JSON.stringify({
+            reminderId: id,
+            customerId,
+            lineUserId,
+            message
+          })
+        });
+
+        showOk("LINEメッセージを送信しました。");
+        await loadTriggers();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    async function loadSettings() {
+      setLoading(true);
+      clearAlert();
+
+      try {
+        const [business, special] = await Promise.all([
+          api("/api/business-days"),
+          api("/api/special-days")
+        ]);
+
+        businessDaysCache = business.businessDays || [];
+        specialDaysCache = special.specialDays || [];
+
+        renderBusinessDays(businessDaysCache);
+        renderSpecialDays(specialDaysCache);
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderBusinessDays(rows) {
+      const box = document.getElementById("businessDaysGrid");
+
+      const byDow = {};
+      rows.forEach(r => byDow[Number(r.day_of_week)] = r);
+
+      const names = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+
+      box.innerHTML = names.map((name, dow) => {
+        const row = byDow[dow] || {
+          day_of_week: dow,
+          day_name: name,
+          is_closed: false,
+          open_time: "10:00",
+          close_time: "19:00",
+          memo: ""
+        };
+
+        return `
+          <div class="day-card">
+            <h4>${name}</h4>
+            <label>
+              <input id="bd-closed-${dow}" type="checkbox" ${row.is_closed ? "checked" : ""}>
+              定休日
+            </label>
+            <input id="bd-open-${dow}" type="time" value="${escapeHtml(timeShort(row.open_time || "10:00"))}">
+            <input id="bd-close-${dow}" type="time" value="${escapeHtml(timeShort(row.close_time || "19:00"))}">
+            <input id="bd-memo-${dow}" type="text" placeholder="メモ" value="${escapeHtml(row.memo || "")}">
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function saveBusinessDays() {
+      clearAlert();
+
+      const names = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+
+      const businessDays = names.map((name, dow) => ({
+        dayOfWeek: dow,
+        dayName: name,
+        isClosed: document.getElementById(`bd-closed-${dow}`).checked,
+        openTime: document.getElementById(`bd-open-${dow}`).value,
+        closeTime: document.getElementById(`bd-close-${dow}`).value,
+        memo: document.getElementById(`bd-memo-${dow}`).value
+      }));
+
+      try {
+        await api("/api/business-days", {
+          method: "PATCH",
+          body: JSON.stringify({ businessDays })
+        });
+
+        showOk("曜日別の営業設定を保存しました。LIFFカレンダーにも反映されます。");
+        await loadSettings();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    function renderSpecialDays(rows) {
+      const body = document.getElementById("specialDaysTableBody");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="4" class="muted">臨時休みは登録されていません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(row => `
+        <tr>
+          <td>${escapeHtml(formatDate(row.target_date))}</td>
+          <td>${row.is_closed ? badgeStatus("臨時休業") : badgeStatus("特別営業")}</td>
+          <td>${escapeHtml(row.reason || row.memo || "")}</td>
+          <td>
+            <button class="btn btn-red" onclick="deleteSpecialDay('${row.id}')">削除</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function addSpecialDay() {
+      clearAlert();
+
+      const targetDate = document.getElementById("specialDate").value;
+      const isClosed = document.getElementById("specialIsClosed").value === "true";
+      const reason = document.getElementById("specialReason").value.trim() || (isClosed ? "臨時休業" : "特別営業");
+
+      if (!targetDate) {
+        showError("日付を選択してください。");
+        return;
+      }
+
+      try {
+        await api("/api/special-days", {
+          method: "POST",
+          body: JSON.stringify({
+            targetDate,
+            isClosed,
+            reason
+          })
+        });
+
+        document.getElementById("specialDate").value = "";
+        document.getElementById("specialReason").value = "";
+
+        showOk("臨時休み・特別営業日を追加しました。LIFFカレンダーにも反映されます。");
+        await loadSettings();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    async function deleteSpecialDay(id) {
+      if (!confirm("この臨時休み設定を削除しますか？")) return;
+
+      clearAlert();
+
+      try {
+        await api(`/api/special-days/${id}`, {
+          method: "DELETE"
+        });
+
+        showOk("削除しました。");
+        await loadSettings();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    function initReservationDates() {
+      const today = new Date();
+      const to = addDays(today, 30);
+
+      document.getElementById("reservationFrom").value = dateYmd(today);
+      document.getElementById("reservationTo").value = dateYmd(to);
+    }
+
+    function statusOptions(current) {
+      const list = [
+        "新規相談",
+        "確認中",
+        "見積もり中",
+        "見積もり後未返信",
+        "入庫予約済み",
+        "作業完了",
+        "保留",
+        "失注"
+      ];
+
+      return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+    }
+
+    function priorityOptions(current) {
+      const list = ["低", "通常", "高"];
+
+      return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+    }
+
+    function badgeStatus(status) {
+      const s = status || "";
+      let cls = "badge-slate";
+
+      if (s.includes("新規") || s.includes("確認") || s.includes("予約")) cls = "badge-blue";
+      if (s.includes("完了") || s.includes("送信済") || s.includes("特別営業")) cls = "badge-green";
+      if (s.includes("未返信") || s.includes("臨時休業") || s.includes("失注")) cls = "badge-red";
+      if (s.includes("見積") || s.includes("保留") || s.includes("pending")) cls = "badge-orange";
+
+      return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
+    }
+
+    function badgeConsult(type) {
+      const s = type || "";
+      let cls = "badge-slate";
+
+      if (s.includes("車検")) cls = "badge-blue";
+      if (s.includes("オイル") || s.includes("点検")) cls = "badge-green";
+      if (s.includes("カスタム") || s.includes("パーツ")) cls = "badge-orange";
+      if (s.includes("異音") || s.includes("修理") || s.includes("キズ")) cls = "badge-red";
+
+      return `<span class="badge ${cls}">${escapeHtml(s || "未入力")}</span>`;
+    }
+
+    function badgeTrigger(type) {
+      const s = type || "";
+      let cls = "badge-slate";
+
+      if (s.includes("車検")) cls = "badge-blue";
+      if (s.includes("オイル")) cls = "badge-green";
+      if (s.includes("休眠")) cls = "badge-orange";
+
+      return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
+    }
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+
+    function showError(message) {
+      const box = document.getElementById("alertBox");
+      box.className = "alert alert-error show";
+      box.textContent = message;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function showOk(message) {
+      const box = document.getElementById("alertBox");
+      box.className = "alert alert-ok show";
+      box.textContent = message;
+      setTimeout(clearAlert, 4000);
+    }
+
+    function clearAlert() {
+      const box = document.getElementById("alertBox");
+      box.className = "alert";
+      box.textContent = "";
+    }
+
+    function setLoading(value) {
+      document.querySelector(".content").classList.toggle("loading", value);
+    }
+
+    function yen(value) {
+      return Number(value || 0).toLocaleString("ja-JP", {
+        style: "currency",
+        currency: "JPY",
+        maximumFractionDigits: 0
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatDate(value) {
+      if (!value) return "";
+      const [y, m, d] = String(value).slice(0,10).split("-");
+      if (!y || !m || !d) return value;
+      return `${Number(y)}年${Number(m)}月${Number(d)}日`;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+
+      return new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(date);
+    }
+
+    function addDays(date, days) {
+      const copy = new Date(date.getTime());
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function dateYmd(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function timeShort(value) {
+      if (!value) return "";
+      return String(value).slice(0,5);
+    }
+  </script>
+</body>
+</html>
