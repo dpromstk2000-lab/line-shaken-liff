@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>STREET HOUSE 杵築｜管理ダッシュボード</title>
+  <title>STREET HOUSE 杵築｜オーナーダッシュボード</title>
 
   <style>
     :root {
-      --bg: #f6f7fb;
+      --bg: #f5f6fa;
       --side: #111827;
       --card: #ffffff;
       --text: #111827;
@@ -19,6 +19,7 @@
       --red: #dc2626;
       --orange: #ea580c;
       --amber: #f59e0b;
+      --purple: #7c3aed;
       --slate: #475569;
       --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
     }
@@ -54,12 +55,12 @@
       inset: 0 auto 0 0;
       display: flex;
       flex-direction: column;
-      z-index: 10;
+      z-index: 20;
     }
 
     .brand {
       padding: 22px 20px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
 
     .brand-row {
@@ -86,7 +87,7 @@
     }
 
     .brand p {
-      margin: 2px 0 0;
+      margin: 3px 0 0;
       color: #9ca3af;
       font-size: 11px;
     }
@@ -105,13 +106,13 @@
       text-align: left;
       padding: 12px 13px;
       border-radius: 12px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
       font-size: 14px;
     }
 
     .nav button:hover {
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255,255,255,0.08);
     }
 
     .nav button.active {
@@ -122,7 +123,7 @@
     .side-footer {
       margin-top: auto;
       padding: 16px 18px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(255,255,255,0.08);
       color: #9ca3af;
       font-size: 11px;
       line-height: 1.6;
@@ -144,7 +145,7 @@
       padding: 12px 26px;
       position: sticky;
       top: 0;
-      z-index: 5;
+      z-index: 10;
       gap: 12px;
     }
 
@@ -154,7 +155,7 @@
     }
 
     .topbar p {
-      margin: 2px 0 0;
+      margin: 3px 0 0;
       color: var(--muted);
       font-size: 12px;
     }
@@ -168,7 +169,7 @@
 
     .content {
       padding: 26px;
-      max-width: 1500px;
+      max-width: 1560px;
     }
 
     .section {
@@ -181,14 +182,8 @@
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(4px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .grid4 {
@@ -230,7 +225,7 @@
     .kpi span {
       color: var(--muted);
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 900;
       display: block;
       margin-bottom: 6px;
     }
@@ -244,6 +239,7 @@
       color: var(--muted);
       display: block;
       margin-top: 6px;
+      line-height: 1.45;
     }
 
     .icon {
@@ -262,6 +258,7 @@
     .bg-green { background: #dcfce7; color: #15803d; }
     .bg-amber { background: #fef3c7; color: #b45309; }
     .bg-orange { background: #ffedd5; color: #c2410c; }
+    .bg-purple { background: #ede9fe; color: #6d28d9; }
     .bg-slate { background: #e2e8f0; color: #334155; }
 
     .panel-title {
@@ -282,6 +279,96 @@
       margin: 3px 0 0;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .toolbar-left,
+    .toolbar-right,
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .filter-row {
+      margin-bottom: 14px;
+    }
+
+    .filter-btn {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #334155;
+      border-radius: 999px;
+      padding: 9px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .filter-btn.active {
+      background: var(--side);
+      color: #ffffff;
+      border-color: var(--side);
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 11px;
+      padding: 10px 13px;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .btn-primary { background: var(--blue); color: #ffffff; }
+    .btn-green { background: var(--green); color: #ffffff; }
+    .btn-red { background: var(--red); color: #ffffff; }
+    .btn-orange { background: var(--orange); color: #ffffff; }
+    .btn-purple { background: var(--purple); color: #ffffff; }
+    .btn-slate { background: #e2e8f0; color: #334155; }
+    .btn-dark { background: var(--side); color: #ffffff; }
+
+    .btn:hover,
+    .filter-btn:hover {
+      filter: brightness(0.96);
+    }
+
+    input,
+    select,
+    textarea {
+      border: 1px solid #d1d5db;
+      border-radius: 11px;
+      padding: 10px 11px;
+      background: #ffffff;
+      color: #111827;
+      outline: none;
+      font-size: 13px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(30,58,138,0.12);
+    }
+
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .input-sm {
+      min-width: 190px;
     }
 
     .table-wrap {
@@ -315,13 +402,8 @@
       background: #fcfcfd;
     }
 
-    .muted {
-      color: var(--muted);
-    }
-
-    .small {
-      font-size: 12px;
-    }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
 
     .badge {
       display: inline-flex;
@@ -330,7 +412,7 @@
       border-radius: 999px;
       padding: 4px 9px;
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 900;
       white-space: nowrap;
       margin: 2px 3px 2px 0;
     }
@@ -350,70 +432,87 @@
       min-width: 130px;
     }
 
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
+    .message-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      border-radius: 12px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      color: #334155;
+      font-size: 12px;
+      max-width: 560px;
     }
 
-    .toolbar-left,
-    .toolbar-right {
+    .list {
+      display: grid;
+      gap: 10px;
+      padding: 0 18px 18px;
+    }
+
+    .list-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 13px;
+      background: #ffffff;
+    }
+
+    .list-item-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+      align-items: flex-start;
+    }
+
+    .list-item strong {
+      font-size: 14px;
+    }
+
+    .task-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .task-card {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--orange);
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .task-card.red { border-left-color: var(--red); }
+    .task-card.orange { border-left-color: var(--orange); }
+    .task-card.green { border-left-color: var(--green); }
+    .task-card.blue { border-left-color: var(--blue); }
+    .task-card.purple { border-left-color: var(--purple); }
+
+    .task-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 7px;
+    }
+
+    .task-title {
+      font-weight: 900;
+      font-size: 15px;
+    }
+
+    .task-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .task-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      align-items: center;
-    }
-
-    .btn {
-      border: 0;
-      border-radius: 11px;
-      padding: 10px 13px;
-      font-weight: 800;
-      cursor: pointer;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-
-    .btn-primary { background: var(--blue); color: #ffffff; }
-    .btn-green { background: var(--green); color: #ffffff; }
-    .btn-red { background: var(--red); color: #ffffff; }
-    .btn-orange { background: var(--orange); color: #ffffff; }
-    .btn-slate { background: #e2e8f0; color: #334155; }
-    .btn-dark { background: var(--side); color: #ffffff; }
-
-    .btn:hover {
-      filter: brightness(0.96);
-    }
-
-    input,
-    select,
-    textarea {
-      border: 1px solid #d1d5db;
-      border-radius: 11px;
-      padding: 10px 11px;
-      background: #ffffff;
-      color: #111827;
-      outline: none;
-      font-size: 13px;
-    }
-
-    input:focus,
-    select:focus,
-    textarea:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.12);
-    }
-
-    textarea {
-      min-height: 72px;
-      resize: vertical;
-    }
-
-    .input-sm {
-      min-width: 170px;
+      margin-top: 10px;
     }
 
     .token-box {
@@ -448,60 +547,12 @@
       margin-bottom: 16px;
       white-space: pre-wrap;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
-    .alert.show {
-      display: block;
-    }
-
-    .alert-error {
-      background: #fee2e2;
-      border: 1px solid #fecaca;
-      color: #991b1b;
-    }
-
-    .alert-ok {
-      background: #dcfce7;
-      border: 1px solid #bbf7d0;
-      color: #166534;
-    }
-
-    .list {
-      display: grid;
-      gap: 10px;
-      padding: 0 18px 18px;
-    }
-
-    .list-item {
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 13px;
-      background: #ffffff;
-    }
-
-    .list-item-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 6px;
-    }
-
-    .list-item strong {
-      font-size: 14px;
-    }
-
-    .message-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      padding: 10px;
-      border-radius: 12px;
-      white-space: pre-wrap;
-      line-height: 1.55;
-      color: #334155;
-      font-size: 12px;
-      max-width: 520px;
-    }
+    .alert.show { display: block; }
+    .alert-error { background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; }
+    .alert-ok { background: #dcfce7; border: 1px solid #bbf7d0; color: #166534; }
 
     .day-list {
       display: grid;
@@ -529,21 +580,24 @@
       align-items: center;
       gap: 7px;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 900;
       color: #334155;
     }
 
     .time-field label,
-    .memo-field label {
+    .memo-field label,
+    .form-field label {
       display: block;
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 900;
       color: var(--muted);
       margin-bottom: 5px;
     }
 
     .time-field input,
-    .memo-field input {
+    .memo-field input,
+    .form-field input,
+    .form-field select {
       width: 100%;
     }
 
@@ -552,19 +606,6 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       align-items: end;
-    }
-
-    .form-field label {
-      display: block;
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-
-    .form-field input,
-    .form-field select {
-      width: 100%;
     }
 
     .loading {
@@ -576,7 +617,7 @@
       display: none;
     }
 
-    @media (max-width: 1100px) {
+    @media (max-width: 1180px) {
       .grid4,
       .grid3,
       .grid2 {
@@ -587,10 +628,7 @@
         grid-template-columns: 1fr 1fr;
       }
 
-      .day-name {
-        grid-column: 1 / -1;
-      }
-
+      .day-name,
       .memo-field {
         grid-column: 1 / -1;
       }
@@ -618,7 +656,8 @@
       .grid4,
       .grid3,
       .grid2,
-      .form-grid {
+      .form-grid,
+      .day-row {
         grid-template-columns: 1fr;
       }
 
@@ -628,10 +667,6 @@
 
       .topbar {
         padding: 12px 14px;
-      }
-
-      .day-row {
-        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -644,26 +679,26 @@
         <div class="brand-row">
           <div class="logo">SH</div>
           <div>
-            <h1>STREET HOUSE 杵築<br>管理ダッシュボード</h1>
+            <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
             <p>LINE公式 DEMO / ksh_demo_</p>
           </div>
         </div>
       </div>
 
       <nav class="nav">
-        <button id="nav-dashboard" class="active" onclick="switchTab('dashboard')">📊 ダッシュボード</button>
+        <button id="nav-today" class="active" onclick="switchTab('today')">✅ 今日やること</button>
         <button id="nav-inquiries" onclick="switchTab('inquiries')">📝 相談一覧</button>
-        <button id="nav-reservations" onclick="switchTab('reservations')">📅 入庫スケジュール</button>
-        <button id="nav-customers" onclick="switchTab('customers')">👥 顧客・車両管理</button>
-        <button id="nav-triggers" onclick="switchTab('triggers')">🔔 未来の売上トリガー</button>
+        <button id="nav-reservations" onclick="switchTab('reservations')">📅 入庫予定</button>
+        <button id="nav-opportunities" onclick="switchTab('opportunities')">💰 売上チャンス</button>
+        <button id="nav-customers" onclick="switchTab('customers')">👥 顧客・車両</button>
         <button id="nav-settings" onclick="switchTab('settings')">⚙️ 店舗設定</button>
       </nav>
 
       <div class="side-footer">
-        Worker:<br>
-        ksh-line-demo-api<br><br>
-        Supabase:<br>
-        ksh_demo_ 系のみ操作
+        毎日見る場所：<br>
+        ✅ 今日やること<br><br>
+        LINE公式 × 車検・整備・カスタム<br>
+        DEMO Dashboard
       </div>
     </aside>
 
@@ -671,8 +706,8 @@
       <header class="topbar">
         <div>
           <button class="btn btn-slate mobile-menu" onclick="toggleSidebar()">☰</button>
-          <h2 id="pageTitle">ダッシュボード</h2>
-          <p id="pageDesc">本日の相談・入庫予定・未来の売上候補を確認します。</p>
+          <h2 id="pageTitle">今日やること</h2>
+          <p id="pageDesc">今日対応すべき相談・車検営業・LINE送信候補をまとめます。</p>
         </div>
         <div class="top-actions">
           <button class="btn btn-slate" onclick="toggleTokenBox()">認証設定</button>
@@ -695,38 +730,39 @@
 
         <div id="alertBox" class="alert"></div>
 
-        <section id="section-dashboard" class="section active">
+        <!-- TODAY -->
+        <section id="section-today" class="section active">
           <div class="grid4">
             <div class="card kpi">
               <div>
-                <span>本日の相談</span>
-                <strong id="kpiTodayInquiries">-</strong>
-                <small>LIFFからの相談数</small>
+                <span>今日やること</span>
+                <strong id="kpiTodayTasks">-</strong>
+                <small>対応推奨の合計</small>
               </div>
-              <div class="icon bg-blue">📝</div>
+              <div class="icon bg-red">✅</div>
             </div>
 
             <div class="card kpi">
               <div>
-                <span>本日の入庫予定</span>
-                <strong id="kpiTodayReservations">-</strong>
-                <small>予約・入庫予定</small>
+                <span>LINE顧客数</span>
+                <strong id="kpiLineMembers">-</strong>
+                <small>DEMO上のLINE連携・顧客数</small>
               </div>
-              <div class="icon bg-green">📅</div>
+              <div class="icon bg-green">💬</div>
             </div>
 
             <div class="card kpi">
               <div>
-                <span>未対応相談</span>
-                <strong id="kpiPendingInquiries">-</strong>
-                <small>新規・確認中・見積もり中</small>
+                <span>車検時期登録</span>
+                <strong id="kpiShakenKnown">-</strong>
+                <small>車両情報が売上資産になる</small>
               </div>
-              <div class="icon bg-red">⚠️</div>
+              <div class="icon bg-blue">🚗</div>
             </div>
 
             <div class="card kpi">
               <div>
-                <span>今月の見込み売上</span>
+                <span>今月の見込み</span>
                 <strong id="kpiMonthlyAmount">-</strong>
                 <small>相談ベースの概算</small>
               </div>
@@ -737,29 +773,15 @@
           <div style="height:16px"></div>
 
           <div class="grid2">
-            <div class="card">
-              <div class="panel-title">
+            <div class="card card-pad">
+              <div class="toolbar">
                 <div>
-                  <h3>最近の相談</h3>
-                  <p>自動判定つきで新しい相談から表示</p>
+                  <h3 style="margin:0">今日やること</h3>
+                  <div class="small muted">オーナーはまずここだけ見ればOKです。</div>
                 </div>
-                <button class="btn btn-slate" onclick="switchTab('inquiries')">詳細</button>
+                <button class="btn btn-slate" onclick="loadToday()">更新</button>
               </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>日時</th>
-                      <th>顧客</th>
-                      <th>車両</th>
-                      <th>内容</th>
-                      <th>自動判定</th>
-                      <th>状態</th>
-                    </tr>
-                  </thead>
-                  <tbody id="dashboardRecentInquiries"></tbody>
-                </table>
-              </div>
+              <div id="todayTaskList" class="task-list"></div>
             </div>
 
             <div class="card">
@@ -779,33 +801,34 @@
           <div class="grid3">
             <div class="card kpi">
               <div>
-                <span>LINE顧客数</span>
-                <strong id="kpiLineMembers">-</strong>
-                <small>登録済み顧客</small>
+                <span>車検2か月以内</span>
+                <strong id="kpiShaken60">-</strong>
+                <small>すぐ連絡したい顧客</small>
               </div>
-              <div class="icon bg-green">💬</div>
+              <div class="icon bg-red">⚠️</div>
             </div>
 
             <div class="card kpi">
               <div>
-                <span>未来の売上候補</span>
-                <strong id="kpiFutureTriggers">-</strong>
-                <small>車検・オイル・休眠</small>
+                <span>車検3か月以内</span>
+                <strong id="kpiShaken90">-</strong>
+                <small>早めに案内したい顧客</small>
               </div>
               <div class="icon bg-orange">🔔</div>
             </div>
 
             <div class="card kpi">
               <div>
-                <span>通知候補</span>
+                <span>LINE送信候補</span>
                 <strong id="kpiReminderQueue">-</strong>
-                <small>LINE送信候補</small>
+                <small>文面コピー・LINE送信可能</small>
               </div>
-              <div class="icon bg-slate">📨</div>
+              <div class="icon bg-purple">📨</div>
             </div>
           </div>
         </section>
 
+        <!-- INQUIRIES -->
         <section id="section-inquiries" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -829,7 +852,7 @@
             <div class="panel-title">
               <div>
                 <h3>相談一覧</h3>
-                <p>車検時期・受付状況・希望入庫日から自動判定します。</p>
+                <p>優先順位・追客タイミングを自動表示します。</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -854,6 +877,7 @@
           </div>
         </section>
 
+        <!-- RESERVATIONS -->
         <section id="section-reservations" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -866,7 +890,7 @@
           <div class="card">
             <div class="panel-title">
               <div>
-                <h3>入庫スケジュール</h3>
+                <h3>入庫予定</h3>
                 <p>予約・入庫予定を確認します。</p>
               </div>
             </div>
@@ -890,45 +914,11 @@
           </div>
         </section>
 
-        <section id="section-customers" class="section">
+        <!-- OPPORTUNITIES -->
+        <section id="section-opportunities" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
-              <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話で検索" />
-              <button class="btn btn-primary" onclick="loadCustomers()">検索</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="panel-title">
-              <div>
-                <h3>顧客・車両管理</h3>
-                <p>車検時期・オイル交換・休眠状態を自動検知します。</p>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>顧客</th>
-                    <th>電話</th>
-                    <th>LINE</th>
-                    <th>ステータス</th>
-                    <th>車両</th>
-                    <th>次回車検</th>
-                    <th>最終来店</th>
-                    <th>自動検知</th>
-                  </tr>
-                </thead>
-                <tbody id="customerTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-triggers" class="section">
-          <div class="toolbar">
-            <div class="toolbar-left">
-              <button class="btn btn-primary" onclick="loadTriggers()">トリガー更新</button>
+              <button class="btn btn-primary" onclick="loadOpportunities()">売上チャンス更新</button>
               <button class="btn btn-orange" onclick="generateReminders()">通知候補を生成</button>
             </div>
           </div>
@@ -937,8 +927,8 @@
             <div class="card">
               <div class="panel-title">
                 <div>
-                  <h3>未来の売上トリガー</h3>
-                  <p>車検・オイル交換・休眠顧客を自動抽出</p>
+                  <h3>売上チャンス</h3>
+                  <p>車検・オイル交換・休眠顧客を自動抽出します。</p>
                 </div>
               </div>
               <div class="table-wrap">
@@ -949,10 +939,10 @@
                       <th>顧客</th>
                       <th>車両</th>
                       <th>日付</th>
-                      <th>理由</th>
+                      <th>理由・文面</th>
                     </tr>
                   </thead>
-                  <tbody id="triggerTableBody"></tbody>
+                  <tbody id="opportunityTableBody"></tbody>
                 </table>
               </div>
             </div>
@@ -960,7 +950,7 @@
             <div class="card">
               <div class="panel-title">
                 <div>
-                  <h3>LINE通知候補</h3>
+                  <h3>LINE送信候補</h3>
                   <p>送信前のメッセージ候補</p>
                 </div>
               </div>
@@ -969,6 +959,57 @@
           </div>
         </section>
 
+        <!-- CUSTOMERS -->
+        <section id="section-customers" class="section">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話で検索" />
+              <button class="btn btn-primary" onclick="loadCustomers()">検索</button>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-slate" onclick="openLineManager()">LINE管理画面</button>
+            </div>
+          </div>
+
+          <div class="filter-row">
+            <button id="cf-all" class="filter-btn active" onclick="setCustomerFilter('all')">すべて</button>
+            <button id="cf-shaken60" class="filter-btn" onclick="setCustomerFilter('shaken60')">車検2か月以内</button>
+            <button id="cf-shaken90" class="filter-btn" onclick="setCustomerFilter('shaken90')">車検3か月以内</button>
+            <button id="cf-oil" class="filter-btn" onclick="setCustomerFilter('oil')">オイル交換時期</button>
+            <button id="cf-dormant" class="filter-btn" onclick="setCustomerFilter('dormant')">休眠顧客</button>
+            <button id="cf-lineLinked" class="filter-btn" onclick="setCustomerFilter('lineLinked')">LINE連携済み</button>
+            <button id="cf-lineMissing" class="filter-btn" onclick="setCustomerFilter('lineMissing')">LINE未連携</button>
+          </div>
+
+          <div class="card">
+            <div class="panel-title">
+              <div>
+                <h3>顧客・車両</h3>
+                <p>名簿ではなく、連絡すべき顧客を探す営業リストとして使います。</p>
+              </div>
+              <div class="small muted" id="customerCountLabel"></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>顧客</th>
+                    <th>電話</th>
+                    <th>LINE</th>
+                    <th>車両</th>
+                    <th>次回車検</th>
+                    <th>自動検知</th>
+                    <th>おすすめ文面</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="customerTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
         <section id="section-settings" class="section">
           <div class="grid2">
             <div class="card card-pad">
@@ -1029,6 +1070,7 @@
             </div>
           </div>
         </section>
+
       </div>
     </main>
   </div>
@@ -1036,38 +1078,41 @@
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
+    const LINE_MANAGER_URL = "https://manager.line.biz/";
 
     let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
-    let currentTab = "dashboard";
+    let currentTab = "today";
+    let currentCustomerFilter = "all";
 
     let dashboardCache = null;
     let inquiriesCache = [];
+    let reservationsCache = [];
     let customersCache = [];
-    let triggersCache = [];
+    let opportunitiesCache = [];
     let remindersCache = [];
     let businessDaysCache = [];
     let specialDaysCache = [];
 
     const pageMeta = {
-      dashboard: {
-        title: "ダッシュボード",
-        desc: "本日の相談・入庫予定・未来の売上候補を確認します。"
+      today: {
+        title: "今日やること",
+        desc: "今日対応すべき相談・車検営業・LINE送信候補をまとめます。"
       },
       inquiries: {
         title: "相談一覧",
         desc: "LIFFから入った相談を管理します。"
       },
       reservations: {
-        title: "入庫スケジュール",
-        desc: "入庫予定・作業予定を確認します。"
+        title: "入庫予定",
+        desc: "予約・入庫予定を確認します。"
+      },
+      opportunities: {
+        title: "売上チャンス",
+        desc: "車検・オイル交換・休眠顧客の営業候補を確認します。"
       },
       customers: {
-        title: "顧客・車両管理",
-        desc: "LINE顧客と車両情報を確認します。"
-      },
-      triggers: {
-        title: "未来の売上トリガー",
-        desc: "車検・オイル交換・休眠顧客の営業候補を確認します。"
+        title: "顧客・車両",
+        desc: "車検時期やLINE連携状況で絞り込み、すぐ連絡できます。"
       },
       settings: {
         title: "店舗設定",
@@ -1078,7 +1123,7 @@
     window.addEventListener("load", async () => {
       document.getElementById("tokenInput").value = dashboardToken;
       initReservationDates();
-      await loadDashboard();
+      await loadToday();
     });
 
     function toggleSidebar() {
@@ -1099,11 +1144,11 @@
 
       document.getElementById("sidebar").classList.remove("open");
 
-      if (tab === "dashboard") loadDashboard();
+      if (tab === "today") loadToday();
       if (tab === "inquiries") loadInquiries();
       if (tab === "reservations") loadReservations();
+      if (tab === "opportunities") loadOpportunities();
       if (tab === "customers") loadCustomers();
-      if (tab === "triggers") loadTriggers();
       if (tab === "settings") loadSettings();
     }
 
@@ -1158,7 +1203,7 @@
       return data;
     }
 
-    async function loadDashboard() {
+    async function loadToday() {
       setLoading(true);
       clearAlert();
 
@@ -1167,17 +1212,24 @@
         dashboardCache = data;
 
         const s = data.summary || {};
+        inquiriesCache = data.recentInquiries || [];
+        reservationsCache = data.todayReservations || [];
+        opportunitiesCache = data.salesTriggers || [];
+        remindersCache = data.reminderQueue || [];
 
-        setText("kpiTodayInquiries", `${s.today_inquiries ?? 0}件`);
-        setText("kpiTodayReservations", `${s.today_reservations ?? 0}件`);
-        setText("kpiPendingInquiries", `${s.pending_inquiries ?? 0}件`);
-        setText("kpiMonthlyAmount", yen(s.monthly_estimated_amount || 0));
+        const customerSample = data.latestCustomers || [];
+        const stats = calcCustomerStats(customerSample, opportunitiesCache, remindersCache, inquiriesCache);
+
+        setText("kpiTodayTasks", `${stats.todayTasks}件`);
         setText("kpiLineMembers", `${s.line_members ?? 0}名`);
-        setText("kpiFutureTriggers", `${s.future_triggers ?? 0}件`);
-        setText("kpiReminderQueue", `${(data.reminderQueue || []).length}件`);
+        setText("kpiShakenKnown", `${stats.shakenKnown}台`);
+        setText("kpiMonthlyAmount", yen(s.monthly_estimated_amount || 0));
+        setText("kpiShaken60", `${stats.shaken60}件`);
+        setText("kpiShaken90", `${stats.shaken90}件`);
+        setText("kpiReminderQueue", `${remindersCache.length}件`);
 
-        renderDashboardRecentInquiries(data.recentInquiries || []);
-        renderDashboardTodayReservations(data.todayReservations || []);
+        renderTodayTasks(data);
+        renderTodayReservations(reservationsCache);
 
       } catch (error) {
         showError(error.message);
@@ -1186,30 +1238,134 @@
       }
     }
 
-    function renderDashboardRecentInquiries(rows) {
-      const body = document.getElementById("dashboardRecentInquiries");
+    function renderTodayTasks(data) {
+      const box = document.getElementById("todayTaskList");
+      const tasks = buildTodayTasks(data);
 
-      if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="6" class="muted">相談はありません。</td></tr>`;
+      if (!tasks.length) {
+        box.innerHTML = `<div class="task-card green">
+          <div class="task-title">本日の緊急対応はありません</div>
+          <div class="task-meta">新規相談・未返信・車検間近の候補が出るとここに表示されます。</div>
+        </div>`;
         return;
       }
 
-      body.innerHTML = rows.slice(0, 8).map(row => `
-        <tr>
-          <td>${escapeHtml(formatDateTime(row.created_at))}</td>
-          <td>
-            <strong>${escapeHtml(row.customer_name_snapshot || row.customer?.name || "未入力")}</strong><br>
-            <span class="muted small">${escapeHtml(row.phone_snapshot || row.customer?.phone || "")}</span>
-          </td>
-          <td>${escapeHtml(row.car_name_snapshot || row.vehicle?.car_name || "未入力")}</td>
-          <td>${badgeConsult(row.consult_type)}</td>
-          <td><div class="auto-box">${renderAutoBadgesForInquiry(row)}</div></td>
-          <td>${badgeStatus(row.status)}</td>
-        </tr>
+      box.innerHTML = tasks.map(task => `
+        <div class="task-card ${task.color}">
+          <div class="task-head">
+            <div>
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-meta">${escapeHtml(task.meta)}</div>
+            </div>
+            ${autoBadge(task.badge, task.color)}
+          </div>
+          <div class="message-box">${escapeHtml(task.message)}</div>
+          <div class="task-actions">
+            <button class="btn btn-slate" onclick="copyText('${escapeAttr(task.name || "")}')">名前コピー</button>
+            <button class="btn btn-slate" onclick="copyText('${escapeAttr(task.message || "")}')">文面コピー</button>
+            ${task.lineUserId ? `<button class="btn btn-green" onclick="sendLineMessage('${escapeAttr(task.customerId || "")}', '${escapeAttr(task.lineUserId)}', '${escapeAttr(task.message)}')">LINE送信</button>` : ""}
+            <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+          </div>
+        </div>
       `).join("");
     }
 
-    function renderDashboardTodayReservations(rows) {
+    function buildTodayTasks(data) {
+      const tasks = [];
+      const today = dateYmd(new Date());
+      const tomorrow = dateYmd(addDays(new Date(), 1));
+
+      const inquiries = data.recentInquiries || [];
+      const opportunities = data.salesTriggers || [];
+      const reminders = data.reminderQueue || [];
+
+      inquiries.forEach(row => {
+        const createdDate = row.created_at ? dateYmd(new Date(row.created_at)) : "";
+        const status = row.status || "";
+
+        if (createdDate === today && isOpenStatus(status)) {
+          tasks.push({
+            type: "inquiry",
+            color: "red",
+            badge: "本日対応",
+            title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様の新規相談`,
+            meta: `${row.consult_type || "相談"} / ${row.car_name_snapshot || row.vehicle?.car_name || "車両未入力"}`,
+            message: buildInquirySuggestedMessage(row),
+            name: row.customer_name_snapshot || row.customer?.name || "",
+            lineUserId: row.line_user_id || row.customer?.line_user_id || "",
+            customerId: row.customer_id || ""
+          });
+        }
+
+        if (String(status).includes("未返信")) {
+          tasks.push({
+            type: "followup",
+            color: "purple",
+            badge: "追客推奨",
+            title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様へ追客`,
+            meta: `${row.consult_type || "相談"} / 見積もり後未返信`,
+            message: buildFollowupMessage(row),
+            name: row.customer_name_snapshot || row.customer?.name || "",
+            lineUserId: row.line_user_id || row.customer?.line_user_id || "",
+            customerId: row.customer_id || ""
+          });
+        }
+
+        if (row.preferred_visit_date === today || row.preferred_visit_date === tomorrow) {
+          tasks.push({
+            type: "visit",
+            color: row.preferred_visit_date === today ? "red" : "orange",
+            badge: row.preferred_visit_date === today ? "本日入庫希望" : "明日入庫希望",
+            title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様の入庫希望日が近いです`,
+            meta: `${formatDate(row.preferred_visit_date)} / ${row.consult_type || "相談"}`,
+            message: buildVisitConfirmMessage(row),
+            name: row.customer_name_snapshot || row.customer?.name || "",
+            lineUserId: row.line_user_id || row.customer?.line_user_id || "",
+            customerId: row.customer_id || ""
+          });
+        }
+      });
+
+      opportunities.slice(0, 8).forEach(row => {
+        const triggerType = row.trigger_type || "";
+        const isImportant =
+          triggerType.includes("車検") ||
+          triggerType.includes("オイル") ||
+          triggerType.includes("休眠");
+
+        if (!isImportant) return;
+
+        tasks.push({
+          type: "opportunity",
+          color: triggerType.includes("車検") ? "orange" : triggerType.includes("オイル") ? "green" : "purple",
+          badge: triggerType,
+          title: `${row.customer_name || "お客様"}様の${triggerType}`,
+          meta: `${row.vehicle_name || "車両未入力"} / ${row.trigger_date ? formatDate(row.trigger_date) : ""}`,
+          message: row.message_preview || "",
+          name: row.customer_name || "",
+          lineUserId: row.line_user_id || "",
+          customerId: row.customer_id || ""
+        });
+      });
+
+      reminders.slice(0, 5).forEach(row => {
+        tasks.push({
+          type: "reminder",
+          color: "blue",
+          badge: "LINE候補",
+          title: `${row.customer?.name || "お客様"}様へのLINE送信候補`,
+          meta: `${row.reminder_type || ""} / ${row.target_date ? formatDate(row.target_date) : ""}`,
+          message: row.message_preview || "",
+          name: row.customer?.name || "",
+          lineUserId: row.customer?.line_user_id || row.line_user_id || "",
+          customerId: row.customer_id || ""
+        });
+      });
+
+      return tasks.slice(0, 12);
+    }
+
+    function renderTodayReservations(rows) {
       const box = document.getElementById("dashboardTodayReservations");
 
       if (!rows.length) {
@@ -1291,7 +1447,11 @@
             <textarea id="memo-${row.id}" placeholder="店舗メモ">${escapeHtml(row.shop_memo || "")}</textarea>
           </td>
           <td>
-            <button class="btn btn-primary" onclick="updateInquiry('${row.id}')">保存</button>
+            <div style="display:grid; gap:6px">
+              <button class="btn btn-primary" onclick="updateInquiry('${row.id}')">保存</button>
+              <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.customer_name_snapshot || row.customer?.name || "")}')">名前コピー</button>
+              <button class="btn btn-slate" onclick="copyText('${escapeAttr(buildInquirySuggestedMessage(row))}')">文面コピー</button>
+            </div>
           </td>
         </tr>
       `).join("");
@@ -1329,7 +1489,8 @@
         const to = document.getElementById("reservationTo").value;
 
         const data = await api(`/api/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-        renderReservations(data.reservations || []);
+        reservationsCache = data.reservations || [];
+        renderReservations(reservationsCache);
 
       } catch (error) {
         showError(error.message);
@@ -1360,72 +1521,16 @@
       `).join("");
     }
 
-    async function loadCustomers() {
-      setLoading(true);
-      clearAlert();
-
-      try {
-        const keyword = document.getElementById("customerKeyword").value.trim();
-        const data = await api(`/api/customers?keyword=${encodeURIComponent(keyword)}&limit=300`);
-        customersCache = data.customers || [];
-        renderCustomers(customersCache);
-
-      } catch (error) {
-        showError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    function renderCustomers(rows) {
-      const body = document.getElementById("customerTableBody");
-
-      if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="8" class="muted">顧客はありません。</td></tr>`;
-        return;
-      }
-
-      body.innerHTML = rows.map(customer => {
-        const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
-
-        const vehicleText = vehicles.length
-          ? vehicles.map(v => escapeHtml(`${v.car_name || v.maker || ""} ${v.model || ""}`.trim() || "未入力")).join("<br>")
-          : "未入力";
-
-        const shakenText = vehicles.length
-          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatDate(v.next_shaken_date) : "未入力")).join("<br>")
-          : "未入力";
-
-        return `
-          <tr>
-            <td>
-              <strong>${escapeHtml(customer.name || "未入力")}</strong><br>
-              <span class="muted small">${escapeHtml(customer.line_display_name || "")}</span>
-            </td>
-            <td>${escapeHtml(customer.phone || "未入力")}</td>
-            <td>
-              <span class="muted small">${escapeHtml(customer.line_user_id || "未連携")}</span>
-            </td>
-            <td>${badgeStatus(customer.status || "見込み客")}</td>
-            <td>${vehicleText}</td>
-            <td>${shakenText}</td>
-            <td>${escapeHtml(customer.last_visit_date ? formatDate(customer.last_visit_date) : "未入力")}</td>
-            <td><div class="auto-box">${renderAutoBadgesForCustomer(customer)}</div></td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    async function loadTriggers() {
+    async function loadOpportunities() {
       setLoading(true);
       clearAlert();
 
       try {
         const data = await api("/api/triggers");
-        triggersCache = data.salesTriggers || [];
+        opportunitiesCache = data.salesTriggers || [];
         remindersCache = data.reminderQueue || [];
 
-        renderTriggers(triggersCache);
+        renderOpportunities(opportunitiesCache);
         renderReminders(remindersCache);
 
       } catch (error) {
@@ -1435,11 +1540,11 @@
       }
     }
 
-    function renderTriggers(rows) {
-      const body = document.getElementById("triggerTableBody");
+    function renderOpportunities(rows) {
+      const body = document.getElementById("opportunityTableBody");
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="5" class="muted">売上トリガーはありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="5" class="muted">売上チャンスはありません。</td></tr>`;
         return;
       }
 
@@ -1452,6 +1557,12 @@
           <td>
             ${escapeHtml(row.reason || "")}
             <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
+            <div class="task-actions">
+              <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.customer_name || "")}')">名前コピー</button>
+              <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.message_preview || "")}')">文面コピー</button>
+              ${row.line_user_id ? `<button class="btn btn-green" onclick="sendLineMessage('${escapeAttr(row.customer_id || "")}', '${escapeAttr(row.line_user_id)}', '${escapeAttr(row.message_preview || "")}')">LINE送信</button>` : ""}
+              <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+            </div>
           </td>
         </tr>
       `).join("");
@@ -1476,9 +1587,11 @@
             / 車両：${escapeHtml(row.vehicle?.car_name || "未入力")}
           </div>
           <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
-          <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
-            <button class="btn btn-slate" onclick="copyTextById('${row.id}')">文面コピー</button>
+          <div class="task-actions">
+            <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.customer?.name || "")}')">名前コピー</button>
+            <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.message_preview || "")}')">文面コピー</button>
             <button class="btn btn-green" onclick="sendReminderLine('${row.id}')">LINE送信</button>
+            <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
           </div>
         </div>
       `).join("");
@@ -1490,19 +1603,11 @@
       try {
         const data = await api("/api/reminders/generate", { method: "POST" });
         showOk(`通知候補を生成しました。件数：${data.generated || 0}`);
-        await loadTriggers();
+        await loadOpportunities();
 
       } catch (error) {
         showError(error.message);
       }
-    }
-
-    async function copyTextById(id) {
-      const row = remindersCache.find(r => r.id === id);
-      if (!row) return;
-
-      await navigator.clipboard.writeText(row.message_preview || "");
-      showOk("メッセージ文面をコピーしました。");
     }
 
     async function sendReminderLine(id) {
@@ -1511,7 +1616,7 @@
       const row = remindersCache.find(r => r.id === id);
       if (!row) return;
 
-      const lineUserId = row.customer?.line_user_id || "";
+      const lineUserId = row.customer?.line_user_id || row.line_user_id || "";
       const customerId = row.customer_id || "";
       const message = row.message_preview || "";
 
@@ -1520,25 +1625,127 @@
         return;
       }
 
-      if (!confirm("このLINEメッセージを送信しますか？")) return;
+      await sendLineMessage(customerId, lineUserId, message, id);
+    }
+
+    async function loadCustomers() {
+      setLoading(true);
+      clearAlert();
 
       try {
-        await api("/api/line/push", {
-          method: "POST",
-          body: JSON.stringify({
-            reminderId: id,
-            customerId,
-            lineUserId,
-            message
-          })
-        });
-
-        showOk("LINEメッセージを送信しました。");
-        await loadTriggers();
+        const keyword = document.getElementById("customerKeyword").value.trim();
+        const data = await api(`/api/customers?keyword=${encodeURIComponent(keyword)}&limit=500`);
+        customersCache = data.customers || [];
+        renderCustomers();
 
       } catch (error) {
         showError(error.message);
+      } finally {
+        setLoading(false);
       }
+    }
+
+    function setCustomerFilter(filter) {
+      currentCustomerFilter = filter;
+
+      document.querySelectorAll(".filter-btn").forEach(btn => btn.classList.remove("active"));
+      const active = document.getElementById(`cf-${filter}`);
+      if (active) active.classList.add("active");
+
+      renderCustomers();
+    }
+
+    function renderCustomers() {
+      const body = document.getElementById("customerTableBody");
+
+      const filtered = customersCache.filter(customer => customerMatchesFilter(customer, currentCustomerFilter));
+
+      document.getElementById("customerCountLabel").textContent =
+        `${filtered.length}件表示 / 全${customersCache.length}件`;
+
+      if (!filtered.length) {
+        body.innerHTML = `<tr><td colspan="8" class="muted">該当する顧客はありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = filtered.map(customer => {
+        const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+        const suggested = buildCustomerSuggestedMessage(customer);
+
+        const vehicleText = vehicles.length
+          ? vehicles.map(v => escapeHtml(`${v.car_name || v.maker || ""} ${v.model || ""}`.trim() || "未入力")).join("<br>")
+          : "未入力";
+
+        const shakenText = vehicles.length
+          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatDate(v.next_shaken_date) : "未入力")).join("<br>")
+          : "未入力";
+
+        return `
+          <tr>
+            <td>
+              <strong>${escapeHtml(customer.name || "未入力")}</strong><br>
+              <span class="muted small">${escapeHtml(customer.line_display_name || "")}</span>
+            </td>
+            <td>${escapeHtml(customer.phone || "未入力")}</td>
+            <td>
+              ${customer.line_user_id ? badgeStatus("LINE連携済み") : badgeStatus("LINE未連携")}<br>
+              <span class="muted small">${escapeHtml(customer.line_user_id || "")}</span>
+            </td>
+            <td>${vehicleText}</td>
+            <td>${shakenText}</td>
+            <td><div class="auto-box">${renderAutoBadgesForCustomer(customer)}</div></td>
+            <td><div class="message-box">${escapeHtml(suggested)}</div></td>
+            <td>
+              <div style="display:grid; gap:6px">
+                <button class="btn btn-slate" onclick="copyText('${escapeAttr(customer.name || "")}')">名前コピー</button>
+                <button class="btn btn-slate" onclick="copyText('${escapeAttr(suggested)}')">文面コピー</button>
+                ${customer.line_user_id ? `<button class="btn btn-green" onclick="sendLineMessage('${escapeAttr(customer.id || "")}', '${escapeAttr(customer.line_user_id)}', '${escapeAttr(suggested)}')">LINE送信</button>` : ""}
+                <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function customerMatchesFilter(customer, filter) {
+      const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+
+      if (filter === "all") return true;
+      if (filter === "lineLinked") return Boolean(customer.line_user_id);
+      if (filter === "lineMissing") return !customer.line_user_id;
+
+      if (filter === "shaken60") {
+        return vehicles.some(v => {
+          const d = daysUntil(v.next_shaken_date);
+          return d !== null && d >= 0 && d <= 60;
+        });
+      }
+
+      if (filter === "shaken90") {
+        return vehicles.some(v => {
+          const d = daysUntil(v.next_shaken_date);
+          return d !== null && d >= 0 && d <= 90;
+        });
+      }
+
+      if (filter === "oil") {
+        return vehicles.some(v => {
+          const d = daysSince(v.last_oil_change_date);
+          return d !== null && d >= 180;
+        });
+      }
+
+      if (filter === "dormant") {
+        const customerDormant = daysSince(customer.last_visit_date);
+        const vehicleDormant = vehicles.some(v => {
+          const d = daysSince(v.last_visit_date);
+          return d !== null && d >= 365;
+        });
+        return (customerDormant !== null && customerDormant >= 365) || vehicleDormant;
+      }
+
+      return true;
     }
 
     async function loadSettings() {
@@ -1709,6 +1916,38 @@
       }
     }
 
+    function calcCustomerStats(customers, opportunities, reminders, inquiries) {
+      const vehicles = customers.flatMap(c => Array.isArray(c.vehicles) ? c.vehicles : []);
+      const shakenKnown = vehicles.filter(v => Boolean(v.next_shaken_date)).length;
+
+      let shaken60 = 0;
+      let shaken90 = 0;
+
+      vehicles.forEach(v => {
+        const d = daysUntil(v.next_shaken_date);
+        if (d !== null && d >= 0 && d <= 60) shaken60 += 1;
+        if (d !== null && d >= 0 && d <= 90) shaken90 += 1;
+      });
+
+      const today = dateYmd(new Date());
+      const todayInquiries = inquiries.filter(i => {
+        const created = i.created_at ? dateYmd(new Date(i.created_at)) : "";
+        return created === today && isOpenStatus(i.status);
+      }).length;
+
+      const todayTasks =
+        todayInquiries +
+        (opportunities || []).slice(0, 10).length +
+        (reminders || []).slice(0, 5).length;
+
+      return {
+        shakenKnown,
+        shaken60,
+        shaken90,
+        todayTasks
+      };
+    }
+
     function renderAutoBadgesForInquiry(row) {
       const badges = [];
       const today = dateYmd(new Date());
@@ -1753,7 +1992,7 @@
         badges.push(autoBadge("通常対応", "slate"));
       }
 
-      return badges.join("");
+      return [...new Set(badges)].join("");
     }
 
     function renderAutoBadgesForCustomer(customer) {
@@ -1764,7 +2003,7 @@
         const shakenDays = daysUntil(vehicle.next_shaken_date);
 
         if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
-          badges.push(autoBadge("車検2か月前", "red"));
+          badges.push(autoBadge("車検2か月以内", "red"));
         } else if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 90) {
           badges.push(autoBadge("車検3か月以内", "orange"));
         }
@@ -1780,11 +2019,77 @@
         badges.push(autoBadge("休眠顧客", "purple"));
       }
 
+      if (!customer.line_user_id) {
+        badges.push(autoBadge("LINE未連携", "slate"));
+      }
+
       if (!badges.length) {
         badges.push(autoBadge("通常", "slate"));
       }
 
-      return uniqueHtmlBadges(badges).join("");
+      return [...new Set(badges)].join("");
+    }
+
+    function buildCustomerSuggestedMessage(customer) {
+      const name = customer.name || "お客様";
+      const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+
+      for (const vehicle of vehicles) {
+        const car = vehicle.car_name || vehicle.model || "お車";
+        const shakenDays = daysUntil(vehicle.next_shaken_date);
+
+        if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
+          return `${name}様、${car}の車検時期が近づいています。早めにご相談いただくと、代車や入庫日程を調整しやすくなります。ご希望日があればお気軽にお知らせください。`;
+        }
+
+        if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 90) {
+          return `${name}様、${car}の車検が3か月以内に近づいています。お見積もりや事前点検も可能ですので、早めのご相談がおすすめです。`;
+        }
+
+        const oilDays = daysSince(vehicle.last_oil_change_date);
+        if (oilDays !== null && oilDays >= 180) {
+          return `${name}様、${car}の前回オイル交換からお時間が経っています。エンジン保護のため、定期交換をおすすめします。`;
+        }
+      }
+
+      const dormant = daysSince(customer.last_visit_date);
+      if (dormant !== null && dormant >= 365) {
+        return `${name}様、前回のご来店からお時間が経っています。お車の点検や気になる箇所があれば、お気軽にご相談ください。`;
+      }
+
+      return `${name}様、いつもありがとうございます。お車の車検・整備・カスタムで気になることがあれば、お気軽にご相談ください。`;
+    }
+
+    function buildInquirySuggestedMessage(row) {
+      const name = row.customer_name_snapshot || row.customer?.name || "お客様";
+      const car = row.car_name_snapshot || row.vehicle?.car_name || "お車";
+      const type = row.consult_type || "ご相談";
+
+      if (type.includes("車検")) {
+        return `${name}様、車検のご相談ありがとうございます。${car}の状態やご希望日を確認し、概算見積もりと入庫可能日をご案内いたします。`;
+      }
+
+      if (type.includes("カスタム") || type.includes("パーツ")) {
+        return `${name}様、${car}のカスタム相談ありがとうございます。取付予定の内容やパーツ情報が分かれば、作業可否と概算をご案内いたします。`;
+      }
+
+      if (type.includes("オイル") || type.includes("点検")) {
+        return `${name}様、点検・オイル交換のご相談ありがとうございます。ご希望の入庫日があればお知らせください。`;
+      }
+
+      return `${name}様、お問い合わせありがとうございます。内容を確認し、スタッフより順次ご連絡いたします。`;
+    }
+
+    function buildFollowupMessage(row) {
+      const name = row.customer_name_snapshot || row.customer?.name || "お客様";
+      const car = row.car_name_snapshot || row.vehicle?.car_name || "お車";
+      return `${name}様、先日ご相談いただいた${car}の件でご連絡です。ご不明点や日程のご希望があれば、お気軽にお知らせください。`;
+    }
+
+    function buildVisitConfirmMessage(row) {
+      const name = row.customer_name_snapshot || row.customer?.name || "お客様";
+      const date = row.preferred_visit_date ? formatDate(row.preferred_visit_date) : "ご希望日";
+      return `${name}様、${date}の入庫希望について確認のご連絡です。お時間や作業内容について、スタッフよりご案内いたします。`;
     }
 
     function autoBadge(text, color) {
@@ -1801,42 +2106,15 @@
       return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;
     }
 
-    function uniqueHtmlBadges(badges) {
-      return [...new Set(badges)];
-    }
-
-    function isOpenStatus(status) {
-      return !["作業完了", "失注", "キャンセル"].some(s => String(status || "").includes(s));
-    }
-
-    function statusOptions(current) {
-      const list = [
-        "新規相談",
-        "確認中",
-        "見積もり中",
-        "見積もり後未返信",
-        "入庫予約済み",
-        "作業完了",
-        "保留",
-        "失注"
-      ];
-
-      return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
-    }
-
-    function priorityOptions(current) {
-      const list = ["低", "通常", "高"];
-      return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
-    }
-
     function badgeStatus(status) {
       const s = status || "";
       let cls = "badge-slate";
 
-      if (s.includes("新規") || s.includes("確認") || s.includes("予約")) cls = "badge-blue";
+      if (s.includes("新規") || s.includes("確認") || s.includes("予約") || s.includes("連携済み")) cls = "badge-blue";
       if (s.includes("完了") || s.includes("送信済") || s.includes("特別営業")) cls = "badge-green";
       if (s.includes("未返信") || s.includes("臨時休業") || s.includes("失注")) cls = "badge-red";
       if (s.includes("見積") || s.includes("保留") || s.includes("pending")) cls = "badge-orange";
+      if (s.includes("未連携")) cls = "badge-slate";
 
       return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
     }
@@ -1864,6 +2142,86 @@
       return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
     }
 
+    function statusOptions(current) {
+      const list = [
+        "新規相談",
+        "確認中",
+        "見積もり中",
+        "見積もり後未返信",
+        "入庫予約済み",
+        "作業完了",
+        "保留",
+        "失注"
+      ];
+
+      return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+    }
+
+    function priorityOptions(current) {
+      const list = ["低", "通常", "高"];
+      return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+    }
+
+    async function sendLineMessage(customerId, lineUserId, message, reminderId = "") {
+      clearAlert();
+
+      if (!lineUserId) {
+        showError("LINEユーザーIDがないため送信できません。文面コピーを使ってください。");
+        return;
+      }
+
+      if (!message) {
+        showError("送信するメッセージがありません。");
+        return;
+      }
+
+      if (!confirm("このLINEメッセージを送信しますか？")) return;
+
+      try {
+        await api("/api/line/push", {
+          method: "POST",
+          body: JSON.stringify({
+            customerId,
+            lineUserId,
+            reminderId,
+            message
+          })
+        });
+
+        showOk("LINEメッセージを送信しました。");
+
+        if (currentTab === "opportunities") await loadOpportunities();
+        if (currentTab === "today") await loadToday();
+
+      } catch (error) {
+        showError(
+          error.message +
+          "\n\nDEMO用の架空LINEユーザーIDの場合、直接送信は失敗します。その場合は「文面コピー」→「LINE管理画面」で確認してください。"
+        );
+      }
+    }
+
+    async function copyText(text) {
+      const value = String(text || "");
+
+      try {
+        await navigator.clipboard.writeText(value);
+        showOk("コピーしました。");
+      } catch {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        showOk("コピーしました。");
+      }
+    }
+
+    function openLineManager() {
+      window.open(LINE_MANAGER_URL, "_blank", "noopener,noreferrer");
+    }
+
     function initReservationDates() {
       const today = new Date();
       const to = addDays(today, 30);
@@ -1872,8 +2230,13 @@
       document.getElementById("reservationTo").value = dateYmd(to);
     }
 
+    function isOpenStatus(status) {
+      return !["作業完了", "失注", "キャンセル"].some(s => String(status || "").includes(s));
+    }
+
     function setText(id, value) {
-      document.getElementById(id).textContent = value;
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
     }
 
     function showError(message) {
@@ -1915,6 +2278,10 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
     }
 
     function formatDate(value) {
