@@ -10,7 +10,6 @@
     :root {
       --bg: #f6f7fb;
       --side: #111827;
-      --side2: #1f2937;
       --card: #ffffff;
       --text: #111827;
       --muted: #6b7280;
@@ -50,7 +49,7 @@
     .sidebar {
       width: 260px;
       background: var(--side);
-      color: #fff;
+      color: #ffffff;
       position: fixed;
       inset: 0 auto 0 0;
       display: flex;
@@ -60,7 +59,7 @@
 
     .brand {
       padding: 22px 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .brand-row {
@@ -112,7 +111,7 @@
     }
 
     .nav button:hover {
-      background: rgba(255,255,255,0.08);
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .nav button.active {
@@ -123,7 +122,7 @@
     .side-footer {
       margin-top: auto;
       padding: 16px 18px;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
       color: #9ca3af;
       font-size: 11px;
       line-height: 1.6;
@@ -136,16 +135,17 @@
     }
 
     .topbar {
-      height: 68px;
-      background: #fff;
+      min-height: 68px;
+      background: #ffffff;
       border-bottom: 1px solid var(--line);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 26px;
+      padding: 12px 26px;
       position: sticky;
       top: 0;
       z-index: 5;
+      gap: 12px;
     }
 
     .topbar h2 {
@@ -163,6 +163,7 @@
       display: flex;
       gap: 8px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .content {
@@ -180,8 +181,14 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .grid4 {
@@ -325,6 +332,7 @@
       font-size: 11px;
       font-weight: 800;
       white-space: nowrap;
+      margin: 2px 3px 2px 0;
     }
 
     .badge-blue { background: #dbeafe; color: #1d4ed8; }
@@ -333,6 +341,14 @@
     .badge-orange { background: #ffedd5; color: #c2410c; }
     .badge-slate { background: #e2e8f0; color: #334155; }
     .badge-amber { background: #fef3c7; color: #92400e; }
+    .badge-purple { background: #ede9fe; color: #6d28d9; }
+
+    .auto-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      min-width: 130px;
+    }
 
     .toolbar {
       display: flex;
@@ -361,12 +377,12 @@
       white-space: nowrap;
     }
 
-    .btn-primary { background: var(--blue); color: #fff; }
-    .btn-green { background: var(--green); color: #fff; }
-    .btn-red { background: var(--red); color: #fff; }
-    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-primary { background: var(--blue); color: #ffffff; }
+    .btn-green { background: var(--green); color: #ffffff; }
+    .btn-red { background: var(--red); color: #ffffff; }
+    .btn-orange { background: var(--orange); color: #ffffff; }
     .btn-slate { background: #e2e8f0; color: #334155; }
-    .btn-dark { background: var(--side); color: #fff; }
+    .btn-dark { background: var(--side); color: #ffffff; }
 
     .btn:hover {
       filter: brightness(0.96);
@@ -378,7 +394,7 @@
       border: 1px solid #d1d5db;
       border-radius: 11px;
       padding: 10px 11px;
-      background: #fff;
+      background: #ffffff;
       color: #111827;
       outline: none;
       font-size: 13px;
@@ -388,7 +404,7 @@
     select:focus,
     textarea:focus {
       border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(30,58,138,0.12);
+      box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.12);
     }
 
     textarea {
@@ -461,7 +477,7 @@
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 13px;
-      background: #fff;
+      background: #ffffff;
     }
 
     .list-item-head {
@@ -487,38 +503,48 @@
       max-width: 520px;
     }
 
-    .day-grid {
+    .day-list {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 10px;
     }
 
-    .day-card {
+    .day-row {
+      display: grid;
+      grid-template-columns: 92px 110px 1fr 1fr 1.4fr;
+      gap: 10px;
+      align-items: center;
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 12px;
-      background: #fff;
+      background: #ffffff;
     }
 
-    .day-card h4 {
-      margin: 0 0 8px;
+    .day-name {
+      font-weight: 900;
       font-size: 14px;
     }
 
-    .day-card label {
+    .closed-check {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
+      gap: 7px;
+      font-size: 13px;
       font-weight: 800;
+      color: #334155;
     }
 
-    .day-card input[type="time"],
-    .day-card input[type="text"] {
+    .time-field label,
+    .memo-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .time-field input,
+    .memo-field input {
       width: 100%;
-      margin-bottom: 7px;
     }
 
     .form-grid {
@@ -550,6 +576,26 @@
       display: none;
     }
 
+    @media (max-width: 1100px) {
+      .grid4,
+      .grid3,
+      .grid2 {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .day-row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .day-name {
+        grid-column: 1 / -1;
+      }
+
+      .memo-field {
+        grid-column: 1 / -1;
+      }
+    }
+
     @media (max-width: 980px) {
       .sidebar {
         transform: translateX(-100%);
@@ -572,7 +618,6 @@
       .grid4,
       .grid3,
       .grid2,
-      .day-grid,
       .form-grid {
         grid-template-columns: 1fr;
       }
@@ -582,7 +627,11 @@
       }
 
       .topbar {
-        padding: 0 14px;
+        padding: 12px 14px;
+      }
+
+      .day-row {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -646,7 +695,6 @@
 
         <div id="alertBox" class="alert"></div>
 
-        <!-- DASHBOARD -->
         <section id="section-dashboard" class="section active">
           <div class="grid4">
             <div class="card kpi">
@@ -693,7 +741,7 @@
               <div class="panel-title">
                 <div>
                   <h3>最近の相談</h3>
-                  <p>新しい相談から順に表示</p>
+                  <p>自動判定つきで新しい相談から表示</p>
                 </div>
                 <button class="btn btn-slate" onclick="switchTab('inquiries')">詳細</button>
               </div>
@@ -705,6 +753,7 @@
                       <th>顧客</th>
                       <th>車両</th>
                       <th>内容</th>
+                      <th>自動判定</th>
                       <th>状態</th>
                     </tr>
                   </thead>
@@ -757,7 +806,6 @@
           </div>
         </section>
 
-        <!-- INQUIRIES -->
         <section id="section-inquiries" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -781,7 +829,7 @@
             <div class="panel-title">
               <div>
                 <h3>相談一覧</h3>
-                <p>LIFFフォームから入った相談を管理します。</p>
+                <p>車検時期・受付状況・希望入庫日から自動判定します。</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -793,6 +841,7 @@
                     <th>車両</th>
                     <th>相談内容</th>
                     <th>希望入庫日</th>
+                    <th>自動判定</th>
                     <th>状態</th>
                     <th>優先度</th>
                     <th>店舗メモ</th>
@@ -805,7 +854,6 @@
           </div>
         </section>
 
-        <!-- RESERVATIONS -->
         <section id="section-reservations" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -842,7 +890,6 @@
           </div>
         </section>
 
-        <!-- CUSTOMERS -->
         <section id="section-customers" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -855,7 +902,7 @@
             <div class="panel-title">
               <div>
                 <h3>顧客・車両管理</h3>
-                <p>LINE顧客と車両情報を確認します。</p>
+                <p>車検時期・オイル交換・休眠状態を自動検知します。</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -869,6 +916,7 @@
                     <th>車両</th>
                     <th>次回車検</th>
                     <th>最終来店</th>
+                    <th>自動検知</th>
                   </tr>
                 </thead>
                 <tbody id="customerTableBody"></tbody>
@@ -877,7 +925,6 @@
           </div>
         </section>
 
-        <!-- TRIGGERS -->
         <section id="section-triggers" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -922,14 +969,15 @@
           </div>
         </section>
 
-        <!-- SETTINGS -->
         <section id="section-settings" class="section">
           <div class="grid2">
             <div class="card card-pad">
               <h3 style="margin-top:0">曜日別の営業設定</h3>
-              <p class="small muted">定休日にチェックを入れると、LIFFの入庫希望日カレンダーで選択できなくなります。</p>
+              <p class="small muted">
+                定休日にチェックを入れると、LIFFの入庫希望日カレンダーで選択できなくなります。
+              </p>
 
-              <div id="businessDaysGrid" class="day-grid"></div>
+              <div id="businessDaysGrid" class="day-list"></div>
 
               <div style="margin-top:14px">
                 <button class="btn btn-primary" onclick="saveBusinessDays()">営業設定を保存</button>
@@ -938,7 +986,9 @@
 
             <div class="card card-pad">
               <h3 style="margin-top:0">臨時休み・特別営業日</h3>
-              <p class="small muted">年末年始・イベント・急な休みを登録できます。</p>
+              <p class="small muted">
+                年末年始・イベント・急な休みを登録できます。
+              </p>
 
               <div class="form-grid">
                 <div class="form-field">
@@ -1140,7 +1190,7 @@
       const body = document.getElementById("dashboardRecentInquiries");
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="5" class="muted">相談はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6" class="muted">相談はありません。</td></tr>`;
         return;
       }
 
@@ -1153,6 +1203,7 @@
           </td>
           <td>${escapeHtml(row.car_name_snapshot || row.vehicle?.car_name || "未入力")}</td>
           <td>${badgeConsult(row.consult_type)}</td>
+          <td><div class="auto-box">${renderAutoBadgesForInquiry(row)}</div></td>
           <td>${badgeStatus(row.status)}</td>
         </tr>
       `).join("");
@@ -1169,7 +1220,7 @@
       box.innerHTML = rows.map(row => `
         <div class="list-item">
           <div class="list-item-head">
-            <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0,5) : "時間未定")} / ${escapeHtml(row.work_type || "")}</strong>
+            <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "時間未定")} / ${escapeHtml(row.work_type || "")}</strong>
             ${badgeStatus(row.status)}
           </div>
           <div class="small">
@@ -1205,7 +1256,7 @@
       const body = document.getElementById("inquiryTableBody");
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="9" class="muted">相談はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="10" class="muted">相談はありません。</td></tr>`;
         return;
       }
 
@@ -1225,6 +1276,7 @@
             <div class="message-box" style="margin-top:8px">${escapeHtml(row.message || "内容なし")}</div>
           </td>
           <td>${escapeHtml(row.preferred_visit_date ? formatDate(row.preferred_visit_date) : "未入力")}</td>
+          <td><div class="auto-box">${renderAutoBadgesForInquiry(row)}</div></td>
           <td>
             <select id="status-${row.id}">
               ${statusOptions(row.status)}
@@ -1297,7 +1349,7 @@
       body.innerHTML = rows.map(row => `
         <tr>
           <td>${escapeHtml(formatDate(row.reservation_date))}</td>
-          <td>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0,5) : "未定")}</td>
+          <td>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "未定")}</td>
           <td>${escapeHtml(row.customer?.name || "未入力")}</td>
           <td>${escapeHtml(row.vehicle?.car_name || "未入力")}</td>
           <td>${escapeHtml(row.work_type || "")}</td>
@@ -1329,18 +1381,19 @@
       const body = document.getElementById("customerTableBody");
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="7" class="muted">顧客はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="8" class="muted">顧客はありません。</td></tr>`;
         return;
       }
 
       body.innerHTML = rows.map(customer => {
         const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+
         const vehicleText = vehicles.length
-          ? vehicles.map(v => `${v.car_name || v.maker || ""} ${v.model || ""}`).join("<br>")
+          ? vehicles.map(v => escapeHtml(`${v.car_name || v.maker || ""} ${v.model || ""}`.trim() || "未入力")).join("<br>")
           : "未入力";
 
         const shakenText = vehicles.length
-          ? vehicles.map(v => v.next_shaken_date ? formatDate(v.next_shaken_date) : "未入力").join("<br>")
+          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatDate(v.next_shaken_date) : "未入力")).join("<br>")
           : "未入力";
 
         return `
@@ -1357,6 +1410,7 @@
             <td>${vehicleText}</td>
             <td>${shakenText}</td>
             <td>${escapeHtml(customer.last_visit_date ? formatDate(customer.last_visit_date) : "未入力")}</td>
+            <td><div class="auto-box">${renderAutoBadgesForCustomer(customer)}</div></td>
           </tr>
         `;
       }).join("");
@@ -1529,15 +1583,28 @@
         };
 
         return `
-          <div class="day-card">
-            <h4>${name}</h4>
-            <label>
+          <div class="day-row">
+            <div class="day-name">${name}</div>
+
+            <label class="closed-check">
               <input id="bd-closed-${dow}" type="checkbox" ${row.is_closed ? "checked" : ""}>
               定休日
             </label>
-            <input id="bd-open-${dow}" type="time" value="${escapeHtml(timeShort(row.open_time || "10:00"))}">
-            <input id="bd-close-${dow}" type="time" value="${escapeHtml(timeShort(row.close_time || "19:00"))}">
-            <input id="bd-memo-${dow}" type="text" placeholder="メモ" value="${escapeHtml(row.memo || "")}">
+
+            <div class="time-field">
+              <label>開店時間</label>
+              <input id="bd-open-${dow}" type="time" value="${escapeHtml(timeShort(row.open_time || "10:00"))}">
+            </div>
+
+            <div class="time-field">
+              <label>閉店時間</label>
+              <input id="bd-close-${dow}" type="time" value="${escapeHtml(timeShort(row.close_time || "19:00"))}">
+            </div>
+
+            <div class="memo-field">
+              <label>メモ</label>
+              <input id="bd-memo-${dow}" type="text" placeholder="例：定休日、短縮営業など" value="${escapeHtml(row.memo || "")}">
+            </div>
           </div>
         `;
       }).join("");
@@ -1642,12 +1709,104 @@
       }
     }
 
-    function initReservationDates() {
-      const today = new Date();
-      const to = addDays(today, 30);
+    function renderAutoBadgesForInquiry(row) {
+      const badges = [];
+      const today = dateYmd(new Date());
+      const tomorrow = dateYmd(addDays(new Date(), 1));
+      const createdDate = row.created_at ? dateYmd(new Date(row.created_at)) : "";
+      const status = row.status || "";
+      const consultType = row.consult_type || "";
+      const estimatedAmount = Number(row.estimated_amount || 0);
 
-      document.getElementById("reservationFrom").value = dateYmd(today);
-      document.getElementById("reservationTo").value = dateYmd(to);
+      if (createdDate === today && isOpenStatus(status)) {
+        badges.push(autoBadge("本日対応推奨", "red"));
+      }
+
+      if (row.preferred_visit_date === today) {
+        badges.push(autoBadge("本日入庫希望", "red"));
+      } else if (row.preferred_visit_date === tomorrow) {
+        badges.push(autoBadge("明日入庫希望", "orange"));
+      }
+
+      const vehicle = row.vehicle || {};
+      const shakenDays = daysUntil(vehicle.next_shaken_date);
+
+      if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
+        badges.push(autoBadge("車検2か月前", "red"));
+      } else if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 90) {
+        badges.push(autoBadge("車検3か月以内", "orange"));
+      }
+
+      if (status.includes("未返信")) {
+        badges.push(autoBadge("追客推奨", "purple"));
+      }
+
+      if (consultType.includes("カスタム") || consultType.includes("パーツ") || estimatedAmount >= 150000) {
+        badges.push(autoBadge("高単価案件", "amber"));
+      }
+
+      if ((row.priority || "") === "高") {
+        badges.push(autoBadge("優先対応", "blue"));
+      }
+
+      if (!badges.length) {
+        badges.push(autoBadge("通常対応", "slate"));
+      }
+
+      return badges.join("");
+    }
+
+    function renderAutoBadgesForCustomer(customer) {
+      const badges = [];
+      const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+
+      vehicles.forEach(vehicle => {
+        const shakenDays = daysUntil(vehicle.next_shaken_date);
+
+        if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
+          badges.push(autoBadge("車検2か月前", "red"));
+        } else if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 90) {
+          badges.push(autoBadge("車検3か月以内", "orange"));
+        }
+
+        const oilDays = daysSince(vehicle.last_oil_change_date);
+        if (oilDays !== null && oilDays >= 180) {
+          badges.push(autoBadge("オイル交換時期", "green"));
+        }
+      });
+
+      const lastVisitDays = daysSince(customer.last_visit_date);
+      if (lastVisitDays !== null && lastVisitDays >= 365) {
+        badges.push(autoBadge("休眠顧客", "purple"));
+      }
+
+      if (!badges.length) {
+        badges.push(autoBadge("通常", "slate"));
+      }
+
+      return uniqueHtmlBadges(badges).join("");
+    }
+
+    function autoBadge(text, color) {
+      const cls = {
+        red: "badge-red",
+        orange: "badge-orange",
+        amber: "badge-amber",
+        green: "badge-green",
+        blue: "badge-blue",
+        purple: "badge-purple",
+        slate: "badge-slate"
+      }[color] || "badge-slate";
+
+      return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;
+    }
+
+    function uniqueHtmlBadges(badges) {
+      return [...new Set(badges)];
+    }
+
+    function isOpenStatus(status) {
+      return !["作業完了", "失注", "キャンセル"].some(s => String(status || "").includes(s));
     }
 
     function statusOptions(current) {
@@ -1667,7 +1826,6 @@
 
     function priorityOptions(current) {
       const list = ["低", "通常", "高"];
-
       return list.map(s => `<option value="${escapeHtml(s)}" ${s === current ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
     }
 
@@ -1704,6 +1862,14 @@
       if (s.includes("休眠")) cls = "badge-orange";
 
       return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
+    }
+
+    function initReservationDates() {
+      const today = new Date();
+      const to = addDays(today, 30);
+
+      document.getElementById("reservationFrom").value = dateYmd(today);
+      document.getElementById("reservationTo").value = dateYmd(to);
     }
 
     function setText(id, value) {
@@ -1753,7 +1919,7 @@
 
     function formatDate(value) {
       if (!value) return "";
-      const [y, m, d] = String(value).slice(0,10).split("-");
+      const [y, m, d] = String(value).slice(0, 10).split("-");
       if (!y || !m || !d) return value;
       return `${Number(y)}年${Number(m)}月${Number(d)}日`;
     }
@@ -1786,9 +1952,36 @@
       return `${y}-${m}-${d}`;
     }
 
+    function parseYmd(value) {
+      if (!value) return null;
+      const parts = String(value).slice(0, 10).split("-").map(Number);
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function daysUntil(value) {
+      const target = parseYmd(value);
+      if (!target) return null;
+
+      const today = parseYmd(dateYmd(new Date()));
+      const diff = target.getTime() - today.getTime();
+
+      return Math.floor(diff / 86400000);
+    }
+
+    function daysSince(value) {
+      const target = parseYmd(value);
+      if (!target) return null;
+
+      const today = parseYmd(dateYmd(new Date()));
+      const diff = today.getTime() - target.getTime();
+
+      return Math.floor(diff / 86400000);
+    }
+
     function timeShort(value) {
       if (!value) return "";
-      return String(value).slice(0,5);
+      return String(value).slice(0, 5);
     }
   </script>
 </body>
