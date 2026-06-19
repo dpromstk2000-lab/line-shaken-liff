@@ -557,6 +557,7 @@
     .add-box {
       display: none;
       margin-bottom: 16px;
+      border: 2px solid #dbeafe;
     }
 
     .add-box.active {
@@ -651,6 +652,74 @@
       display: none;
     }
 
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.62);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      width: min(620px, 100%);
+      max-height: 88vh;
+      overflow: auto;
+      background: #ffffff;
+      border-radius: 18px;
+      box-shadow: 0 22px 60px rgba(0,0,0,0.28);
+      border: 1px solid var(--line);
+    }
+
+    .modal-head {
+      padding: 18px 18px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .modal-body {
+      padding: 16px 18px;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .modal-body dl {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 7px 12px;
+      margin: 0;
+    }
+
+    .modal-body dt {
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .modal-body dd {
+      margin: 0;
+      font-weight: 700;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 14px 18px 18px;
+      border-top: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+
     @media (max-width: 1180px) {
       .grid4,
       .grid3,
@@ -709,6 +778,10 @@
       .topbar {
         padding: 12px 14px;
       }
+
+      .modal-body dl {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -738,8 +811,8 @@
       <div class="side-footer">
         毎日見る場所：<br>
         ✅ 今日やること<br><br>
-        LINE友だち以外の既存客も<br>
-        店舗側で登録可能
+        登録・編集・削除前に<br>
+        必ず確認画面を表示
       </div>
     </aside>
 
@@ -1001,7 +1074,7 @@
             <div class="toolbar-left">
               <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話で検索" />
               <button class="btn btn-primary" onclick="loadCustomers()">検索</button>
-              <button class="btn btn-green" onclick="toggleAddCustomer()">＋ 顧客を追加</button>
+              <button class="btn btn-green" onclick="openNewCustomerForm()">＋ 顧客を追加</button>
             </div>
             <div class="toolbar-right">
               <button class="btn btn-slate" onclick="openLineManager()">LINE管理画面</button>
@@ -1011,9 +1084,9 @@
           <div id="addCustomerBox" class="card card-pad add-box">
             <div class="toolbar">
               <div>
-                <h3 style="margin:0">店舗側で顧客・車両を登録</h3>
-                <div class="small muted">
-                  LINE友だち以外の既存客・店頭客・電話客も登録できます。次回車検年月は今月以降、最大3年先まで選択できます。
+                <h3 id="customerFormTitle" style="margin:0">店舗側で顧客・車両を登録</h3>
+                <div id="customerFormHelp" class="small muted">
+                  LINE友だち以外の既存客・店頭客・電話客も登録できます。登録前に確認画面を表示します。
                 </div>
               </div>
               <button class="btn btn-slate" onclick="clearAddCustomerForm()">入力クリア</button>
@@ -1088,8 +1161,8 @@
             </div>
 
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px">
-              <button class="btn btn-green" onclick="createCustomer()">この内容で登録</button>
-              <button class="btn btn-slate" onclick="toggleAddCustomer()">閉じる</button>
+              <button id="customerSubmitButton" class="btn btn-green" onclick="saveCustomerForm()">登録内容を確認</button>
+              <button class="btn btn-slate" onclick="closeCustomerForm()">閉じる</button>
             </div>
           </div>
 
@@ -1196,6 +1269,19 @@
     </main>
   </div>
 
+  <div id="confirmOverlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="confirmTitle">確認</h3>
+      </div>
+      <div id="confirmBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-slate" onclick="closeConfirm()">キャンセル</button>
+        <button id="confirmOkButton" class="btn btn-primary" onclick="runConfirmAction()">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
@@ -1214,6 +1300,10 @@
     let businessDaysCache = [];
     let specialDaysCache = [];
     let todayTasksCache = [];
+
+    let editingCustomerId = "";
+    let editingVehicleId = "";
+    let confirmAction = null;
 
     const pageMeta = {
       today: {
@@ -1772,28 +1862,57 @@
       }
     }
 
-    function toggleAddCustomer() {
-      initCustomerFormLimits();
-      document.getElementById("addCustomerBox").classList.toggle("active");
+    function openNewCustomerForm() {
+      clearAddCustomerForm();
+      editingCustomerId = "";
+      editingVehicleId = "";
+      document.getElementById("customerFormTitle").textContent = "店舗側で顧客・車両を登録";
+      document.getElementById("customerFormHelp").textContent = "LINE友だち以外の既存客・店頭客・電話客も登録できます。登録前に確認画面を表示します。";
+      document.getElementById("customerSubmitButton").textContent = "登録内容を確認";
+      document.getElementById("addCustomerBox").classList.add("active");
+      scrollToCustomerForm();
     }
 
-    function initCustomerFormLimits() {
-      const today = new Date();
-      const todayDate = dateYmd(today);
-      const thisMonth = monthValue(today);
-      const maxShakenMonth = addMonthsValue(today, 36);
-
-      const shaken = document.getElementById("newNextShakenMonth");
-      if (shaken) {
-        shaken.min = thisMonth;
-        shaken.max = maxShakenMonth;
+    function openEditCustomerForm(customerId) {
+      const customer = findCustomer(customerId);
+      if (!customer) {
+        showError("編集対象の顧客が見つかりません。");
+        return;
       }
 
-      const oil = document.getElementById("newLastOilChangeDate");
-      if (oil) oil.max = todayDate;
+      const vehicle = Array.isArray(customer.vehicles) && customer.vehicles.length
+        ? customer.vehicles[0]
+        : {};
 
-      const visit = document.getElementById("newLastVisitDate");
-      if (visit) visit.max = todayDate;
+      editingCustomerId = customer.id || "";
+      editingVehicleId = vehicle.id || "";
+
+      document.getElementById("customerFormTitle").textContent = "顧客・車両を編集";
+      document.getElementById("customerFormHelp").textContent = "変更内容は保存前に確認画面を表示します。";
+      document.getElementById("customerSubmitButton").textContent = "変更内容を確認";
+
+      document.getElementById("newCustomerName").value = customer.name || "";
+      document.getElementById("newCustomerPhone").value = customer.phone || "";
+      document.getElementById("newCustomerStatus").value = normalizeCustomerStatus(customer.status || "店舗登録");
+      document.getElementById("newLastVisitDate").value = normalizeDateInput(customer.last_visit_date || vehicle.last_visit_date || "");
+      document.getElementById("newCustomerMemo").value = customer.memo || "";
+
+      document.getElementById("newCarName").value = vehicle.car_name || "";
+      document.getElementById("newMaker").value = vehicle.maker || "";
+      document.getElementById("newModel").value = vehicle.model || "";
+      document.getElementById("newPlateLast4").value = vehicle.plate_last4 || "";
+      document.getElementById("newNextShakenMonth").value = getVehicleMonthValue(vehicle);
+      document.getElementById("newLastOilChangeDate").value = normalizeDateInput(vehicle.last_oil_change_date || "");
+      document.getElementById("newVehicleMemo").value = vehicle.memo || "";
+
+      initCustomerFormLimits();
+      document.getElementById("addCustomerBox").classList.add("active");
+      scrollToCustomerForm();
+    }
+
+    function closeCustomerForm() {
+      document.getElementById("addCustomerBox").classList.remove("active");
+      clearAddCustomerForm();
     }
 
     function clearAddCustomerForm() {
@@ -1815,13 +1934,66 @@
       });
 
       document.getElementById("newCustomerStatus").value = "店舗登録";
+      editingCustomerId = "";
+      editingVehicleId = "";
+      document.getElementById("customerFormTitle").textContent = "店舗側で顧客・車両を登録";
+      document.getElementById("customerFormHelp").textContent = "LINE友だち以外の既存客・店頭客・電話客も登録できます。登録前に確認画面を表示します。";
+      document.getElementById("customerSubmitButton").textContent = "登録内容を確認";
       initCustomerFormLimits();
     }
 
-    async function createCustomer() {
+    function scrollToCustomerForm() {
+      setTimeout(() => {
+        document.getElementById("addCustomerBox").scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }, 80);
+    }
+
+    function initCustomerFormLimits() {
+      const today = new Date();
+      const todayDate = dateYmd(today);
+      const thisMonth = monthValue(today);
+      const maxShakenMonth = addMonthsValue(today, 36);
+
+      const shaken = document.getElementById("newNextShakenMonth");
+      if (shaken) {
+        shaken.min = thisMonth;
+        shaken.max = maxShakenMonth;
+      }
+
+      const oil = document.getElementById("newLastOilChangeDate");
+      if (oil) oil.max = todayDate;
+
+      const visit = document.getElementById("newLastVisitDate");
+      if (visit) visit.max = todayDate;
+    }
+
+    function saveCustomerForm() {
       clearAlert();
       initCustomerFormLimits();
 
+      const payload = buildCustomerPayloadFromForm();
+      if (!payload) return;
+
+      const isEdit = Boolean(editingCustomerId);
+      const title = isEdit ? "この内容で変更しますか？" : "この内容で登録しますか？";
+      const body = buildCustomerConfirmHtml(payload, isEdit);
+
+      showConfirm(title, body, async () => {
+        if (isEdit) {
+          await updateCustomer(payload);
+        } else {
+          await createCustomer(payload);
+        }
+      }, {
+        okText: isEdit ? "変更する" : "登録する",
+        danger: false
+      });
+    }
+
+    function buildCustomerPayloadFromForm() {
       const name = document.getElementById("newCustomerName").value.trim();
       const phone = document.getElementById("newCustomerPhone").value.trim();
       const nextShakenMonth = document.getElementById("newNextShakenMonth").value;
@@ -1830,13 +2002,13 @@
 
       if (!name) {
         showError("お名前を入力してください。");
-        return;
+        return null;
       }
 
       const monthCheck = validateNextShakenMonth(nextShakenMonth);
       if (!monthCheck.ok) {
         showError(monthCheck.message);
-        return;
+        return null;
       }
 
       const pastCheck = validatePastDateFields({
@@ -1846,7 +2018,7 @@
 
       if (!pastCheck.ok) {
         showError(pastCheck.message);
-        return;
+        return null;
       }
 
       const payload = {
@@ -1866,6 +2038,41 @@
         }
       };
 
+      if (editingVehicleId) {
+        payload.vehicle.id = editingVehicleId;
+      }
+
+      return payload;
+    }
+
+    function buildCustomerConfirmHtml(payload, isEdit) {
+      const vehicle = payload.vehicle || {};
+
+      return `
+        <p class="muted" style="margin-top:0">
+          ${isEdit ? "以下の内容に変更します。" : "以下の内容で新規登録します。"}間違いがないか確認してください。
+        </p>
+        <dl>
+          <dt>お名前</dt><dd>${escapeHtml(payload.name || "未入力")}</dd>
+          <dt>電話番号</dt><dd>${escapeHtml(payload.phone || "未入力")}</dd>
+          <dt>ステータス</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>
+          <dt>最終来店日</dt><dd>${escapeHtml(payload.lastVisitDate ? formatDate(payload.lastVisitDate) : "未入力")}</dd>
+          <dt>車種・車名</dt><dd>${escapeHtml(vehicle.carName || "未入力")}</dd>
+          <dt>メーカー</dt><dd>${escapeHtml(vehicle.maker || "未入力")}</dd>
+          <dt>型式・モデル</dt><dd>${escapeHtml(vehicle.model || "未入力")}</dd>
+          <dt>ナンバー下4桁</dt><dd>${escapeHtml(vehicle.plateLast4 || "未入力")}</dd>
+          <dt>次回車検</dt><dd>${escapeHtml(vehicle.nextShakenDate ? formatYearMonth(vehicle.nextShakenDate) : "未入力")}</dd>
+          <dt>前回オイル交換</dt><dd>${escapeHtml(vehicle.lastOilChangeDate ? formatDate(vehicle.lastOilChangeDate) : "未入力")}</dd>
+          <dt>店舗メモ</dt><dd>${escapeHtml(payload.memo || "未入力")}</dd>
+          <dt>車両メモ</dt><dd>${escapeHtml(vehicle.memo || "未入力")}</dd>
+        </dl>
+      `;
+    }
+
+    async function createCustomer(payload) {
+      clearAlert();
+      setLoading(true);
+
       try {
         await api("/api/customers", {
           method: "POST",
@@ -1873,13 +2080,100 @@
         });
 
         showOk("店舗側で顧客・車両を登録しました。");
-        clearAddCustomerForm();
+        closeCustomerForm();
         currentCustomerFilter = "all";
         updateCustomerFilterButtons();
         await loadCustomers();
 
       } catch (error) {
         showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function updateCustomer(payload) {
+      if (!editingCustomerId) {
+        showError("編集対象の顧客IDがありません。");
+        return;
+      }
+
+      clearAlert();
+      setLoading(true);
+
+      try {
+        await api(`/api/customers/${editingCustomerId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+
+        showOk("顧客・車両情報を更新しました。");
+        closeCustomerForm();
+        await loadCustomers();
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function confirmDeleteCustomer(customerId) {
+      const customer = findCustomer(customerId);
+      if (!customer) {
+        showError("削除対象の顧客が見つかりません。");
+        return;
+      }
+
+      const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+      const vehicleText = vehicles.length
+        ? vehicles.map(v => `${v.car_name || "車両名未入力"} ${v.plate_last4 ? " / 下4桁 " + v.plate_last4 : ""}`).join("<br>")
+        : "車両なし";
+
+      const body = `
+        <p style="margin-top:0;color:#991b1b;font-weight:900">
+          この顧客を通常一覧から非表示にします。
+        </p>
+        <p class="muted">
+          完全削除ではなく、顧客ステータスを「削除済み」、車両ステータスを「inactive」に変更します。
+          過去の相談・予約・送信履歴とのつながりは残します。
+        </p>
+        <dl>
+          <dt>お名前</dt><dd>${escapeHtml(customer.name || "未入力")}</dd>
+          <dt>電話番号</dt><dd>${escapeHtml(customer.phone || "未入力")}</dd>
+          <dt>車両</dt><dd>${vehicleText}</dd>
+        </dl>
+      `;
+
+      showConfirm("この顧客を削除済みにしますか？", body, async () => {
+        await deleteCustomer(customerId);
+      }, {
+        okText: "削除済みにする",
+        danger: true
+      });
+    }
+
+    async function deleteCustomer(customerId) {
+      clearAlert();
+      setLoading(true);
+
+      try {
+        await api(`/api/customers/${customerId}`, {
+          method: "DELETE"
+        });
+
+        showOk("顧客を削除済みにしました。通常の一覧には表示されません。");
+
+        if (editingCustomerId === customerId) {
+          closeCustomerForm();
+        }
+
+        await loadCustomers();
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -1961,7 +2255,7 @@
           : "未入力";
 
         const shakenText = vehicles.length
-          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatYearMonth(v.next_shaken_date) : "未入力")).join("<br>")
+          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatYearMonth(v.next_shaken_date) : formatVehicleYearMonth(v))).join("<br>")
           : "未入力";
 
         return `
@@ -1981,11 +2275,13 @@
             <td><div class="message-box">${escapeHtml(suggested)}</div></td>
             <td>
               <div style="display:grid; gap:6px">
+                <button class="btn btn-primary" onclick="openEditCustomerForm('${customer.id}')">編集</button>
                 <button class="btn btn-slate" onclick="copyCustomerName('${customer.id}')">名前コピー</button>
                 <button class="btn btn-slate" onclick="copyCustomerPhone('${customer.id}')">電話コピー</button>
                 <button class="btn btn-slate" onclick="copyCustomerMessage('${customer.id}')">文面コピー</button>
                 ${customer.line_user_id ? `<button class="btn btn-green" onclick="sendCustomerLine('${customer.id}')">LINE送信</button>` : ""}
                 <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+                <button class="btn btn-red" onclick="confirmDeleteCustomer('${customer.id}')">削除</button>
               </div>
             </td>
           </tr>
@@ -2002,14 +2298,14 @@
 
       if (filter === "shaken60") {
         return vehicles.some(v => {
-          const d = daysUntil(v.next_shaken_date);
+          const d = daysUntil(vehicleDateForCalc(v));
           return d !== null && d >= 0 && d <= 60;
         });
       }
 
       if (filter === "shaken90") {
         return vehicles.some(v => {
-          const d = daysUntil(v.next_shaken_date);
+          const d = daysUntil(vehicleDateForCalc(v));
           return d !== null && d >= 0 && d <= 90;
         });
       }
@@ -2184,32 +2480,37 @@
     }
 
     async function deleteSpecialDay(id) {
-      if (!confirm("この臨時休み設定を削除しますか？")) return;
+      showConfirm("この臨時休み設定を削除しますか？", `
+        <p class="muted">削除すると、LIFFカレンダーの休業日設定からも外れます。</p>
+      `, async () => {
+        clearAlert();
 
-      clearAlert();
+        try {
+          await api(`/api/special-days/${id}`, {
+            method: "DELETE"
+          });
 
-      try {
-        await api(`/api/special-days/${id}`, {
-          method: "DELETE"
-        });
+          showOk("削除しました。");
+          await loadSettings();
 
-        showOk("削除しました。");
-        await loadSettings();
-
-      } catch (error) {
-        showError(error.message);
-      }
+        } catch (error) {
+          showError(error.message);
+        }
+      }, {
+        okText: "削除する",
+        danger: true
+      });
     }
 
     function calcCustomerStats(customers, opportunities, reminders, inquiries) {
       const vehicles = customers.flatMap(c => Array.isArray(c.vehicles) ? c.vehicles : []);
-      const shakenKnown = vehicles.filter(v => Boolean(v.next_shaken_date)).length;
+      const shakenKnown = vehicles.filter(v => Boolean(vehicleDateForCalc(v))).length;
 
       let shaken60 = 0;
       let shaken90 = 0;
 
       vehicles.forEach(v => {
-        const d = daysUntil(v.next_shaken_date);
+        const d = daysUntil(vehicleDateForCalc(v));
         if (d !== null && d >= 0 && d <= 60) shaken60 += 1;
         if (d !== null && d >= 0 && d <= 90) shaken90 += 1;
       });
@@ -2253,7 +2554,7 @@
       }
 
       const vehicle = row.vehicle || {};
-      const shakenDays = daysUntil(vehicle.next_shaken_date);
+      const shakenDays = daysUntil(vehicleDateForCalc(vehicle));
 
       if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
         badges.push(autoBadge("車検2か月前", "red"));
@@ -2285,7 +2586,7 @@
       const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
 
       vehicles.forEach(vehicle => {
-        const shakenDays = daysUntil(vehicle.next_shaken_date);
+        const shakenDays = daysUntil(vehicleDateForCalc(vehicle));
 
         if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
           badges.push(autoBadge("車検2か月以内", "red"));
@@ -2321,7 +2622,7 @@
 
       for (const vehicle of vehicles) {
         const car = vehicle.car_name || vehicle.model || "お車";
-        const shakenDays = daysUntil(vehicle.next_shaken_date);
+        const shakenDays = daysUntil(vehicleDateForCalc(vehicle));
 
         if (shakenDays !== null && shakenDays >= 0 && shakenDays <= 60) {
           return `${name}様、${car}の車検時期が近づいています。早めにご相談いただくと、代車や入庫日程を調整しやすくなります。ご希望日があればお気軽にお知らせください。`;
@@ -2397,7 +2698,7 @@
 
       if (s.includes("新規") || s.includes("確認") || s.includes("予約") || s.includes("連携済み")) cls = "badge-blue";
       if (s.includes("完了") || s.includes("送信済") || s.includes("特別営業")) cls = "badge-green";
-      if (s.includes("未返信") || s.includes("臨時休業") || s.includes("失注")) cls = "badge-red";
+      if (s.includes("未返信") || s.includes("臨時休業") || s.includes("失注") || s.includes("削除")) cls = "badge-red";
       if (s.includes("見積") || s.includes("保留") || s.includes("pending")) cls = "badge-orange";
       if (s.includes("未連携")) cls = "badge-slate";
 
@@ -2460,31 +2761,37 @@
         return;
       }
 
-      if (!confirm("このLINEメッセージを送信しますか？")) return;
+      showConfirm("このLINEメッセージを送信しますか？", `
+        <p class="muted">以下の文面をLINEで送信します。</p>
+        <div class="message-box">${escapeHtml(message)}</div>
+      `, async () => {
+        try {
+          await api("/api/line/push", {
+            method: "POST",
+            body: JSON.stringify({
+              customerId,
+              lineUserId,
+              reminderId,
+              message
+            })
+          });
 
-      try {
-        await api("/api/line/push", {
-          method: "POST",
-          body: JSON.stringify({
-            customerId,
-            lineUserId,
-            reminderId,
-            message
-          })
-        });
+          showOk("LINEメッセージを送信しました。");
 
-        showOk("LINEメッセージを送信しました。");
+          if (currentTab === "opportunities") await loadOpportunities();
+          if (currentTab === "today") await loadToday();
+          if (currentTab === "customers") await loadCustomers();
 
-        if (currentTab === "opportunities") await loadOpportunities();
-        if (currentTab === "today") await loadToday();
-        if (currentTab === "customers") await loadCustomers();
-
-      } catch (error) {
-        showError(
-          error.message +
-          "\n\nDEMO用の架空LINEユーザーIDの場合、直接送信は失敗します。その場合は「文面コピー」→「LINE管理画面」で確認してください。"
-        );
-      }
+        } catch (error) {
+          showError(
+            error.message +
+            "\n\nDEMO用の架空LINEユーザーIDの場合、直接送信は失敗します。その場合は「文面コピー」→「LINE管理画面」で確認してください。"
+          );
+        }
+      }, {
+        okText: "送信する",
+        danger: false
+      });
     }
 
     function findInquiry(id) {
@@ -2634,6 +2941,30 @@
       document.getElementById("reservationTo").value = dateYmd(to);
     }
 
+    function showConfirm(title, bodyHtml, action, options = {}) {
+      confirmAction = action;
+      document.getElementById("confirmTitle").textContent = title;
+      document.getElementById("confirmBody").innerHTML = bodyHtml;
+      const okButton = document.getElementById("confirmOkButton");
+      okButton.textContent = options.okText || "OK";
+      okButton.className = options.danger ? "btn btn-red" : "btn btn-primary";
+      document.getElementById("confirmOverlay").classList.add("active");
+    }
+
+    function closeConfirm() {
+      confirmAction = null;
+      document.getElementById("confirmOverlay").classList.remove("active");
+    }
+
+    async function runConfirmAction() {
+      const action = confirmAction;
+      closeConfirm();
+
+      if (typeof action === "function") {
+        await action();
+      }
+    }
+
     function isOpenStatus(status) {
       return !["作業完了", "失注", "キャンセル"].some(s => String(status || "").includes(s));
     }
@@ -2696,6 +3027,15 @@
       const [y, m] = String(value).slice(0, 10).split("-");
       if (!y || !m) return value;
       return `${Number(y)}年${Number(m)}月`;
+    }
+
+    function formatVehicleYearMonth(vehicle) {
+      if (!vehicle) return "未入力";
+      if (vehicle.next_shaken_date) return formatYearMonth(vehicle.next_shaken_date);
+      if (vehicle.next_shaken_year && vehicle.next_shaken_month) {
+        return `${Number(vehicle.next_shaken_year)}年${Number(vehicle.next_shaken_month)}月`;
+      }
+      return "未入力";
     }
 
     function formatMonthLabel(value) {
@@ -2779,6 +3119,41 @@
     function timeShort(value) {
       if (!value) return "";
       return String(value).slice(0, 5);
+    }
+
+    function normalizeDateInput(value) {
+      if (!value) return "";
+      return String(value).slice(0, 10);
+    }
+
+    function normalizeCustomerStatus(value) {
+      const allowed = ["店舗登録", "既存客", "車検見込み", "カスタム見込み", "LINE未連携"];
+      return allowed.includes(value) ? value : "店舗登録";
+    }
+
+    function getVehicleMonthValue(vehicle) {
+      if (!vehicle) return "";
+
+      if (vehicle.next_shaken_date) {
+        return String(vehicle.next_shaken_date).slice(0, 7);
+      }
+
+      if (vehicle.next_shaken_year && vehicle.next_shaken_month) {
+        return `${String(vehicle.next_shaken_year).padStart(4, "0")}-${String(vehicle.next_shaken_month).padStart(2, "0")}`;
+      }
+
+      return "";
+    }
+
+    function vehicleDateForCalc(vehicle) {
+      if (!vehicle) return "";
+      if (vehicle.next_shaken_date) return vehicle.next_shaken_date;
+
+      if (vehicle.next_shaken_year && vehicle.next_shaken_month) {
+        return `${String(vehicle.next_shaken_year).padStart(4, "0")}-${String(vehicle.next_shaken_month).padStart(2, "0")}-01`;
+      }
+
+      return "";
     }
   </script>
 </body>
