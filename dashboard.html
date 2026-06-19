@@ -465,10 +465,6 @@
       align-items: flex-start;
     }
 
-    .list-item strong {
-      font-size: 14px;
-    }
-
     .task-list {
       display: grid;
       gap: 12px;
@@ -811,8 +807,8 @@
       <div class="side-footer">
         毎日見る場所：<br>
         ✅ 今日やること<br><br>
-        登録・編集・削除前に<br>
-        必ず確認画面を表示
+        相談 → 顧客登録 → 入庫予定<br>
+        まで管理可能
       </div>
     </aside>
 
@@ -995,6 +991,84 @@
               <input id="reservationFrom" type="date" />
               <input id="reservationTo" type="date" />
               <button class="btn btn-primary" onclick="loadReservations()">表示</button>
+              <button class="btn btn-green" onclick="openNewReservationForm()">＋ 入庫予定を追加</button>
+            </div>
+          </div>
+
+          <div id="reservationFormBox" class="card card-pad add-box">
+            <div class="toolbar">
+              <div>
+                <h3 id="reservationFormTitle" style="margin:0">入庫予定を追加</h3>
+                <div id="reservationFormHelp" class="small muted">
+                  顧客と車両を選択し、入庫予定を登録します。登録前に確認画面を表示します。
+                </div>
+              </div>
+              <button class="btn btn-slate" onclick="clearReservationForm()">入力クリア</button>
+            </div>
+
+            <div class="add-grid">
+              <div class="form-field form-wide">
+                <label>顧客 必須</label>
+                <select id="reservationCustomerId" onchange="onReservationCustomerChange()">
+                  <option value="">顧客を選択</option>
+                </select>
+              </div>
+
+              <div class="form-field form-wide">
+                <label>車両</label>
+                <select id="reservationVehicleId">
+                  <option value="">車両を選択</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label>入庫日 必須</label>
+                <input id="reservationDateInput" type="date" />
+              </div>
+
+              <div class="form-field">
+                <label>入庫時間</label>
+                <input id="reservationTimeInput" type="time" />
+              </div>
+
+              <div class="form-field">
+                <label>作業内容</label>
+                <select id="reservationWorkType">
+                  <option value="車検">車検</option>
+                  <option value="点検">点検</option>
+                  <option value="オイル交換">オイル交換</option>
+                  <option value="修理">修理</option>
+                  <option value="カスタム">カスタム</option>
+                  <option value="見積もり">見積もり</option>
+                  <option value="その他">その他</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label>状態</label>
+                <select id="reservationStatus">
+                  <option value="入庫予定">入庫予定</option>
+                  <option value="入庫済み">入庫済み</option>
+                  <option value="作業中">作業中</option>
+                  <option value="作業完了">作業完了</option>
+                  <option value="キャンセル">キャンセル</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label>見込み金額</label>
+                <input id="reservationEstimatedAmount" type="number" min="0" step="1000" placeholder="例：120000" />
+              </div>
+
+              <div class="form-field form-full">
+                <label>メモ</label>
+                <textarea id="reservationMemo" placeholder="例：代車希望、車検証確認、タイヤ交換提案など"></textarea>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px">
+              <button id="reservationSubmitButton" class="btn btn-green" onclick="saveReservationForm()">登録内容を確認</button>
+              <button class="btn btn-slate" onclick="closeReservationForm()">閉じる</button>
             </div>
           </div>
 
@@ -1017,6 +1091,7 @@
                     <th>状態</th>
                     <th>見込み金額</th>
                     <th>メモ</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody id="reservationTableBody"></tbody>
@@ -1303,6 +1378,7 @@
 
     let editingCustomerId = "";
     let editingVehicleId = "";
+    let editingReservationId = "";
     let confirmAction = null;
 
     const pageMeta = {
@@ -1316,7 +1392,7 @@
       },
       reservations: {
         title: "入庫予定",
-        desc: "予約・入庫予定を確認します。"
+        desc: "店舗側で入庫予定を追加・変更・削除できます。"
       },
       opportunities: {
         title: "売上チャンス",
@@ -1336,6 +1412,7 @@
       document.getElementById("tokenInput").value = dashboardToken;
       initReservationDates();
       initCustomerFormLimits();
+      initReservationFormLimits();
       await loadToday();
     });
 
@@ -1682,6 +1759,7 @@
           <td>
             <div style="display:grid; gap:6px">
               <button class="btn btn-primary" onclick="updateInquiry('${row.id}')">保存</button>
+              <button class="btn btn-green" onclick="openReservationFromInquiry('${row.id}')">入庫予定へ</button>
               <button class="btn btn-slate" onclick="copyInquiryName('${row.id}')">名前コピー</button>
               <button class="btn btn-slate" onclick="copyInquiryPhone('${row.id}')">電話コピー</button>
               <button class="btn btn-slate" onclick="copyInquiryMessage('${row.id}')">文面コピー</button>
@@ -1719,12 +1797,15 @@
       clearAlert();
 
       try {
+        await ensureCustomersLoaded();
+
         const from = document.getElementById("reservationFrom").value;
         const to = document.getElementById("reservationTo").value;
 
         const data = await api(`/api/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
         reservationsCache = data.reservations || [];
         renderReservations(reservationsCache);
+        populateReservationCustomerSelect();
 
       } catch (error) {
         showError(error.message);
@@ -1737,7 +1818,7 @@
       const body = document.getElementById("reservationTableBody");
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="8" class="muted">入庫予定はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="muted">入庫予定はありません。</td></tr>`;
         return;
       }
 
@@ -1745,14 +1826,419 @@
         <tr>
           <td>${escapeHtml(formatDate(row.reservation_date))}</td>
           <td>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "未定")}</td>
-          <td>${escapeHtml(row.customer?.name || "未入力")}</td>
-          <td>${escapeHtml(row.vehicle?.car_name || "未入力")}</td>
+          <td>
+            <strong>${escapeHtml(row.customer?.name || "未入力")}</strong><br>
+            <span class="muted small">${escapeHtml(row.customer?.phone || "")}</span>
+          </td>
+          <td>
+            ${escapeHtml(row.vehicle?.car_name || "未入力")}<br>
+            <span class="muted small">${escapeHtml(row.vehicle?.plate_last4 ? "下4桁 " + row.vehicle.plate_last4 : "")}</span>
+          </td>
           <td>${escapeHtml(row.work_type || "")}</td>
           <td>${badgeStatus(row.status)}</td>
           <td>${yen(row.estimated_amount || 0)}</td>
           <td>${escapeHtml(row.memo || "")}</td>
+          <td>
+            <div style="display:grid; gap:6px">
+              <button class="btn btn-primary" onclick="openEditReservationForm('${row.id}')">編集</button>
+              <button class="btn btn-slate" onclick="copyReservationMessage('${row.id}')">文面コピー</button>
+              <button class="btn btn-red" onclick="confirmDeleteReservation('${row.id}')">削除</button>
+            </div>
+          </td>
         </tr>
       `).join("");
+    }
+
+    async function openNewReservationForm() {
+      await ensureCustomersLoaded();
+
+      editingReservationId = "";
+      clearReservationForm(false);
+      document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
+      document.getElementById("reservationFormHelp").textContent = "顧客と車両を選択し、入庫予定を登録します。登録前に確認画面を表示します。";
+      document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
+      document.getElementById("reservationFormBox").classList.add("active");
+
+      populateReservationCustomerSelect();
+      initReservationFormLimits();
+      scrollToReservationForm();
+    }
+
+    async function openReservationFromInquiry(inquiryId) {
+      const inquiry = findInquiry(inquiryId);
+      if (!inquiry) {
+        showError("対象の相談が見つかりません。");
+        return;
+      }
+
+      switchTab("reservations");
+
+      setTimeout(async () => {
+        await ensureCustomersLoaded();
+
+        editingReservationId = "";
+        clearReservationForm(false);
+        document.getElementById("reservationFormTitle").textContent = "相談から入庫予定を作成";
+        document.getElementById("reservationFormHelp").textContent = "相談内容をもとに入庫予定を作成します。登録すると相談ステータスも入庫予約済みにできます。";
+        document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
+        document.getElementById("reservationFormBox").classList.add("active");
+
+        populateReservationCustomerSelect();
+
+        if (inquiry.customer_id) {
+          document.getElementById("reservationCustomerId").value = inquiry.customer_id;
+          onReservationCustomerChange();
+
+          if (inquiry.vehicle_id) {
+            document.getElementById("reservationVehicleId").value = inquiry.vehicle_id;
+          }
+        }
+
+        document.getElementById("reservationDateInput").value = normalizeDateInput(inquiry.preferred_visit_date || "");
+        document.getElementById("reservationWorkType").value = normalizeWorkType(inquiry.consult_type || "その他");
+        document.getElementById("reservationStatus").value = "入庫予定";
+        document.getElementById("reservationEstimatedAmount").value = inquiry.estimated_amount || "";
+        document.getElementById("reservationMemo").value = [
+          inquiry.consult_type ? `相談内容：${inquiry.consult_type}` : "",
+          inquiry.message ? `内容：${inquiry.message}` : ""
+        ].filter(Boolean).join("\n");
+
+        document.getElementById("reservationFormBox").dataset.inquiryId = inquiry.id || "";
+        initReservationFormLimits();
+        scrollToReservationForm();
+      }, 300);
+    }
+
+    async function openEditReservationForm(reservationId) {
+      await ensureCustomersLoaded();
+
+      const reservation = reservationsCache.find(row => row.id === reservationId);
+      if (!reservation) {
+        showError("編集対象の入庫予定が見つかりません。");
+        return;
+      }
+
+      editingReservationId = reservation.id || "";
+
+      document.getElementById("reservationFormTitle").textContent = "入庫予定を編集";
+      document.getElementById("reservationFormHelp").textContent = "変更内容は保存前に確認画面を表示します。";
+      document.getElementById("reservationSubmitButton").textContent = "変更内容を確認";
+      document.getElementById("reservationFormBox").classList.add("active");
+      document.getElementById("reservationFormBox").dataset.inquiryId = reservation.inquiry_id || "";
+
+      populateReservationCustomerSelect();
+
+      document.getElementById("reservationCustomerId").value = reservation.customer_id || "";
+      onReservationCustomerChange();
+
+      document.getElementById("reservationVehicleId").value = reservation.vehicle_id || "";
+      document.getElementById("reservationDateInput").value = normalizeDateInput(reservation.reservation_date || "");
+      document.getElementById("reservationTimeInput").value = reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "";
+      document.getElementById("reservationWorkType").value = normalizeWorkType(reservation.work_type || "その他");
+      document.getElementById("reservationStatus").value = normalizeReservationStatus(reservation.status || "入庫予定");
+      document.getElementById("reservationEstimatedAmount").value = reservation.estimated_amount || "";
+      document.getElementById("reservationMemo").value = reservation.memo || "";
+
+      initReservationFormLimits();
+      scrollToReservationForm();
+    }
+
+    function closeReservationForm() {
+      document.getElementById("reservationFormBox").classList.remove("active");
+      clearReservationForm();
+    }
+
+    function clearReservationForm(resetMode = true) {
+      [
+        "reservationCustomerId",
+        "reservationVehicleId",
+        "reservationDateInput",
+        "reservationTimeInput",
+        "reservationEstimatedAmount",
+        "reservationMemo"
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+
+      document.getElementById("reservationWorkType").value = "車検";
+      document.getElementById("reservationStatus").value = "入庫予定";
+      document.getElementById("reservationFormBox").dataset.inquiryId = "";
+      populateReservationVehicleSelect("");
+
+      if (resetMode) {
+        editingReservationId = "";
+        document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
+        document.getElementById("reservationFormHelp").textContent = "顧客と車両を選択し、入庫予定を登録します。登録前に確認画面を表示します。";
+        document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
+      }
+
+      initReservationFormLimits();
+    }
+
+    function scrollToReservationForm() {
+      setTimeout(() => {
+        document.getElementById("reservationFormBox").scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }, 80);
+    }
+
+    function initReservationFormLimits() {
+      const today = new Date();
+      const dateInput = document.getElementById("reservationDateInput");
+      if (dateInput) {
+        dateInput.min = dateYmd(today);
+        dateInput.max = dateYmd(addDays(today, 90));
+      }
+    }
+
+    function populateReservationCustomerSelect() {
+      const select = document.getElementById("reservationCustomerId");
+      if (!select) return;
+
+      const current = select.value;
+
+      const options = [`<option value="">顧客を選択</option>`]
+        .concat(customersCache.map(customer => {
+          const phone = customer.phone ? ` / ${customer.phone}` : "";
+          return `<option value="${escapeHtml(customer.id)}">${escapeHtml(customer.name || "未入力")}${escapeHtml(phone)}</option>`;
+        }));
+
+      select.innerHTML = options.join("");
+
+      if (current) select.value = current;
+    }
+
+    function onReservationCustomerChange() {
+      const customerId = document.getElementById("reservationCustomerId").value;
+      populateReservationVehicleSelect(customerId);
+    }
+
+    function populateReservationVehicleSelect(customerId) {
+      const select = document.getElementById("reservationVehicleId");
+      if (!select) return;
+
+      const customer = customerId ? findCustomer(customerId) : null;
+      const vehicles = customer && Array.isArray(customer.vehicles) ? customer.vehicles : [];
+
+      const options = [`<option value="">車両を選択</option>`]
+        .concat(vehicles.map(vehicle => {
+          const plate = vehicle.plate_last4 ? ` / 下4桁 ${vehicle.plate_last4}` : "";
+          const label = `${vehicle.car_name || vehicle.maker || vehicle.model || "車両名未入力"}${plate}`;
+          return `<option value="${escapeHtml(vehicle.id)}">${escapeHtml(label)}</option>`;
+        }));
+
+      select.innerHTML = options.join("");
+    }
+
+    function saveReservationForm() {
+      clearAlert();
+      initReservationFormLimits();
+
+      const payload = buildReservationPayloadFromForm();
+      if (!payload) return;
+
+      const isEdit = Boolean(editingReservationId);
+      const title = isEdit ? "この内容で入庫予定を変更しますか？" : "この内容で入庫予定を登録しますか？";
+      const body = buildReservationConfirmHtml(payload, isEdit);
+
+      showConfirm(title, body, async () => {
+        if (isEdit) {
+          await updateReservation(payload);
+        } else {
+          await createReservation(payload);
+        }
+      }, {
+        okText: isEdit ? "変更する" : "登録する",
+        danger: false
+      });
+    }
+
+    function buildReservationPayloadFromForm() {
+      const customerId = document.getElementById("reservationCustomerId").value;
+      const vehicleId = document.getElementById("reservationVehicleId").value;
+      const reservationDate = document.getElementById("reservationDateInput").value;
+      const reservationTime = document.getElementById("reservationTimeInput").value;
+      const workType = document.getElementById("reservationWorkType").value;
+      const status = document.getElementById("reservationStatus").value;
+      const estimatedAmount = document.getElementById("reservationEstimatedAmount").value;
+      const memo = document.getElementById("reservationMemo").value.trim();
+      const inquiryId = document.getElementById("reservationFormBox").dataset.inquiryId || "";
+
+      if (!customerId) {
+        showError("顧客を選択してください。");
+        return null;
+      }
+
+      if (!reservationDate) {
+        showError("入庫日を選択してください。");
+        return null;
+      }
+
+      const today = dateYmd(new Date());
+      if (reservationDate < today) {
+        showError("入庫日は本日以降を選択してください。");
+        return null;
+      }
+
+      return {
+        customerId,
+        vehicleId: vehicleId || null,
+        inquiryId: inquiryId || null,
+        reservationDate,
+        reservationTime: reservationTime || null,
+        workType,
+        status,
+        estimatedAmount: estimatedAmount === "" ? null : Number(estimatedAmount),
+        memo
+      };
+    }
+
+    function buildReservationConfirmHtml(payload, isEdit) {
+      const customer = findCustomer(payload.customerId);
+      const vehicle = getCustomerVehicle(payload.customerId, payload.vehicleId);
+
+      return `
+        <p class="muted" style="margin-top:0">
+          ${isEdit ? "以下の内容に変更します。" : "以下の内容で入庫予定を登録します。"}間違いがないか確認してください。
+        </p>
+        <dl>
+          <dt>顧客</dt><dd>${escapeHtml(customer?.name || "未入力")}</dd>
+          <dt>電話番号</dt><dd>${escapeHtml(customer?.phone || "未入力")}</dd>
+          <dt>車両</dt><dd>${escapeHtml(vehicle ? buildVehicleLabel(vehicle) : "未入力")}</dd>
+          <dt>入庫日</dt><dd>${escapeHtml(formatDate(payload.reservationDate))}</dd>
+          <dt>入庫時間</dt><dd>${escapeHtml(payload.reservationTime || "未入力")}</dd>
+          <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
+          <dt>状態</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>
+          <dt>見込み金額</dt><dd>${escapeHtml(payload.estimatedAmount ? yen(payload.estimatedAmount) : "未入力")}</dd>
+          <dt>メモ</dt><dd>${escapeHtml(payload.memo || "未入力")}</dd>
+        </dl>
+      `;
+    }
+
+    async function createReservation(payload) {
+      clearAlert();
+      setLoading(true);
+
+      try {
+        await api("/api/reservations", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+
+        showOk("入庫予定を登録しました。");
+        closeReservationForm();
+        await loadReservations();
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function updateReservation(payload) {
+      if (!editingReservationId) {
+        showError("編集対象の入庫予定IDがありません。");
+        return;
+      }
+
+      clearAlert();
+      setLoading(true);
+
+      try {
+        await api(`/api/reservations/${editingReservationId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+
+        showOk("入庫予定を更新しました。");
+        closeReservationForm();
+        await loadReservations();
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function confirmDeleteReservation(reservationId) {
+      const reservation = reservationsCache.find(row => row.id === reservationId);
+      if (!reservation) {
+        showError("削除対象の入庫予定が見つかりません。");
+        return;
+      }
+
+      const body = `
+        <p style="margin-top:0;color:#991b1b;font-weight:900">
+          この入庫予定を通常一覧から非表示にします。
+        </p>
+        <p class="muted">
+          完全削除ではなく、入庫予定の状態を「削除済み」に変更します。
+        </p>
+        <dl>
+          <dt>顧客</dt><dd>${escapeHtml(reservation.customer?.name || "未入力")}</dd>
+          <dt>車両</dt><dd>${escapeHtml(reservation.vehicle ? buildVehicleLabel(reservation.vehicle) : "未入力")}</dd>
+          <dt>入庫日</dt><dd>${escapeHtml(formatDate(reservation.reservation_date))}</dd>
+          <dt>時間</dt><dd>${escapeHtml(reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "未入力")}</dd>
+          <dt>作業内容</dt><dd>${escapeHtml(reservation.work_type || "未入力")}</dd>
+        </dl>
+      `;
+
+      showConfirm("この入庫予定を削除済みにしますか？", body, async () => {
+        await deleteReservation(reservationId);
+      }, {
+        okText: "削除済みにする",
+        danger: true
+      });
+    }
+
+    async function deleteReservation(reservationId) {
+      clearAlert();
+      setLoading(true);
+
+      try {
+        await api(`/api/reservations/${reservationId}`, {
+          method: "DELETE"
+        });
+
+        showOk("入庫予定を削除済みにしました。通常の一覧には表示されません。");
+
+        if (editingReservationId === reservationId) {
+          closeReservationForm();
+        }
+
+        await loadReservations();
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function copyReservationMessage(reservationId) {
+      const reservation = reservationsCache.find(row => row.id === reservationId);
+      if (!reservation) return;
+
+      const name = reservation.customer?.name || "お客様";
+      const date = reservation.reservation_date ? formatDate(reservation.reservation_date) : "入庫日";
+      const time = reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "";
+      const work = reservation.work_type || "作業";
+
+      const message = `${name}様、${date}${time ? " " + time + "頃" : ""}の${work}入庫予定についてご連絡です。ご都合が変わる場合は、お早めにお知らせください。`;
+
+      copyText(message);
+    }
+
+    async function ensureCustomersLoaded() {
+      if (customersCache.length) return;
+
+      const data = await api("/api/customers?limit=500");
+      customersCache = data.customers || [];
     }
 
     async function loadOpportunities() {
@@ -2127,7 +2613,7 @@
 
       const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
       const vehicleText = vehicles.length
-        ? vehicles.map(v => `${v.car_name || "車両名未入力"} ${v.plate_last4 ? " / 下4桁 " + v.plate_last4 : ""}`).join("<br>")
+        ? vehicles.map(v => `${escapeHtml(v.car_name || "車両名未入力")} ${v.plate_last4 ? " / 下4桁 " + escapeHtml(v.plate_last4) : ""}`).join("<br>")
         : "車両なし";
 
       const body = `
@@ -2275,6 +2761,7 @@
             <td><div class="message-box">${escapeHtml(suggested)}</div></td>
             <td>
               <div style="display:grid; gap:6px">
+                <button class="btn btn-green" onclick="openNewReservationForCustomer('${customer.id}')">入庫予定</button>
                 <button class="btn btn-primary" onclick="openEditCustomerForm('${customer.id}')">編集</button>
                 <button class="btn btn-slate" onclick="copyCustomerName('${customer.id}')">名前コピー</button>
                 <button class="btn btn-slate" onclick="copyCustomerPhone('${customer.id}')">電話コピー</button>
@@ -2287,6 +2774,25 @@
           </tr>
         `;
       }).join("");
+    }
+
+    async function openNewReservationForCustomer(customerId) {
+      switchTab("reservations");
+
+      setTimeout(async () => {
+        await openNewReservationForm();
+        document.getElementById("reservationCustomerId").value = customerId;
+        onReservationCustomerChange();
+
+        const customer = findCustomer(customerId);
+        const vehicle = customer && Array.isArray(customer.vehicles) && customer.vehicles.length
+          ? customer.vehicles[0]
+          : null;
+
+        if (vehicle) {
+          document.getElementById("reservationVehicleId").value = vehicle.id || "";
+        }
+      }, 350);
     }
 
     function customerMatchesFilter(customer, filter) {
@@ -2696,10 +3202,10 @@
       const s = status || "";
       let cls = "badge-slate";
 
-      if (s.includes("新規") || s.includes("確認") || s.includes("予約") || s.includes("連携済み")) cls = "badge-blue";
-      if (s.includes("完了") || s.includes("送信済") || s.includes("特別営業")) cls = "badge-green";
-      if (s.includes("未返信") || s.includes("臨時休業") || s.includes("失注") || s.includes("削除")) cls = "badge-red";
-      if (s.includes("見積") || s.includes("保留") || s.includes("pending")) cls = "badge-orange";
+      if (s.includes("新規") || s.includes("確認") || s.includes("予約") || s.includes("予定") || s.includes("連携済み")) cls = "badge-blue";
+      if (s.includes("完了") || s.includes("送信済") || s.includes("特別営業") || s.includes("入庫済み")) cls = "badge-green";
+      if (s.includes("未返信") || s.includes("臨時休業") || s.includes("失注") || s.includes("削除") || s.includes("キャンセル")) cls = "badge-red";
+      if (s.includes("見積") || s.includes("保留") || s.includes("pending") || s.includes("作業中")) cls = "badge-orange";
       if (s.includes("未連携")) cls = "badge-slate";
 
       return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
@@ -2804,6 +3310,12 @@
 
     function findReminder(id) {
       return remindersCache.find(row => row.id === id) || null;
+    }
+
+    function getCustomerVehicle(customerId, vehicleId) {
+      const customer = findCustomer(customerId);
+      if (!customer || !Array.isArray(customer.vehicles)) return null;
+      return customer.vehicles.find(vehicle => vehicle.id === vehicleId) || null;
     }
 
     function copyInquiryName(id) {
@@ -3131,6 +3643,18 @@
       return allowed.includes(value) ? value : "店舗登録";
     }
 
+    function normalizeWorkType(value) {
+      const allowed = ["車検", "点検", "オイル交換", "修理", "カスタム", "見積もり", "その他"];
+      if (!value) return "その他";
+      const hit = allowed.find(item => String(value).includes(item));
+      return hit || "その他";
+    }
+
+    function normalizeReservationStatus(value) {
+      const allowed = ["入庫予定", "入庫済み", "作業中", "作業完了", "キャンセル"];
+      return allowed.includes(value) ? value : "入庫予定";
+    }
+
     function getVehicleMonthValue(vehicle) {
       if (!vehicle) return "";
 
@@ -3154,6 +3678,13 @@
       }
 
       return "";
+    }
+
+    function buildVehicleLabel(vehicle) {
+      if (!vehicle) return "未入力";
+      const name = vehicle.car_name || vehicle.maker || vehicle.model || "車両名未入力";
+      const plate = vehicle.plate_last4 ? ` / 下4桁 ${vehicle.plate_last4}` : "";
+      return `${name}${plate}`;
     }
   </script>
 </body>
