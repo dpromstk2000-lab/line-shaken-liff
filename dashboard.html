@@ -1108,7 +1108,7 @@
 
               <div class="form-field">
                 <label>状態</label>
-                <select id="reservationStatus">
+                <select id="reservationStatus" onchange="toggleReservationCompletionFields()">
                   <option value="入庫予定">入庫予定</option>
                   <option value="入庫済み">入庫済み</option>
                   <option value="作業中">作業中</option>
@@ -1125,6 +1125,45 @@
               <div class="form-field form-full">
                 <label>メモ</label>
                 <textarea id="reservationMemo" placeholder="例：代車希望、車検証確認、タイヤ交換提案など"></textarea>
+              </div>
+
+              <div id="reservationCompletionBox" class="form-field form-full" style="display:none; border:2px solid #bbf7d0; background:#f0fdf4; border-radius:16px; padding:14px;">
+                <label style="font-size:13px; color:#166534; margin-bottom:8px;">作業完了・売上化</label>
+                <div class="small muted" style="margin-bottom:12px;">
+                  状態を「作業完了」にした場合のみ保存します。実売上・次回提案を顧客と車両にも反映します。
+                </div>
+
+                <div class="add-grid">
+                  <div class="form-field">
+                    <label>実売上金額</label>
+                    <input id="reservationActualSalesAmount" type="number" min="0" step="1000" placeholder="例：132000" />
+                  </div>
+
+                  <div class="form-field">
+                    <label>作業完了日</label>
+                    <input id="reservationCompletedDate" type="date" />
+                  </div>
+
+                  <div class="form-field">
+                    <label>次回オイル交換目安</label>
+                    <input id="reservationNextOilChangeDate" type="date" />
+                  </div>
+
+                  <div class="form-field">
+                    <label>次回車検年月</label>
+                    <input id="reservationNextShakenMonth" type="month" />
+                  </div>
+
+                  <div class="form-field form-wide">
+                    <label>作業完了メモ</label>
+                    <textarea id="reservationCompletionMemo" placeholder="例：車検完了。ブレーキパッド残量少なめ、次回点検時に確認。"></textarea>
+                  </div>
+
+                  <div class="form-field form-wide">
+                    <label>次回提案メモ</label>
+                    <textarea id="reservationNextProposalMemo" placeholder="例：半年後にオイル交換案内。次回車検時にタイヤ交換提案。"></textarea>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1899,7 +1938,7 @@
           </td>
           <td>${escapeHtml(row.work_type || "")}</td>
           <td>${badgeStatus(row.status)}</td>
-          <td>${yen(row.estimated_amount || 0)}</td>
+          <td>${renderReservationAmount(row)}</td>
           <td>${escapeHtml(row.memo || "")}</td>
           <td>
             <div style="display:grid; gap:6px">
@@ -1926,6 +1965,7 @@
 
       searchReservationCustomers();
       initReservationFormLimits();
+      toggleReservationCompletionFields();
       scrollToReservationForm();
     }
 
@@ -1963,6 +2003,7 @@
         document.getElementById("reservationDateInput").value = normalizeDateInput(inquiry.preferred_visit_date || "");
         document.getElementById("reservationWorkType").value = normalizeWorkType(inquiry.consult_type || "その他");
         document.getElementById("reservationStatus").value = "入庫予定";
+        toggleReservationCompletionFields();
         document.getElementById("reservationEstimatedAmount").value = inquiry.estimated_amount || "";
         document.getElementById("reservationMemo").value = [
           inquiry.consult_type ? `相談内容：${inquiry.consult_type}` : "",
@@ -2006,6 +2047,13 @@
       document.getElementById("reservationStatus").value = normalizeReservationStatus(reservation.status || "入庫予定");
       document.getElementById("reservationEstimatedAmount").value = reservation.estimated_amount || "";
       document.getElementById("reservationMemo").value = reservation.memo || "";
+      document.getElementById("reservationActualSalesAmount").value = reservation.actual_sales_amount || "";
+      document.getElementById("reservationCompletedDate").value = normalizeDateInput(reservation.completed_date || "");
+      document.getElementById("reservationCompletionMemo").value = reservation.completion_memo || "";
+      document.getElementById("reservationNextProposalMemo").value = reservation.next_proposal_memo || "";
+      document.getElementById("reservationNextOilChangeDate").value = normalizeDateInput(reservation.next_oil_change_date || "");
+      document.getElementById("reservationNextShakenMonth").value = buildMonthInputValue(reservation.next_shaken_year, reservation.next_shaken_month);
+      toggleReservationCompletionFields();
 
       await loadReservationTimeOptionsForForm(reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "");
 
@@ -2024,7 +2072,13 @@
         "reservationVehicleId",
         "reservationDateInput",
         "reservationEstimatedAmount",
-        "reservationMemo"
+        "reservationMemo",
+        "reservationActualSalesAmount",
+        "reservationCompletedDate",
+        "reservationCompletionMemo",
+        "reservationNextProposalMemo",
+        "reservationNextOilChangeDate",
+        "reservationNextShakenMonth"
       ].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = "";
@@ -2038,6 +2092,7 @@
       renderSelectedReservationCustomer();
       populateReservationVehicleSelect("");
       resetReservationTimeSelect("先に入庫日を選択してください");
+      toggleReservationCompletionFields();
 
       if (resetMode) {
         editingReservationId = "";
@@ -2202,6 +2257,48 @@
       }
     }
 
+    function toggleReservationCompletionFields() {
+      const status = document.getElementById("reservationStatus")?.value || "";
+      const box = document.getElementById("reservationCompletionBox");
+      if (!box) return;
+
+      const isCompleted = status === "作業完了";
+      box.style.display = isCompleted ? "block" : "none";
+
+      if (!isCompleted) return;
+
+      const completedDate = document.getElementById("reservationCompletedDate");
+      if (completedDate && !completedDate.value) {
+        completedDate.value = dateYmd(new Date());
+      }
+
+      const actualSales = document.getElementById("reservationActualSalesAmount");
+      const estimated = document.getElementById("reservationEstimatedAmount");
+      if (actualSales && estimated && !actualSales.value && estimated.value) {
+        actualSales.value = estimated.value;
+      }
+    }
+
+    function buildMonthInputValue(year, month) {
+      const y = Number(year || 0);
+      const m = Number(month || 0);
+
+      if (!y || !m || m < 1 || m > 12) return "";
+
+      return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}`;
+    }
+
+    function renderReservationAmount(row) {
+      const actual = Number(row.actual_sales_amount || 0);
+      const estimated = Number(row.estimated_amount || 0);
+
+      if (row.status === "作業完了" && actual > 0) {
+        return `<strong>${yen(actual)}</strong><br><span class="badge badge-green">実売上</span>`;
+      }
+
+      return yen(estimated || 0);
+    }
+
     async function loadReservationTimeOptionsForForm(preferredTime = "") {
       const date = document.getElementById("reservationDateInput").value;
       const select = document.getElementById("reservationTimeInput");
@@ -2332,6 +2429,12 @@
       const estimatedAmount = document.getElementById("reservationEstimatedAmount").value;
       const memo = document.getElementById("reservationMemo").value.trim();
       const inquiryId = document.getElementById("reservationFormBox").dataset.inquiryId || "";
+      const actualSalesAmount = document.getElementById("reservationActualSalesAmount")?.value || "";
+      const completedDate = document.getElementById("reservationCompletedDate")?.value || "";
+      const completionMemo = document.getElementById("reservationCompletionMemo")?.value.trim() || "";
+      const nextProposalMemo = document.getElementById("reservationNextProposalMemo")?.value.trim() || "";
+      const nextOilChangeDate = document.getElementById("reservationNextOilChangeDate")?.value || "";
+      const nextShakenMonth = document.getElementById("reservationNextShakenMonth")?.value || "";
 
       if (!customerId) {
         showError("顧客を検索して選択してください。");
@@ -2354,6 +2457,23 @@
         return null;
       }
 
+      if (status === "作業完了") {
+        if (!actualSalesAmount) {
+          showError("作業完了にする場合は、実売上金額を入力してください。");
+          return null;
+        }
+
+        if (Number(actualSalesAmount) < 0) {
+          showError("実売上金額は0円以上で入力してください。");
+          return null;
+        }
+
+        if (!completedDate) {
+          showError("作業完了日を入力してください。");
+          return null;
+        }
+      }
+
       return {
         customerId,
         vehicleId: vehicleId || null,
@@ -2363,7 +2483,13 @@
         workType,
         status,
         estimatedAmount: estimatedAmount === "" ? null : Number(estimatedAmount),
-        memo
+        memo,
+        actualSalesAmount: status === "作業完了" && actualSalesAmount !== "" ? Number(actualSalesAmount) : null,
+        completedDate: status === "作業完了" ? completedDate : null,
+        completionMemo: status === "作業完了" ? completionMemo : "",
+        nextProposalMemo: status === "作業完了" ? nextProposalMemo : "",
+        nextOilChangeDate: status === "作業完了" ? nextOilChangeDate : "",
+        nextShakenMonth: status === "作業完了" ? nextShakenMonth : ""
       };
     }
 
@@ -2384,6 +2510,14 @@
           <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
           <dt>状態</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>
           <dt>見込み金額</dt><dd>${escapeHtml(payload.estimatedAmount ? yen(payload.estimatedAmount) : "未入力")}</dd>
+          ${payload.status === "作業完了" ? `
+            <dt>実売上金額</dt><dd>${escapeHtml(payload.actualSalesAmount !== null && payload.actualSalesAmount !== undefined ? yen(payload.actualSalesAmount) : "未入力")}</dd>
+            <dt>作業完了日</dt><dd>${escapeHtml(payload.completedDate ? formatDate(payload.completedDate) : "未入力")}</dd>
+            <dt>次回オイル交換</dt><dd>${escapeHtml(payload.nextOilChangeDate ? formatDate(payload.nextOilChangeDate) : "未入力")}</dd>
+            <dt>次回車検年月</dt><dd>${escapeHtml(payload.nextShakenMonth || "未入力")}</dd>
+            <dt>作業完了メモ</dt><dd>${escapeHtml(payload.completionMemo || "未入力")}</dd>
+            <dt>次回提案メモ</dt><dd>${escapeHtml(payload.nextProposalMemo || "未入力")}</dd>
+          ` : ""}
           <dt>メモ</dt><dd>${escapeHtml(payload.memo || "未入力")}</dd>
         </dl>
       `;
@@ -2425,7 +2559,7 @@
           body: JSON.stringify(payload)
         });
 
-        showOk("入庫予定を更新しました。");
+        showOk(payload.status === "作業完了" ? "作業完了・売上情報を保存しました。顧客・車両にも反映しました。" : "入庫予定を更新しました。");
         closeReservationForm();
         await loadReservations();
 
@@ -3888,7 +4022,8 @@
       if (!value) return null;
       return `${value}-01`;
     }
-　　　    function normalizeTime(value) {
+
+    function normalizeTime(value) {
       const text = String(value ?? "").trim();
       if (!text) return "";
 
@@ -3905,10 +4040,6 @@
       return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
     }
 
-    function timeShort(value) {
-      if (!value) return "";
-      return String(value).slice(0, 5);
-    }
     function timeShort(value) {
       if (!value) return "";
       return String(value).slice(0, 5);
