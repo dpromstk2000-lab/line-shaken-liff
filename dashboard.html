@@ -2205,6 +2205,7 @@
     async function loadReservationTimeOptionsForForm(preferredTime = "") {
       const date = document.getElementById("reservationDateInput").value;
       const select = document.getElementById("reservationTimeInput");
+      const normalizedPreferredTime = normalizeTime(preferredTime || "");
 
       if (!date) {
         resetReservationTimeSelect("先に入庫日を選択してください");
@@ -2223,21 +2224,65 @@
           return;
         }
 
+        const slots = Array.isArray(data.slots) ? data.slots : [];
         const times = Array.isArray(data.times) ? data.times : [];
+        const slotItems = slots.length
+          ? slots.map(slot => ({
+              time: normalizeTime(slot.time),
+              limit: Number(slot.limit || data.slotLimit || 1),
+              used: Number(slot.used || 0),
+              remaining: Number(slot.remaining ?? Math.max(Number(slot.limit || data.slotLimit || 1) - Number(slot.used || 0), 0)),
+              isFull: Boolean(slot.isFull ?? slot.is_full)
+            })).filter(slot => slot.time)
+          : times.map(time => ({
+              time: normalizeTime(time),
+              limit: Number(data.slotLimit || 1),
+              used: 0,
+              remaining: Number(data.slotLimit || 1),
+              isFull: false
+            })).filter(slot => slot.time);
 
-        if (!times.length) {
+        if (!slotItems.length) {
           select.innerHTML = `<option value="">選択できる時間がありません</option>`;
           select.disabled = true;
           return;
         }
 
-        select.disabled = false;
+        const optionHtml = slotItems.map(slot => {
+          const isCurrentEditingTime = Boolean(normalizedPreferredTime && slot.time === normalizedPreferredTime);
+          const isFull = slot.isFull || slot.remaining <= 0;
+          const disabled = isFull && !isCurrentEditingTime;
+
+          let label = slot.time;
+          if (isCurrentEditingTime) {
+            label += "（現在の予約）";
+          } else if (isFull) {
+            label += "（満枠）";
+          } else if (Number.isFinite(slot.remaining)) {
+            label += `（残り${slot.remaining}）`;
+          }
+
+          return `<option value="${escapeHtml(slot.time)}"${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
+        });
+
+        const selectableCount = slotItems.filter(slot => {
+          const isCurrentEditingTime = Boolean(normalizedPreferredTime && slot.time === normalizedPreferredTime);
+          const isFull = slot.isFull || slot.remaining <= 0;
+          return !isFull || isCurrentEditingTime;
+        }).length;
+
         select.innerHTML = [`<option value="">入庫時間を選択</option>`]
-          .concat(times.map(time => `<option value="${escapeHtml(time)}">${escapeHtml(time)}</option>`))
+          .concat(optionHtml)
           .join("");
 
-        if (preferredTime && times.includes(preferredTime)) {
-          select.value = preferredTime;
+        select.disabled = selectableCount === 0;
+
+        if (normalizedPreferredTime && slotItems.some(slot => slot.time === normalizedPreferredTime)) {
+          select.value = normalizedPreferredTime;
+        }
+
+        if (selectableCount === 0) {
+          showError("この日の入庫時間はすべて満枠です。別の日を選択してください。");
         }
 
       } catch (error) {
