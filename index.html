@@ -1,243 +1,818 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>車検・整備・カスタム ご相談窓口</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- LIFF SDK -->
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <style>
-        body { background-color: #1a1a1a; color: #eee; font-family: 'Helvetica Neue', Arial, sans-serif; }
-        .card { background-color: #2a2a2a; border: 1px solid #444; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        .btn-primary { background-color: #e67e22; border: none; font-weight: bold; }
-        .btn-primary:hover { background-color: #d35400; }
-        .btn-outline-light { border-color: #666; color: #ccc; }
-        .step-title { font-size: 1.2rem; font-weight: bold; color: #fff; margin-bottom: 1.5rem; }
-        .progress { height: 6px; border-radius: 3px; background-color: #444; }
-        .progress-bar { background-color: #e67e22; }
-        .form-label { font-weight: bold; color: #ddd; }
-        .badge { background-color: #555 !important; color: #ccc; }
-    </style>
-</head>
-<body>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<div class="container py-4" style="max-width: 500px;">
-    <div class="text-center mb-3">
-        <h5 style="letter-spacing: 2px; font-weight: bold; color: #fff;">STREET HOUSE 湾岸通り</h5>
-        <p style="font-size: 0.75rem; color: #aaa; margin: 0;">車検・整備・チューニング・カスタム</p>
-    </div>
+  <title>STREET HOUSE 杵築｜車検・整備・カスタム相談</title>
 
-    <div class="card p-4">
-        <!-- 進捗バー -->
-        <div class="progress mb-4">
-            <div id="progressBar" class="progress-bar" role="progressbar" style="width: 33%;"></div>
-        </div>
+  <!-- LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
-        <form id="diagnosisForm">
-            <!-- 質問1: 基本情報 -->
-            <div id="step1" class="step-section">
-                <div class="step-title">Q1. お客様の情報を教えてください</div>
-                
-                <div class="mb-3">
-                    <label for="userName" class="form-label" style="margin-bottom: 2px;">お名前（フルネーム）</label>
-                    <div style="color: #ff6b6b; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px;">※LINE名が自動入力されます。ニックネーム等の場合は本名（漢字）への修正をお願いします。</div>
-                    <input type="text" id="userName" class="form-control bg-dark text-white border-secondary" placeholder="例：山田 太郎" required>
-                </div>
-
-                <div class="mb-4">
-                    <label for="carName" class="form-label">お車の名前 <span class="badge">任意</span></label>
-                    <input type="text" id="carName" class="form-control bg-dark text-white border-secondary" placeholder="例：シルビア、プリウス、タントなど">
-                </div>
-
-                <button type="button" class="btn btn-primary w-100 py-2" onclick="nextStep(2)">次へ進む</button>
-            </div>
-
-            <!-- 質問2: ご相談内容 -->
-            <div id="step2" class="step-section d-none">
-                <div class="step-title">Q2. 本日のご相談内容はどちらでしょうか？</div>
-                
-                <div class="mb-4">
-                    <select id="consultType" class="form-select bg-dark text-white border-secondary" style="font-size: 1.1rem; padding: 10px;">
-                        <option value="車検の見積もり・予約">🚗 車検の見積もり・予約</option>
-                        <option value="定期点検・オイル交換">🔧 定期点検・オイル交換</option>
-                        <option value="キズ・ヘコミの修理">✨ キズ・ヘコミの修理</option>
-                        <option value="異音・トラブルの点検">⚠️ 異音・トラブルの点検</option>
-                        <option value="パーツ持ち込み取付・カスタム">🏁 パーツ持ち込み取付・カスタム</option>
-                        <option value="その他（相談・質問など）">💬 その他（相談・質問など）</option>
-                    </select>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-light w-50" onclick="prevStep(1)">戻る</button>
-                    <button type="button" class="btn btn-primary w-50" onclick="nextStep(3)">次へ進む</button>
-                </div>
-            </div>
-
-            <!-- 質問3: 次回車検時期 -->
-            <div id="step3" class="step-section d-none">
-                <div class="step-title">Q3. あなたのお車の「次回車検」の年月を教えてください</div>
-                <div style="color: #e67e22; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px;">🔔 ※車検のうっかり忘れ防止に！満了日の2ヶ月前にLINEで個別にお知らせをお届けします。</div>
-                
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label for="shakenYear" class="form-label">年</label>
-                        <select id="shakenYear" class="form-select bg-dark text-white border-secondary" style="padding: 10px;" onchange="updateMonths()">
-                            <!-- JavaScriptで自動生成 -->
-                        </select>
-                    </div>
-                    <div class="col-6">
-                        <label for="shakenMonth" class="form-label">月</label>
-                        <select id="shakenMonth" class="form-select bg-dark text-white border-secondary" style="padding: 10px;">
-                            <!-- 年に応じて自動切り替え -->
-                        </select>
-                    </div>
-                </div>
-
-                <div class="mb-4 mt-4">
-                    <label for="userMessage" class="form-label">ご要望や気になる症状があればご記入ください <span class="badge">任意</span></label>
-                    <textarea id="userMessage" class="form-control bg-dark text-white border-secondary" rows="3" placeholder="例：ブレーキを踏むと音がする、〇〇のパーツを持ち込みで付けてほしい、など"></textarea>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-light w-50" onclick="prevStep(2)">戻る</button>
-                    <button type="button" class="btn btn-primary w-50" onclick="submitDiagnosis()">この内容でリクエストする</button>
-                </div>
-            </div>
-        </form>
-
-        <!-- 完了画面 -->
-        <div id="thankYouSection" class="text-center d-none py-4">
-            <div class="mb-3" style="font-size: 3rem; color: #e67e22;">✓</div>
-            <h5>ご回答ありがとうございました！</h5>
-            <p class="text-muted small mt-3">ご相談データがストリートハウス湾岸通りへ送信されました。内容を確認し、スタッフよりLINEメッセージにて折り返しご連絡いたします。</p>
-            <div class="alert alert-secondary small text-start mt-4 bg-dark text-light border-secondary" style="font-size: 0.85rem;">
-                車検年月の登録に基づき、<strong>車検満了日の2ヶ月前</strong>など、最適なタイミングで事前のご案内をお送りさせていただきます。どうぞ安心してお待ちください。
-            </div>
-            <button class="btn btn-secondary w-100 mt-3" onclick="liff.closeWindow()">画面を閉じる</button>
-        </div>
-
-    </div>
-</div>
-
-<script>
-    // 現在の基準年月（2026年5月）を取得
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1;
-
-    function getReiwaString(year) {
-        const reiwaYear = year - 2018;
-        return `令和${reiwaYear}年`;
+  <style>
+    :root {
+      --bg: #111111;
+      --card: #1f1f1f;
+      --card2: #2a2a2a;
+      --text: #f5f5f5;
+      --muted: #a3a3a3;
+      --line: #3a3a3a;
+      --accent: #e67e22;
+      --accent2: #ff9f43;
+      --danger: #ff6b6b;
+      --ok: #2ecc71;
+      --input: #151515;
     }
 
-    window.onload = function() {
-        const yearSelect = document.getElementById('shakenYear');
-        yearSelect.innerHTML = '<option value="">-- 年を選択 --</option>';
-        
-        for (let i = 0; i < 4; i++) {
-            const y = currentYear + i;
-            const option = document.createElement('option');
-            option.value = y;
-            option.textContent = `${y}年（${getReiwaString(y)}）`;
-            yearSelect.appendChild(option);
-        }
-        updateMonths();
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top, rgba(230, 126, 34, 0.14), transparent 34%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    .wrap {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 22px 16px 32px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .logo {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 10px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #e67e22, #8e4409);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 10px 30px rgba(230, 126, 34, 0.22);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 1.8px;
+      font-weight: 800;
+    }
+
+    .header p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .card {
+      background: rgba(31, 31, 31, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    .progress {
+      height: 7px;
+      background: #3a3a3a;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 22px;
+    }
+
+    .progress-bar {
+      width: 33%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .step-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+      margin: -6px 0 14px;
+    }
+
+    .notice {
+      background: rgba(230, 126, 34, 0.1);
+      border: 1px solid rgba(230, 126, 34, 0.35);
+      color: #ffd5ad;
+      padding: 11px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+
+    .field {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #e7e7e7;
+      margin-bottom: 7px;
+    }
+
+    .required {
+      color: var(--danger);
+      font-size: 11px;
+      margin-left: 4px;
+    }
+
+    .optional {
+      color: var(--muted);
+      font-size: 11px;
+      margin-left: 4px;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #4a4a4a;
+      border-radius: 12px;
+      padding: 12px 13px;
+      background: var(--input);
+      color: var(--text);
+      font-size: 16px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.15);
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 13px;
+      padding: 13px 14px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.06s ease, opacity 0.2s ease;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), #d35400);
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      width: 42%;
+      background: #333333;
+      color: #eeeeee;
+      border: 1px solid #555555;
+    }
+
+    .btn-half {
+      width: 58%;
+    }
+
+    .btn-close {
+      width: 100%;
+      background: #444444;
+      color: #ffffff;
+      margin-top: 14px;
+    }
+
+    .error {
+      display: none;
+      background: rgba(255, 107, 107, 0.12);
+      border: 1px solid rgba(255, 107, 107, 0.45);
+      color: #ffc9c9;
+      padding: 11px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      white-space: pre-wrap;
+    }
+
+    .success {
+      display: none;
+      text-align: center;
+      padding: 20px 4px 8px;
+    }
+
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: rgba(46, 204, 113, 0.15);
+      border: 1px solid rgba(46, 204, 113, 0.45);
+      color: var(--ok);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 900;
+    }
+
+    .success h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .success p {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 10px;
+    }
+
+    .summary-box {
+      text-align: left;
+      background: #171717;
+      border: 1px solid #3d3d3d;
+      border-radius: 14px;
+      padding: 13px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #dddddd;
+    }
+
+    .summary-box strong {
+      color: #ffffff;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .small-help {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .footer {
+      text-align: center;
+      color: #666666;
+      font-size: 10px;
+      margin-top: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="logo">SH</div>
+      <h1>STREET HOUSE 杵築</h1>
+      <p>車検・整備・カスタム ご相談窓口</p>
+    </div>
+
+    <div class="card">
+      <div id="progressArea" class="progress">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+
+      <div id="errorBox" class="error"></div>
+
+      <form id="consultForm">
+        <!-- STEP 1 -->
+        <section id="step1" class="step active">
+          <div class="step-title">Q1. お客様情報を教えてください</div>
+
+          <div class="notice">
+            LINE名が自動入力されます。ニックネームの場合は、本名に修正してください。
+          </div>
+
+          <div class="field">
+            <label for="userName">お名前<span class="required">必須</span></label>
+            <input id="userName" type="text" placeholder="例：山田 太郎" autocomplete="name" />
+          </div>
+
+          <div class="field">
+            <label for="phone">電話番号<span class="optional">任意</span></label>
+            <input id="phone" type="tel" placeholder="例：090-1234-5678" autocomplete="tel" />
+            <div class="small-help">折り返し連絡が必要な場合に使用します。</div>
+          </div>
+
+          <div class="field">
+            <label for="carName">お車の名前・車種<span class="optional">任意</span></label>
+            <input id="carName" type="text" placeholder="例：シルビア、ジムニー、ハイエースなど" />
+          </div>
+
+          <div class="field">
+            <label for="plateLast4">ナンバー下4桁<span class="optional">任意</span></label>
+            <input id="plateLast4" type="tel" inputmode="numeric" maxlength="4" placeholder="例：1234" />
+          </div>
+
+          <button type="button" class="btn-primary" onclick="goStep(2)">次へ進む</button>
+        </section>
+
+        <!-- STEP 2 -->
+        <section id="step2" class="step">
+          <div class="step-title">Q2. ご相談内容を選んでください</div>
+
+          <div class="field">
+            <label for="consultType">相談内容<span class="required">必須</span></label>
+            <select id="consultType">
+              <option value="車検の見積もり・予約">🚗 車検の見積もり・予約</option>
+              <option value="定期点検・オイル交換">🔧 定期点検・オイル交換</option>
+              <option value="キズ・ヘコミの修理">✨ キズ・ヘコミの修理</option>
+              <option value="異音・トラブルの点検">⚠️ 異音・トラブルの点検</option>
+              <option value="パーツ持ち込み取付・カスタム">🏁 パーツ持ち込み取付・カスタム</option>
+              <option value="カスタム相談">🛠 カスタム相談</option>
+              <option value="その他（相談・質問など）">💬 その他（相談・質問など）</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="preferredVisitDate">希望入庫日<span class="optional">任意</span></label>
+            <input id="preferredVisitDate" type="date" />
+            <div class="small-help">未定の場合は空欄で大丈夫です。</div>
+          </div>
+
+          <div class="field">
+            <label for="preferredContactMethod">希望連絡方法<span class="optional">任意</span></label>
+            <select id="preferredContactMethod">
+              <option value="LINE">LINEで連絡希望</option>
+              <option value="電話">電話で連絡希望</option>
+              <option value="どちらでも可">どちらでも可</option>
+            </select>
+          </div>
+
+          <div class="buttons">
+            <button type="button" class="btn-secondary" onclick="goStep(1)">戻る</button>
+            <button type="button" class="btn-primary btn-half" onclick="goStep(3)">次へ進む</button>
+          </div>
+        </section>
+
+        <!-- STEP 3 -->
+        <section id="step3" class="step">
+          <div class="step-title">Q3. 車検時期・ご要望を教えてください</div>
+
+          <div class="notice">
+            次回車検年月を登録しておくと、車検時期が近づいたお客様を店舗側で確認できます。
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="shakenYear">次回車検 年<span class="optional">任意</span></label>
+              <select id="shakenYear" onchange="updateMonths()"></select>
+            </div>
+
+            <div class="field">
+              <label for="shakenMonth">次回車検 月<span class="optional">任意</span></label>
+              <select id="shakenMonth"></select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="mileageKm">現在の走行距離<span class="optional">任意</span></label>
+            <input id="mileageKm" type="tel" inputmode="numeric" placeholder="例：78500" />
+          </div>
+
+          <div class="field">
+            <label for="userMessage">ご要望・気になる症状<span class="optional">任意</span></label>
+            <textarea id="userMessage" placeholder="例：ブレーキを踏むと音がする、車検と一緒にカスタムも相談したい、パーツ持ち込みで取り付けたい、など"></textarea>
+          </div>
+
+          <div class="buttons">
+            <button type="button" class="btn-secondary" onclick="goStep(2)">戻る</button>
+            <button id="submitBtn" type="button" class="btn-primary btn-half" onclick="submitForm()">この内容で送信する</button>
+          </div>
+
+          <div id="loadingText" class="loading">送信中です。少しお待ちください...</div>
+        </section>
+      </form>
+
+      <!-- 完了画面 -->
+      <div id="successArea" class="success">
+        <div class="success-icon">✓</div>
+        <h2>送信が完了しました</h2>
+        <p>
+          ご相談内容をSTREET HOUSE 杵築へ送信しました。<br />
+          内容を確認後、スタッフよりLINEまたはご希望の方法でご連絡します。
+        </p>
+
+        <div class="summary-box" id="successSummary"></div>
+
+        <button class="btn-close" type="button" onclick="closeLiffWindow()">画面を閉じる</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      STREET HOUSE Kitsuki LINE DEMO / ksh-line-demo-api
+    </div>
+  </div>
+
+  <script>
+    // =====================================================
+    // 設定
+    // =====================================================
+
+    // LINE Developersで作成したLIFF IDに変更してください。
+    const LIFF_ID = "YOUR_LIFF_ID";
+
+    // Cloudflare WorkerのURLに変更してください。
+    // 例: https://ksh-line-demo-api.xxxxx.workers.dev
+    const WORKER_API_BASE = "https://ksh-line-demo-api.あなたのサブドメイン.workers.dev";
+
+    const SHOP_CODE = "street_house_kitsuki";
+
+    // =====================================================
+    // LIFFプロフィール保持
+    // =====================================================
+
+    let lineProfile = {
+      userId: "",
+      displayName: "",
+      pictureUrl: ""
     };
 
-    // 年月連動システム
-    function updateMonths() {
-        const yearSelect = document.getElementById('shakenYear');
-        const monthSelect = document.getElementById('shakenMonth');
-        const selectedYear = parseInt(yearSelect.value);
-        
-        monthSelect.innerHTML = '<option value="">-- 月を選択 --</option>';
-        
-        if (!selectedYear) return;
+    let isSubmitting = false;
 
-        let startMonth = 1;
-        let endMonth = 12;
+    // =====================================================
+    // 初期化
+    // =====================================================
 
-        if (selectedYear === currentYear) {
-            startMonth = currentMonth;
-        } else if (selectedYear === currentYear + 3) {
-            endMonth = currentMonth;
-        }
-
-        for (let m = startMonth; m <= endMonth; m++) {
-            const option = document.createElement('option');
-            option.value = `${m}月`;
-            option.textContent = `${m}月`;
-            monthSelect.appendChild(option);
-        }
-    }
-
-    // LIFF初期化
-    liff.init({ liffId: "2010239091-K5EeUmBh" }).then(() => {
-        if (liff.isLoggedIn()) {
-            liff.getProfile().then(profile => {
-                document.getElementById('userName').value = profile.displayName;
-            });
-        } else {
-            liff.login();
-        }
-    }).catch((err) => {
-        console.error('LIFF Initialization failed', err);
+    window.addEventListener("load", async () => {
+      initYearMonthSelect();
+      applyConsultTypeFromQuery();
+      await initLiff();
     });
 
-    // ステップ切り替え（★お名前のエラーガードを完全に削除しました）
-    function nextStep(step) {
-        if (step === 2) {
-            const name = document.getElementById('userName').value.trim();
-            if (!name) { alert('お名前を入力してください。'); return; }
-        }
-        
-        document.querySelectorAll('.step-section').forEach(el => el.classList.add('d-none'));
-        document.getElementById(`step${step}`).classList.remove('d-none');
-        
-        const progressPercent = step === 2 ? 66 : 100;
-        document.getElementById('progressBar').style.width = `${progressPercent}%`;
-    }
-
-    function prevStep(step) {
-        document.querySelectorAll('.step-section').forEach(el => el.classList.add('d-none'));
-        document.getElementById(`step${step}`).classList.remove('d-none');
-        
-        const progressPercent = step === 1 ? 33 : 66;
-        document.getElementById('progressBar').style.width = `${progressPercent}%`;
-    }
-
-    // チャットへメッセージ送信
-    function submitDiagnosis() {
-        const name = document.getElementById('userName').value;
-        const car = document.getElementById('carName').value || "未入力";
-        const type = document.getElementById('consultType').value;
-        const yearVal = document.getElementById('shakenYear').value;
-        const month = document.getElementById('shakenMonth').value;
-        const msg = document.getElementById('userMessage').value || "特になし";
-        
-        if (!yearVal || !month) {
-            alert('次回車検の「年」と「月」をどちらも必ず選択してください。');
-            return;
+    async function initLiff() {
+      try {
+        if (!LIFF_ID || LIFF_ID === "YOUR_LIFF_ID") {
+          console.warn("LIFF_ID is not set. Demo browser mode.");
+          fillDemoProfile();
+          return;
         }
 
-        const yearText = `${yearVal}年（${getReiwaString(parseInt(yearVal))}）`;
-        const textMessage = `【受付：ご相談・車検登録】\n\n・お名前: ${name}\n・お車の名前: ${car}\n・本日のご相談: ${type}\n・次回車検時期: ${yearText} ${month}\n・ご要望・症状:\n  ${msg}`;
+        await liff.init({ liffId: LIFF_ID });
 
-        liff.sendMessages([{
-            type: 'text',
-            text: textMessage
-        }]).then(() => {
-            document.getElementById('diagnosisForm').classList.add('d-none');
-            document.getElementById('progressBar').parentElement.classList.add('d-none');
-            document.getElementById('thankYouSection').classList.remove('d-none');
-        }).catch((err) => {
-            alert('送信に失敗しました。公式アカウントのチャット画面からもう一度お試しください。');
-            console.error(err);
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+
+        lineProfile = {
+          userId: profile.userId || "",
+          displayName: profile.displayName || "",
+          pictureUrl: profile.pictureUrl || ""
+        };
+
+        if (lineProfile.displayName) {
+          const nameInput = document.getElementById("userName");
+          if (!nameInput.value) {
+            nameInput.value = lineProfile.displayName;
+          }
+        }
+      } catch (error) {
+        console.error("LIFF init failed:", error);
+        showError(
+          "LINE情報の取得に失敗しました。\nフォーム入力は可能ですが、LINE連携情報が取得できていない可能性があります。"
+        );
+        fillDemoProfile();
+      }
+    }
+
+    function fillDemoProfile() {
+      lineProfile = {
+        userId: "demo_line_user",
+        displayName: "デモユーザー",
+        pictureUrl: ""
+      };
+
+      const nameInput = document.getElementById("userName");
+      if (!nameInput.value) {
+        nameInput.value = "デモユーザー";
+      }
+    }
+
+    function applyConsultTypeFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const type = params.get("type");
+
+      if (!type) return;
+
+      const consultType = document.getElementById("consultType");
+
+      if (type === "shaken") {
+        consultType.value = "車検の見積もり・予約";
+      } else if (type === "oil") {
+        consultType.value = "定期点検・オイル交換";
+      } else if (type === "custom") {
+        consultType.value = "カスタム相談";
+      } else if (type === "repair") {
+        consultType.value = "異音・トラブルの点検";
+      }
+    }
+
+    // =====================================================
+    // ステップ切り替え
+    // =====================================================
+
+    function goStep(stepNumber) {
+      clearError();
+
+      if (stepNumber === 2) {
+        const name = getValue("userName");
+        if (!name) {
+          showError("お名前を入力してください。");
+          return;
+        }
+      }
+
+      document.querySelectorAll(".step").forEach((step) => {
+        step.classList.remove("active");
+      });
+
+      document.getElementById(`step${stepNumber}`).classList.add("active");
+
+      const progressWidth = stepNumber === 1 ? "33%" : stepNumber === 2 ? "66%" : "100%";
+      document.getElementById("progressBar").style.width = progressWidth;
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // =====================================================
+    // 車検年月
+    // =====================================================
+
+    function initYearMonthSelect() {
+      const yearSelect = document.getElementById("shakenYear");
+      const currentYear = new Date().getFullYear();
+
+      yearSelect.innerHTML = '<option value="">未選択</option>';
+
+      for (let i = 0; i <= 5; i++) {
+        const year = currentYear + i;
+        const option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = `${year}年（${getReiwaString(year)}）`;
+        yearSelect.appendChild(option);
+      }
+
+      updateMonths();
+    }
+
+    function updateMonths() {
+      const monthSelect = document.getElementById("shakenMonth");
+      const selectedYear = document.getElementById("shakenYear").value;
+
+      monthSelect.innerHTML = '<option value="">未選択</option>';
+
+      if (!selectedYear) return;
+
+      for (let month = 1; month <= 12; month++) {
+        const option = document.createElement("option");
+        option.value = String(month);
+        option.textContent = `${month}月`;
+        monthSelect.appendChild(option);
+      }
+    }
+
+    function getReiwaString(year) {
+      const reiwaYear = year - 2018;
+      if (reiwaYear <= 0) return "";
+      return `令和${reiwaYear}年`;
+    }
+
+    // =====================================================
+    // 送信処理
+    // =====================================================
+
+    async function submitForm() {
+      clearError();
+
+      if (isSubmitting) return;
+
+      const name = getValue("userName");
+      const consultType = getValue("consultType");
+
+      if (!name) {
+        showError("お名前を入力してください。");
+        goStep(1);
+        return;
+      }
+
+      if (!consultType) {
+        showError("相談内容を選択してください。");
+        goStep(2);
+        return;
+      }
+
+      const payload = {
+        shopCode: SHOP_CODE,
+
+        name: name,
+        phone: getValue("phone"),
+
+        lineUserId: lineProfile.userId || "",
+        lineDisplayName: lineProfile.displayName || "",
+
+        carName: getValue("carName"),
+        plateLast4: getValue("plateLast4"),
+
+        consultType: consultType,
+        preferredVisitDate: getValue("preferredVisitDate"),
+        preferredContactMethod: getValue("preferredContactMethod"),
+
+        shakenYear: getValue("shakenYear"),
+        shakenMonth: getValue("shakenMonth"),
+
+        mileageKm: getValue("mileageKm"),
+
+        message: getValue("userMessage"),
+
+        source: "LIFF"
+      };
+
+      try {
+        setSubmitting(true);
+
+        const response = await fetch(`${WORKER_API_BASE}/api/inquiries`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
         });
-    }
-</script>
 
+        const resultText = await response.text();
+        let result = {};
+
+        try {
+          result = resultText ? JSON.parse(resultText) : {};
+        } catch (error) {
+          result = {
+            ok: false,
+            message: resultText
+          };
+        }
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || "送信に失敗しました。");
+        }
+
+        showSuccess(payload, result);
+      } catch (error) {
+        console.error(error);
+        showError(
+          "送信に失敗しました。\n時間をおいてもう一度お試しください。\n\n" +
+          (error.message || "")
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
+    function showSuccess(payload, result) {
+      document.getElementById("consultForm").style.display = "none";
+      document.getElementById("progressArea").style.display = "none";
+      document.getElementById("successArea").style.display = "block";
+
+      const shakenText =
+        payload.shakenYear && payload.shakenMonth
+          ? `${payload.shakenYear}年 ${payload.shakenMonth}月`
+          : "未入力";
+
+      const carText = payload.carName || "未入力";
+
+      document.getElementById("successSummary").innerHTML = `
+        <div><strong>お名前：</strong>${escapeHtml(payload.name)}</div>
+        <div><strong>お車：</strong>${escapeHtml(carText)}</div>
+        <div><strong>相談内容：</strong>${escapeHtml(payload.consultType)}</div>
+        <div><strong>次回車検：</strong>${escapeHtml(shakenText)}</div>
+      `;
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function setSubmitting(value) {
+      isSubmitting = value;
+
+      const submitBtn = document.getElementById("submitBtn");
+      const loadingText = document.getElementById("loadingText");
+
+      submitBtn.disabled = value;
+      submitBtn.style.opacity = value ? "0.65" : "1";
+      submitBtn.textContent = value ? "送信中..." : "この内容で送信する";
+      loadingText.style.display = value ? "block" : "none";
+    }
+
+    // =====================================================
+    // UI補助
+    // =====================================================
+
+    function getValue(id) {
+      const element = document.getElementById(id);
+      if (!element) return "";
+      return String(element.value || "").trim();
+    }
+
+    function showError(message) {
+      const errorBox = document.getElementById("errorBox");
+      errorBox.textContent = message;
+      errorBox.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function clearError() {
+      const errorBox = document.getElementById("errorBox");
+      errorBox.textContent = "";
+      errorBox.style.display = "none";
+    }
+
+    function closeLiffWindow() {
+      try {
+        if (window.liff && liff.isInClient()) {
+          liff.closeWindow();
+          return;
+        }
+      } catch (error) {
+        console.warn(error);
+      }
+
+      window.close();
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
 </body>
 </html>
