@@ -13,7 +13,6 @@
     :root {
       --bg: #111111;
       --card: #1f1f1f;
-      --card2: #2a2a2a;
       --text: #f5f5f5;
       --muted: #a3a3a3;
       --line: #3a3a3a;
@@ -22,6 +21,7 @@
       --danger: #ff6b6b;
       --ok: #2ecc71;
       --input: #151515;
+      --disabled: #2b2b2b;
     }
 
     * {
@@ -78,6 +78,13 @@
       margin: 4px 0 0;
       font-size: 12px;
       color: var(--muted);
+    }
+
+    .status-line {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #777;
+      text-align: center;
     }
 
     .card {
@@ -224,6 +231,7 @@
 
     button:disabled {
       cursor: not-allowed;
+      opacity: 0.6;
     }
 
     .btn-primary {
@@ -338,11 +346,124 @@
       margin-top: 14px;
     }
 
-    .status-line {
+    .hidden {
+      display: none;
+    }
+
+    .calendar-box {
+      background: #151515;
+      border: 1px solid #3f3f3f;
+      border-radius: 14px;
+      padding: 12px;
       margin-top: 8px;
-      font-size: 11px;
-      color: #777;
+    }
+
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .calendar-title {
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .calendar-nav {
+      display: flex;
+      gap: 6px;
+    }
+
+    .calendar-nav button {
+      padding: 7px 10px;
+      font-size: 12px;
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+    }
+
+    .calendar-week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      margin-bottom: 5px;
+    }
+
+    .calendar-week div {
       text-align: center;
+      color: #888;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 0;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+    }
+
+    .day-btn {
+      padding: 9px 0;
+      min-height: 38px;
+      border-radius: 10px;
+      font-size: 13px;
+      background: #252525;
+      color: #fff;
+      border: 1px solid #3f3f3f;
+    }
+
+    .day-btn.open:hover {
+      background: rgba(230, 126, 34, 0.22);
+      border-color: var(--accent);
+    }
+
+    .day-btn.selected {
+      background: linear-gradient(135deg, var(--accent), #d35400);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .day-btn.closed {
+      background: #191919;
+      color: #666;
+      text-decoration: line-through;
+      border-color: #2a2a2a;
+      cursor: not-allowed;
+    }
+
+    .day-btn.blank {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .selected-date-box {
+      margin-top: 10px;
+      padding: 10px 11px;
+      border-radius: 11px;
+      background: rgba(46, 204, 113, 0.1);
+      border: 1px solid rgba(46, 204, 113, 0.35);
+      color: #c8f7dc;
+      font-size: 13px;
+    }
+
+    .calendar-note {
+      margin-top: 8px;
+      color: #aaa;
+      font-size: 11px;
+    }
+
+    .calendar-loading {
+      color: #aaa;
+      font-size: 12px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .other-box {
+      margin-top: -4px;
+      margin-bottom: 15px;
     }
 
     @media (max-width: 360px) {
@@ -367,6 +488,11 @@
       .btn-half {
         width: 100%;
       }
+
+      .day-btn {
+        font-size: 12px;
+        min-height: 34px;
+      }
     }
   </style>
 </head>
@@ -388,7 +514,6 @@
       <div id="errorBox" class="error"></div>
 
       <form id="consultForm">
-        <!-- STEP 1 -->
         <section id="step1" class="step active">
           <div class="step-title">Q1. お客様情報を教えてください</div>
 
@@ -420,13 +545,12 @@
           <button type="button" class="btn-primary" onclick="goStep(2)">次へ進む</button>
         </section>
 
-        <!-- STEP 2 -->
         <section id="step2" class="step">
           <div class="step-title">Q2. ご相談内容を選んでください</div>
 
           <div class="field">
             <label for="consultType">相談内容<span class="required">必須</span></label>
-            <select id="consultType">
+            <select id="consultType" onchange="onConsultTypeChange()">
               <option value="車検の見積もり・予約">🚗 車検の見積もり・予約</option>
               <option value="定期点検・オイル交換">🔧 定期点検・オイル交換</option>
               <option value="キズ・ヘコミの修理">✨ キズ・ヘコミの修理</option>
@@ -437,10 +561,45 @@
             </select>
           </div>
 
+          <div id="otherConsultBox" class="field other-box hidden">
+            <label for="otherConsultDetail">その他の内容<span class="required">必須</span></label>
+            <input id="otherConsultDetail" type="text" placeholder="例：購入前相談、保険、部品の相談など" />
+          </div>
+
           <div class="field">
-            <label for="preferredVisitDate">希望入庫日<span class="optional">任意</span></label>
-            <input id="preferredVisitDate" type="date" />
-            <div class="small-help">未定の場合は空欄で大丈夫です。</div>
+            <label>希望入庫日<span class="optional">任意</span></label>
+
+            <input id="preferredVisitDate" type="hidden" />
+
+            <div class="calendar-box">
+              <div class="calendar-header">
+                <div id="calendarTitle" class="calendar-title">読み込み中...</div>
+                <div class="calendar-nav">
+                  <button type="button" onclick="moveCalendarMonth(-1)">前月</button>
+                  <button type="button" onclick="moveCalendarMonth(1)">次月</button>
+                </div>
+              </div>
+
+              <div class="calendar-week">
+                <div>日</div>
+                <div>月</div>
+                <div>火</div>
+                <div>水</div>
+                <div>木</div>
+                <div>金</div>
+                <div>土</div>
+              </div>
+
+              <div id="calendarGrid" class="calendar-grid">
+                <div class="calendar-loading">営業カレンダーを読み込み中...</div>
+              </div>
+
+              <div id="selectedDateBox" class="selected-date-box hidden"></div>
+
+              <div class="calendar-note">
+                定休日・臨時休業日は選択できません。
+              </div>
+            </div>
           </div>
 
           <div class="field">
@@ -458,12 +617,11 @@
           </div>
         </section>
 
-        <!-- STEP 3 -->
         <section id="step3" class="step">
           <div class="step-title">Q3. 車検時期・ご要望を教えてください</div>
 
           <div class="notice">
-            次回車検年月を登録しておくと、店舗側で車検時期の近いお客様を確認できます。
+            次回車検年月を登録しておくと、店舗側で車検時期の近いお客様を確認できます。選択できるのは最大3年先までです。
           </div>
 
           <div class="grid2">
@@ -497,7 +655,6 @@
         </section>
       </form>
 
-      <!-- 完了画面 -->
       <div id="successArea" class="success">
         <div class="success-icon">✓</div>
         <h2>送信が完了しました</h2>
@@ -519,22 +676,20 @@
 
   <script>
     // =====================================================
-    // 必ず変更する設定
+    // 設定
     // =====================================================
 
     // LINE Developersで作成したLIFF IDに変更してください。
     // まだLIFF IDがない場合は、このままでもブラウザテストできます。
-    const LIFF_ID = "2010239091-K5EeUmBh";
+    const LIFF_ID = "YOUR_LIFF_ID";
 
-    // Cloudflare Worker「ksh-line-demo-api」のURLに変更してください。
-    // 例: https://ksh-line-demo-api.xxxxx.workers.dev
+    // Cloudflare Worker
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
 
-    // Supabase / Worker 側と合わせる店舗コード
     const SHOP_CODE = "street_house_kitsuki";
 
     // =====================================================
-    // LIFFプロフィール保持
+    // 状態管理
     // =====================================================
 
     let lineProfile = {
@@ -545,6 +700,11 @@
 
     let isSubmitting = false;
 
+    let calendarDays = [];
+    let calendarDayMap = {};
+    let calendarMonthCursor = null;
+    let selectedVisitDate = "";
+
     // =====================================================
     // 初期化
     // =====================================================
@@ -552,7 +712,12 @@
     window.addEventListener("load", async () => {
       initYearMonthSelect();
       applyConsultTypeFromQuery();
-      await initLiff();
+      onConsultTypeChange();
+      initCalendarCursor();
+      await Promise.all([
+        initLiff(),
+        loadPublicCalendar()
+      ]);
     });
 
     async function initLiff() {
@@ -560,7 +725,6 @@
 
       try {
         if (!LIFF_ID || LIFF_ID === "YOUR_LIFF_ID") {
-          console.warn("LIFF_ID is not set. Browser demo mode.");
           fillDemoProfile();
           status.textContent = "ブラウザ確認モード";
           return;
@@ -635,6 +799,8 @@
         consultType.value = "異音・トラブルの点検";
       } else if (type === "parts") {
         consultType.value = "パーツ持ち込み取付・カスタム";
+      } else if (type === "other") {
+        consultType.value = "その他（相談・質問など）";
       }
     }
 
@@ -649,6 +815,21 @@
         const name = getValue("userName");
         if (!name) {
           showError("お名前を入力してください。");
+          return;
+        }
+      }
+
+      if (stepNumber === 3) {
+        const consultType = getValue("consultType");
+        const otherDetail = getValue("otherConsultDetail");
+
+        if (!consultType) {
+          showError("相談内容を選択してください。");
+          return;
+        }
+
+        if (consultType.includes("その他") && !otherDetail) {
+          showError("その他の内容を入力してください。");
           return;
         }
       }
@@ -670,7 +851,172 @@
     }
 
     // =====================================================
-    // 車検年月
+    // その他相談
+    // =====================================================
+
+    function onConsultTypeChange() {
+      const consultType = getValue("consultType");
+      const box = document.getElementById("otherConsultBox");
+
+      if (consultType.includes("その他")) {
+        box.classList.remove("hidden");
+      } else {
+        box.classList.add("hidden");
+        document.getElementById("otherConsultDetail").value = "";
+      }
+    }
+
+    // =====================================================
+    // 営業カレンダー
+    // =====================================================
+
+    function initCalendarCursor() {
+      const today = new Date();
+      calendarMonthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    async function loadPublicCalendar() {
+      const from = formatDateYmd(new Date());
+      const to = formatDateYmd(addDays(new Date(), 90));
+
+      try {
+        const response = await fetch(`${WORKER_API_BASE}/api/public/calendar?from=${from}&to=${to}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || "営業カレンダーの取得に失敗しました。");
+        }
+
+        calendarDays = Array.isArray(result.calendar) ? result.calendar : [];
+        calendarDayMap = {};
+
+        calendarDays.forEach((day) => {
+          calendarDayMap[day.date] = day;
+        });
+
+        renderCalendar();
+      } catch (error) {
+        console.error(error);
+
+        document.getElementById("calendarGrid").innerHTML =
+          `<div class="calendar-loading">営業カレンダーを取得できませんでした。時間をおいて再読み込みしてください。</div>`;
+
+        showError(
+          "営業カレンダーの取得に失敗しました。\n定休日・臨時休みを反映できないため、希望入庫日は選択できません。"
+        );
+      }
+    }
+
+    function renderCalendar() {
+      const title = document.getElementById("calendarTitle");
+      const grid = document.getElementById("calendarGrid");
+
+      const year = calendarMonthCursor.getFullYear();
+      const month = calendarMonthCursor.getMonth();
+
+      title.textContent = `${year}年 ${month + 1}月`;
+
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+
+      const firstDow = firstDay.getDay();
+      const daysInMonth = lastDay.getDate();
+
+      const todayYmd = formatDateYmd(new Date());
+      const maxYmd = formatDateYmd(addDays(new Date(), 90));
+
+      let html = "";
+
+      for (let i = 0; i < firstDow; i++) {
+        html += `<button type="button" class="day-btn blank">0</button>`;
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        const ymd = formatDateYmd(date);
+
+        const info = calendarDayMap[ymd];
+        const isPast = ymd < todayYmd;
+        const isOver = ymd > maxYmd;
+        const isOpen = info ? Boolean(info.is_open) : false;
+        const isClosed = !isOpen || isPast || isOver;
+        const selectedClass = ymd === selectedVisitDate ? "selected" : "";
+        const closedClass = isClosed ? "closed" : "open";
+        const reason = info && info.reason ? info.reason : isPast ? "過去の日付" : isOver ? "受付範囲外" : "休業日";
+
+        if (isClosed) {
+          html += `
+            <button
+              type="button"
+              class="day-btn ${closedClass}"
+              disabled
+              title="${escapeAttr(reason)}"
+            >${day}</button>
+          `;
+        } else {
+          html += `
+            <button
+              type="button"
+              class="day-btn ${closedClass} ${selectedClass}"
+              onclick="selectVisitDate('${ymd}')"
+            >${day}</button>
+          `;
+        }
+      }
+
+      grid.innerHTML = html;
+      updateCalendarNav();
+    }
+
+    function updateCalendarNav() {
+      const navButtons = document.querySelectorAll(".calendar-nav button");
+      const current = new Date();
+      const minMonth = new Date(current.getFullYear(), current.getMonth(), 1);
+      const maxBase = addDays(current, 90);
+      const maxMonth = new Date(maxBase.getFullYear(), maxBase.getMonth(), 1);
+
+      navButtons[0].disabled = calendarMonthCursor <= minMonth;
+      navButtons[1].disabled = calendarMonthCursor >= maxMonth;
+    }
+
+    function moveCalendarMonth(diff) {
+      const next = new Date(
+        calendarMonthCursor.getFullYear(),
+        calendarMonthCursor.getMonth() + diff,
+        1
+      );
+
+      const current = new Date();
+      const minMonth = new Date(current.getFullYear(), current.getMonth(), 1);
+      const maxBase = addDays(current, 90);
+      const maxMonth = new Date(maxBase.getFullYear(), maxBase.getMonth(), 1);
+
+      if (next < minMonth || next > maxMonth) return;
+
+      calendarMonthCursor = next;
+      renderCalendar();
+    }
+
+    function selectVisitDate(ymd) {
+      const info = calendarDayMap[ymd];
+
+      if (!info || !info.is_open) {
+        showError("この日は定休日または臨時休業日のため選択できません。");
+        return;
+      }
+
+      selectedVisitDate = ymd;
+      document.getElementById("preferredVisitDate").value = ymd;
+
+      const box = document.getElementById("selectedDateBox");
+      box.classList.remove("hidden");
+      box.textContent = `希望入庫日：${formatDateJa(ymd)} を選択中`;
+
+      renderCalendar();
+    }
+
+    // =====================================================
+    // 車検年月 最大3年
     // =====================================================
 
     function initYearMonthSelect() {
@@ -679,7 +1025,7 @@
 
       yearSelect.innerHTML = '<option value="">未選択</option>';
 
-      for (let i = 0; i <= 5; i++) {
+      for (let i = 0; i <= 3; i++) {
         const year = currentYear + i;
         const option = document.createElement("option");
 
@@ -694,13 +1040,28 @@
 
     function updateMonths() {
       const monthSelect = document.getElementById("shakenMonth");
-      const selectedYear = document.getElementById("shakenYear").value;
+      const selectedYear = Number(document.getElementById("shakenYear").value);
+      const today = new Date();
+
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
 
       monthSelect.innerHTML = '<option value="">未選択</option>';
 
       if (!selectedYear) return;
 
-      for (let month = 1; month <= 12; month++) {
+      let startMonth = 1;
+      let endMonth = 12;
+
+      if (selectedYear === currentYear) {
+        startMonth = currentMonth;
+      }
+
+      if (selectedYear === currentYear + 3) {
+        endMonth = currentMonth;
+      }
+
+      for (let month = startMonth; month <= endMonth; month++) {
         const option = document.createElement("option");
 
         option.value = String(month);
@@ -727,6 +1088,7 @@
 
       const name = getValue("userName");
       const consultType = getValue("consultType");
+      const otherConsultDetail = getValue("otherConsultDetail");
 
       if (!name) {
         showError("お名前を入力してください。");
@@ -740,10 +1102,9 @@
         return;
       }
 
-      if (!WORKER_API_BASE || WORKER_API_BASE.includes("あなたのサブドメイン")) {
-        showError(
-          "Cloudflare WorkerのURLが未設定です。\nindex.html内の WORKER_API_BASE を実際のURLに変更してください。"
-        );
+      if (consultType.includes("その他") && !otherConsultDetail) {
+        showError("その他の内容を入力してください。");
+        goStep(2);
         return;
       }
 
@@ -760,6 +1121,8 @@
         plateLast4: getValue("plateLast4"),
 
         consultType: consultType,
+        otherConsultDetail: otherConsultDetail,
+
         preferredVisitDate: getValue("preferredVisitDate"),
         preferredContactMethod: getValue("preferredContactMethod"),
 
@@ -777,7 +1140,7 @@
       try {
         setSubmitting(true);
 
-        const response = await fetch(`${WORKER_API_BASE.replace(/\/$/, "")}/api/inquiries`, {
+        const response = await fetch(`${WORKER_API_BASE}/api/inquiries`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -826,12 +1189,16 @@
 
       const carText = payload.carName || "未入力";
       const phoneText = payload.phone || "未入力";
+      const visitText = payload.preferredVisitDate
+        ? formatDateJa(payload.preferredVisitDate)
+        : "未入力";
 
       document.getElementById("successSummary").innerHTML = `
         <div><strong>お名前：</strong>${escapeHtml(payload.name)}</div>
         <div><strong>電話番号：</strong>${escapeHtml(phoneText)}</div>
         <div><strong>お車：</strong>${escapeHtml(carText)}</div>
         <div><strong>相談内容：</strong>${escapeHtml(payload.consultType)}</div>
+        <div><strong>希望入庫日：</strong>${escapeHtml(visitText)}</div>
         <div><strong>次回車検：</strong>${escapeHtml(shakenText)}</div>
       `;
 
@@ -851,7 +1218,7 @@
     }
 
     // =====================================================
-    // UI補助
+    // 補助
     // =====================================================
 
     function getValue(id) {
@@ -886,6 +1253,27 @@
       window.close();
     }
 
+    function addDays(date, days) {
+      const copy = new Date(date.getTime());
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function formatDateYmd(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function formatDateJa(ymd) {
+      if (!ymd) return "";
+      const [y, m, d] = ymd.split("-");
+      const date = new Date(Number(y), Number(m) - 1, Number(d));
+      const week = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
+      return `${Number(y)}年${Number(m)}月${Number(d)}日（${week}）`;
+    }
+
     function escapeHtml(value) {
       return String(value || "")
         .replace(/&/g, "&amp;")
@@ -893,6 +1281,10 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
     }
   </script>
 </body>
