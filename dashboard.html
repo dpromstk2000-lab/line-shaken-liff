@@ -1013,7 +1013,7 @@
               <div>
                 <h3 style="margin:0">店舗側で顧客・車両を登録</h3>
                 <div class="small muted">
-                  LINE友だち以外の既存客・店頭客・電話客も登録できます。LINE未連携でも車検管理・営業リスト化ができます。
+                  LINE友だち以外の既存客・店頭客・電話客も登録できます。次回車検年月は今月以降、最大3年先まで選択できます。
                 </div>
               </div>
               <button class="btn btn-slate" onclick="clearAddCustomerForm()">入力クリア</button>
@@ -1245,6 +1245,7 @@
     window.addEventListener("load", async () => {
       document.getElementById("tokenInput").value = dashboardToken;
       initReservationDates();
+      initCustomerFormLimits();
       await loadToday();
     });
 
@@ -1304,10 +1305,24 @@
         ...(options.headers || {})
       };
 
-      const response = await fetch(url, {
-        ...options,
-        headers
-      });
+      let response;
+
+      try {
+        response = await fetch(url, {
+          ...options,
+          headers
+        });
+      } catch (error) {
+        throw new Error(
+          "APIに接続できませんでした。\n\n" +
+          "確認してください。\n" +
+          "1. worker.js の完全版がCloudflareに保存・Deployされているか\n" +
+          "2. Worker URL が開けるか\n" +
+          "3. dashboard.html を Ctrl + F5 で強制更新したか\n\n" +
+          `確認URL：${WORKER_API_BASE}/health\n` +
+          `接続先：${url}`
+        );
+      }
 
       const text = await response.text();
       let data = {};
@@ -1758,7 +1773,27 @@
     }
 
     function toggleAddCustomer() {
+      initCustomerFormLimits();
       document.getElementById("addCustomerBox").classList.toggle("active");
+    }
+
+    function initCustomerFormLimits() {
+      const today = new Date();
+      const todayDate = dateYmd(today);
+      const thisMonth = monthValue(today);
+      const maxShakenMonth = addMonthsValue(today, 36);
+
+      const shaken = document.getElementById("newNextShakenMonth");
+      if (shaken) {
+        shaken.min = thisMonth;
+        shaken.max = maxShakenMonth;
+      }
+
+      const oil = document.getElementById("newLastOilChangeDate");
+      if (oil) oil.max = todayDate;
+
+      const visit = document.getElementById("newLastVisitDate");
+      if (visit) visit.max = todayDate;
     }
 
     function clearAddCustomerForm() {
@@ -1780,16 +1815,37 @@
       });
 
       document.getElementById("newCustomerStatus").value = "店舗登録";
+      initCustomerFormLimits();
     }
 
     async function createCustomer() {
       clearAlert();
+      initCustomerFormLimits();
 
       const name = document.getElementById("newCustomerName").value.trim();
       const phone = document.getElementById("newCustomerPhone").value.trim();
+      const nextShakenMonth = document.getElementById("newNextShakenMonth").value;
+      const lastOilChangeDate = document.getElementById("newLastOilChangeDate").value;
+      const lastVisitDate = document.getElementById("newLastVisitDate").value;
 
       if (!name) {
         showError("お名前を入力してください。");
+        return;
+      }
+
+      const monthCheck = validateNextShakenMonth(nextShakenMonth);
+      if (!monthCheck.ok) {
+        showError(monthCheck.message);
+        return;
+      }
+
+      const pastCheck = validatePastDateFields({
+        lastOilChangeDate,
+        lastVisitDate
+      });
+
+      if (!pastCheck.ok) {
+        showError(pastCheck.message);
         return;
       }
 
@@ -1798,14 +1854,14 @@
         phone,
         status: document.getElementById("newCustomerStatus").value,
         memo: document.getElementById("newCustomerMemo").value.trim(),
-        lastVisitDate: document.getElementById("newLastVisitDate").value || null,
+        lastVisitDate: lastVisitDate || null,
         vehicle: {
           carName: document.getElementById("newCarName").value.trim(),
           maker: document.getElementById("newMaker").value.trim(),
           model: document.getElementById("newModel").value.trim(),
           plateLast4: document.getElementById("newPlateLast4").value.trim(),
-          nextShakenDate: monthToDate(document.getElementById("newNextShakenMonth").value),
-          lastOilChangeDate: document.getElementById("newLastOilChangeDate").value || null,
+          nextShakenDate: monthToDate(nextShakenMonth),
+          lastOilChangeDate: lastOilChangeDate || null,
           memo: document.getElementById("newVehicleMemo").value.trim()
         }
       };
@@ -1825,6 +1881,50 @@
       } catch (error) {
         showError(error.message);
       }
+    }
+
+    function validateNextShakenMonth(value) {
+      if (!value) return { ok: true };
+
+      const today = new Date();
+      const min = monthValue(today);
+      const max = addMonthsValue(today, 36);
+
+      if (value < min) {
+        return {
+          ok: false,
+          message: `次回車検年月は今月以降を選択してください。\n選択可能：${formatMonthLabel(min)} 〜 ${formatMonthLabel(max)}`
+        };
+      }
+
+      if (value > max) {
+        return {
+          ok: false,
+          message: `次回車検年月は最大3年先までです。\n選択可能：${formatMonthLabel(min)} 〜 ${formatMonthLabel(max)}`
+        };
+      }
+
+      return { ok: true };
+    }
+
+    function validatePastDateFields(input) {
+      const today = dateYmd(new Date());
+
+      if (input.lastOilChangeDate && input.lastOilChangeDate > today) {
+        return {
+          ok: false,
+          message: "前回オイル交換日は未来の日付を選択できません。"
+        };
+      }
+
+      if (input.lastVisitDate && input.lastVisitDate > today) {
+        return {
+          ok: false,
+          message: "最終来店日は未来の日付を選択できません。"
+        };
+      }
+
+      return { ok: true };
     }
 
     function setCustomerFilter(filter) {
@@ -2598,6 +2698,12 @@
       return `${Number(y)}年${Number(m)}月`;
     }
 
+    function formatMonthLabel(value) {
+      if (!value) return "";
+      const [y, m] = String(value).split("-");
+      return `${Number(y)}年${Number(m)}月`;
+    }
+
     function formatDateTime(value) {
       if (!value) return "";
       const date = new Date(value);
@@ -2617,6 +2723,18 @@
       const copy = new Date(date.getTime());
       copy.setDate(copy.getDate() + days);
       return copy;
+    }
+
+    function addMonthsValue(date, months) {
+      const copy = new Date(date.getFullYear(), date.getMonth(), 1);
+      copy.setMonth(copy.getMonth() + Number(months || 0));
+      return monthValue(copy);
+    }
+
+    function monthValue(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      return `${y}-${m}`;
     }
 
     function dateYmd(date) {
