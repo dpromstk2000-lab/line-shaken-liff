@@ -28,10 +28,14 @@
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
       background:
-        radial-gradient(circle at top, rgba(230, 126, 34, 0.14), transparent 34%),
+        radial-gradient(circle at top, rgba(230, 126, 34, 0.16), transparent 36%),
         var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", Arial, sans-serif;
@@ -50,23 +54,23 @@
     }
 
     .logo {
-      width: 56px;
-      height: 56px;
+      width: 58px;
+      height: 58px;
       margin: 0 auto 10px;
-      border-radius: 16px;
+      border-radius: 17px;
       background: linear-gradient(135deg, #e67e22, #8e4409);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 900;
       letter-spacing: 1px;
-      box-shadow: 0 10px 30px rgba(230, 126, 34, 0.22);
+      box-shadow: 0 10px 30px rgba(230, 126, 34, 0.24);
     }
 
     .header h1 {
       margin: 0;
       font-size: 19px;
-      letter-spacing: 1.8px;
+      letter-spacing: 1.6px;
       font-weight: 800;
     }
 
@@ -77,7 +81,7 @@
     }
 
     .card {
-      background: rgba(31, 31, 31, 0.96);
+      background: rgba(31, 31, 31, 0.97);
       border: 1px solid var(--line);
       border-radius: 18px;
       padding: 20px;
@@ -124,12 +128,6 @@
       font-size: 18px;
       font-weight: 800;
       margin-bottom: 16px;
-    }
-
-    .note {
-      font-size: 12px;
-      color: var(--muted);
-      margin: -6px 0 14px;
     }
 
     .notice {
@@ -180,6 +178,11 @@
       outline: none;
     }
 
+    input::placeholder,
+    textarea::placeholder {
+      color: #777;
+    }
+
     input:focus,
     select:focus,
     textarea:focus {
@@ -188,7 +191,7 @@
     }
 
     textarea {
-      min-height: 110px;
+      min-height: 112px;
       resize: vertical;
     }
 
@@ -212,11 +215,15 @@
       font-size: 15px;
       font-weight: 800;
       cursor: pointer;
-      transition: transform 0.06s ease, opacity 0.2s ease;
+      transition: transform 0.06s ease, opacity 0.2s ease, background 0.2s ease;
     }
 
     button:active {
       transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
     }
 
     .btn-primary {
@@ -298,6 +305,14 @@
       color: #dddddd;
     }
 
+    .summary-box div {
+      margin-bottom: 5px;
+    }
+
+    .summary-box div:last-child {
+      margin-bottom: 0;
+    }
+
     .summary-box strong {
       color: #ffffff;
     }
@@ -322,6 +337,37 @@
       font-size: 10px;
       margin-top: 14px;
     }
+
+    .status-line {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #777;
+      text-align: center;
+    }
+
+    @media (max-width: 360px) {
+      .wrap {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .card {
+        padding: 17px;
+      }
+
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+
+      .buttons {
+        flex-direction: column;
+      }
+
+      .btn-secondary,
+      .btn-half {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 
@@ -331,6 +377,7 @@
       <div class="logo">SH</div>
       <h1>STREET HOUSE 杵築</h1>
       <p>車検・整備・カスタム ご相談窓口</p>
+      <div id="liffStatus" class="status-line">LINE情報を確認中...</div>
     </div>
 
     <div class="card">
@@ -416,7 +463,7 @@
           <div class="step-title">Q3. 車検時期・ご要望を教えてください</div>
 
           <div class="notice">
-            次回車検年月を登録しておくと、車検時期が近づいたお客様を店舗側で確認できます。
+            次回車検年月を登録しておくと、店舗側で車検時期の近いお客様を確認できます。
           </div>
 
           <div class="grid2">
@@ -466,22 +513,24 @@
     </div>
 
     <div class="footer">
-      STREET HOUSE Kitsuki LINE DEMO / ksh-line-demo-api
+      STREET HOUSE Kitsuki LINE DEMO / line-shaken-liff
     </div>
   </div>
 
   <script>
     // =====================================================
-    // 設定
+    // 必ず変更する設定
     // =====================================================
 
     // LINE Developersで作成したLIFF IDに変更してください。
+    // まだLIFF IDがない場合は、このままでもブラウザテストできます。
     const LIFF_ID = "YOUR_LIFF_ID";
 
-    // Cloudflare WorkerのURLに変更してください。
+    // Cloudflare Worker「ksh-line-demo-api」のURLに変更してください。
     // 例: https://ksh-line-demo-api.xxxxx.workers.dev
     const WORKER_API_BASE = "https://ksh-line-demo-api.あなたのサブドメイン.workers.dev";
 
+    // Supabase / Worker 側と合わせる店舗コード
     const SHOP_CODE = "street_house_kitsuki";
 
     // =====================================================
@@ -507,16 +556,20 @@
     });
 
     async function initLiff() {
+      const status = document.getElementById("liffStatus");
+
       try {
         if (!LIFF_ID || LIFF_ID === "YOUR_LIFF_ID") {
-          console.warn("LIFF_ID is not set. Demo browser mode.");
+          console.warn("LIFF_ID is not set. Browser demo mode.");
           fillDemoProfile();
+          status.textContent = "ブラウザ確認モード";
           return;
         }
 
         await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
+          status.textContent = "LINEログインへ移動します...";
           liff.login();
           return;
         }
@@ -535,12 +588,19 @@
             nameInput.value = lineProfile.displayName;
           }
         }
+
+        status.textContent = lineProfile.displayName
+          ? `${lineProfile.displayName} 様`
+          : "LINE連携済み";
       } catch (error) {
         console.error("LIFF init failed:", error);
+
+        fillDemoProfile();
+        status.textContent = "LINE情報の取得に失敗しました";
+
         showError(
           "LINE情報の取得に失敗しました。\nフォーム入力は可能ですが、LINE連携情報が取得できていない可能性があります。"
         );
-        fillDemoProfile();
       }
     }
 
@@ -573,6 +633,8 @@
         consultType.value = "カスタム相談";
       } else if (type === "repair") {
         consultType.value = "異音・トラブルの点検";
+      } else if (type === "parts") {
+        consultType.value = "パーツ持ち込み取付・カスタム";
       }
     }
 
@@ -597,7 +659,11 @@
 
       document.getElementById(`step${stepNumber}`).classList.add("active");
 
-      const progressWidth = stepNumber === 1 ? "33%" : stepNumber === 2 ? "66%" : "100%";
+      const progressWidth =
+        stepNumber === 1 ? "33%" :
+        stepNumber === 2 ? "66%" :
+        "100%";
+
       document.getElementById("progressBar").style.width = progressWidth;
 
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -616,8 +682,10 @@
       for (let i = 0; i <= 5; i++) {
         const year = currentYear + i;
         const option = document.createElement("option");
+
         option.value = String(year);
         option.textContent = `${year}年（${getReiwaString(year)}）`;
+
         yearSelect.appendChild(option);
       }
 
@@ -634,8 +702,10 @@
 
       for (let month = 1; month <= 12; month++) {
         const option = document.createElement("option");
+
         option.value = String(month);
         option.textContent = `${month}月`;
+
         monthSelect.appendChild(option);
       }
     }
@@ -670,6 +740,13 @@
         return;
       }
 
+      if (!WORKER_API_BASE || WORKER_API_BASE.includes("あなたのサブドメイン")) {
+        showError(
+          "Cloudflare WorkerのURLが未設定です。\nindex.html内の WORKER_API_BASE を実際のURLに変更してください。"
+        );
+        return;
+      }
+
       const payload = {
         shopCode: SHOP_CODE,
 
@@ -693,13 +770,14 @@
 
         message: getValue("userMessage"),
 
-        source: "LIFF"
+        source: "LIFF",
+        pageUrl: window.location.href
       };
 
       try {
         setSubmitting(true);
 
-        const response = await fetch(`${WORKER_API_BASE}/api/inquiries`, {
+        const response = await fetch(`${WORKER_API_BASE.replace(/\/$/, "")}/api/inquiries`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -726,6 +804,7 @@
         showSuccess(payload, result);
       } catch (error) {
         console.error(error);
+
         showError(
           "送信に失敗しました。\n時間をおいてもう一度お試しください。\n\n" +
           (error.message || "")
@@ -746,9 +825,11 @@
           : "未入力";
 
       const carText = payload.carName || "未入力";
+      const phoneText = payload.phone || "未入力";
 
       document.getElementById("successSummary").innerHTML = `
         <div><strong>お名前：</strong>${escapeHtml(payload.name)}</div>
+        <div><strong>電話番号：</strong>${escapeHtml(phoneText)}</div>
         <div><strong>お車：</strong>${escapeHtml(carText)}</div>
         <div><strong>相談内容：</strong>${escapeHtml(payload.consultType)}</div>
         <div><strong>次回車検：</strong>${escapeHtml(shakenText)}</div>
@@ -807,11 +888,11 @@
 
     function escapeHtml(value) {
       return String(value || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
     }
   </script>
 </body>
