@@ -648,6 +648,60 @@
       display: none;
     }
 
+    .customer-search-box {
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .customer-result-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 280px;
+      overflow: auto;
+    }
+
+    .customer-result {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 11px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .customer-result:hover {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(30,58,138,0.08);
+    }
+
+    .selected-customer-card {
+      display: none;
+      border: 2px solid #bbf7d0;
+      background: #f0fdf4;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .selected-customer-card.active {
+      display: block;
+    }
+
+    .selected-customer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
     .modal-overlay {
       display: none;
       position: fixed;
@@ -807,8 +861,8 @@
       <div class="side-footer">
         毎日見る場所：<br>
         ✅ 今日やること<br><br>
-        相談 → 顧客登録 → 入庫予定<br>
-        まで管理可能
+        顧客検索 → 入庫予定作成<br>
+        営業時間外の誤登録を防止
       </div>
     </aside>
 
@@ -1000,35 +1054,43 @@
               <div>
                 <h3 id="reservationFormTitle" style="margin:0">入庫予定を追加</h3>
                 <div id="reservationFormHelp" class="small muted">
-                  顧客と車両を選択し、入庫予定を登録します。登録前に確認画面を表示します。
+                  顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。
                 </div>
               </div>
               <button class="btn btn-slate" onclick="clearReservationForm()">入力クリア</button>
             </div>
 
-            <div class="add-grid">
-              <div class="form-field form-wide">
-                <label>顧客 必須</label>
-                <select id="reservationCustomerId" onchange="onReservationCustomerChange()">
-                  <option value="">顧客を選択</option>
-                </select>
+            <div class="customer-search-box">
+              <div class="form-field">
+                <label>顧客検索</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                  <input id="reservationCustomerSearch" type="text" placeholder="名前・電話番号・車種・ナンバー下4桁で検索" style="flex:1; min-width:240px" oninput="searchReservationCustomers()" />
+                  <button class="btn btn-primary" onclick="searchReservationCustomers()">検索</button>
+                </div>
               </div>
+              <div id="reservationCustomerResults" class="customer-result-list"></div>
+            </div>
 
+            <div id="selectedReservationCustomerCard" class="selected-customer-card"></div>
+
+            <div class="add-grid">
               <div class="form-field form-wide">
                 <label>車両</label>
                 <select id="reservationVehicleId">
-                  <option value="">車両を選択</option>
+                  <option value="">先に顧客を選択してください</option>
                 </select>
               </div>
 
               <div class="form-field">
                 <label>入庫日 必須</label>
-                <input id="reservationDateInput" type="date" />
+                <input id="reservationDateInput" type="date" onchange="loadReservationTimeOptionsForForm()" />
               </div>
 
               <div class="form-field">
-                <label>入庫時間</label>
-                <input id="reservationTimeInput" type="time" />
+                <label>入庫時間 必須</label>
+                <select id="reservationTimeInput">
+                  <option value="">先に入庫日を選択してください</option>
+                </select>
               </div>
 
               <div class="form-field">
@@ -1284,7 +1346,7 @@
             <div class="card card-pad">
               <h3 style="margin-top:0">曜日別の営業設定</h3>
               <p class="small muted">
-                定休日にチェックを入れると、LIFFの入庫希望日カレンダーで選択できなくなります。
+                定休日にチェックを入れると、LIFFの入庫希望日カレンダーと入庫予定登録に反映されます。
               </p>
 
               <div id="businessDaysGrid" class="day-list"></div>
@@ -1379,6 +1441,7 @@
     let editingCustomerId = "";
     let editingVehicleId = "";
     let editingReservationId = "";
+    let selectedReservationCustomerId = "";
     let confirmAction = null;
 
     const pageMeta = {
@@ -1392,7 +1455,7 @@
       },
       reservations: {
         title: "入庫予定",
-        desc: "店舗側で入庫予定を追加・変更・削除できます。"
+        desc: "顧客検索と営業時間内の時間選択で、入庫予定を登録します。"
       },
       opportunities: {
         title: "売上チャンス",
@@ -1404,7 +1467,7 @@
       },
       settings: {
         title: "店舗設定",
-        desc: "定休日・臨時休みを管理します。"
+        desc: "定休日・臨時休み・営業時間を管理します。"
       }
     };
 
@@ -1805,7 +1868,7 @@
         const data = await api(`/api/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
         reservationsCache = data.reservations || [];
         renderReservations(reservationsCache);
-        populateReservationCustomerSelect();
+        searchReservationCustomers();
 
       } catch (error) {
         showError(error.message);
@@ -1853,13 +1916,15 @@
       await ensureCustomersLoaded();
 
       editingReservationId = "";
+      selectedReservationCustomerId = "";
       clearReservationForm(false);
+
       document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
-      document.getElementById("reservationFormHelp").textContent = "顧客と車両を選択し、入庫予定を登録します。登録前に確認画面を表示します。";
+      document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。";
       document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
       document.getElementById("reservationFormBox").classList.add("active");
 
-      populateReservationCustomerSelect();
+      searchReservationCustomers();
       initReservationFormLimits();
       scrollToReservationForm();
     }
@@ -1877,21 +1942,22 @@
         await ensureCustomersLoaded();
 
         editingReservationId = "";
+        selectedReservationCustomerId = "";
         clearReservationForm(false);
+
         document.getElementById("reservationFormTitle").textContent = "相談から入庫予定を作成";
         document.getElementById("reservationFormHelp").textContent = "相談内容をもとに入庫予定を作成します。登録すると相談ステータスも入庫予約済みにできます。";
         document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
         document.getElementById("reservationFormBox").classList.add("active");
 
-        populateReservationCustomerSelect();
-
         if (inquiry.customer_id) {
-          document.getElementById("reservationCustomerId").value = inquiry.customer_id;
-          onReservationCustomerChange();
+          selectReservationCustomer(inquiry.customer_id);
 
           if (inquiry.vehicle_id) {
             document.getElementById("reservationVehicleId").value = inquiry.vehicle_id;
           }
+        } else {
+          searchReservationCustomers();
         }
 
         document.getElementById("reservationDateInput").value = normalizeDateInput(inquiry.preferred_visit_date || "");
@@ -1904,9 +1970,10 @@
         ].filter(Boolean).join("\n");
 
         document.getElementById("reservationFormBox").dataset.inquiryId = inquiry.id || "";
+        await loadReservationTimeOptionsForForm();
         initReservationFormLimits();
         scrollToReservationForm();
-      }, 300);
+      }, 350);
     }
 
     async function openEditReservationForm(reservationId) {
@@ -1919,6 +1986,7 @@
       }
 
       editingReservationId = reservation.id || "";
+      selectedReservationCustomerId = "";
 
       document.getElementById("reservationFormTitle").textContent = "入庫予定を編集";
       document.getElementById("reservationFormHelp").textContent = "変更内容は保存前に確認画面を表示します。";
@@ -1926,18 +1994,20 @@
       document.getElementById("reservationFormBox").classList.add("active");
       document.getElementById("reservationFormBox").dataset.inquiryId = reservation.inquiry_id || "";
 
-      populateReservationCustomerSelect();
-
-      document.getElementById("reservationCustomerId").value = reservation.customer_id || "";
-      onReservationCustomerChange();
+      if (reservation.customer_id) {
+        selectReservationCustomer(reservation.customer_id);
+      } else {
+        searchReservationCustomers();
+      }
 
       document.getElementById("reservationVehicleId").value = reservation.vehicle_id || "";
       document.getElementById("reservationDateInput").value = normalizeDateInput(reservation.reservation_date || "");
-      document.getElementById("reservationTimeInput").value = reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "";
       document.getElementById("reservationWorkType").value = normalizeWorkType(reservation.work_type || "その他");
       document.getElementById("reservationStatus").value = normalizeReservationStatus(reservation.status || "入庫予定");
       document.getElementById("reservationEstimatedAmount").value = reservation.estimated_amount || "";
       document.getElementById("reservationMemo").value = reservation.memo || "";
+
+      await loadReservationTimeOptionsForForm(reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "");
 
       initReservationFormLimits();
       scrollToReservationForm();
@@ -1950,10 +2020,9 @@
 
     function clearReservationForm(resetMode = true) {
       [
-        "reservationCustomerId",
+        "reservationCustomerSearch",
         "reservationVehicleId",
         "reservationDateInput",
-        "reservationTimeInput",
         "reservationEstimatedAmount",
         "reservationMemo"
       ].forEach(id => {
@@ -1964,16 +2033,21 @@
       document.getElementById("reservationWorkType").value = "車検";
       document.getElementById("reservationStatus").value = "入庫予定";
       document.getElementById("reservationFormBox").dataset.inquiryId = "";
+
+      selectedReservationCustomerId = "";
+      renderSelectedReservationCustomer();
       populateReservationVehicleSelect("");
+      resetReservationTimeSelect("先に入庫日を選択してください");
 
       if (resetMode) {
         editingReservationId = "";
         document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
-        document.getElementById("reservationFormHelp").textContent = "顧客と車両を選択し、入庫予定を登録します。登録前に確認画面を表示します。";
+        document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。";
         document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
       }
 
       initReservationFormLimits();
+      searchReservationCustomers();
     }
 
     function scrollToReservationForm() {
@@ -1994,26 +2068,114 @@
       }
     }
 
-    function populateReservationCustomerSelect() {
-      const select = document.getElementById("reservationCustomerId");
-      if (!select) return;
+    function searchReservationCustomers() {
+      const box = document.getElementById("reservationCustomerResults");
+      if (!box) return;
 
-      const current = select.value;
+      const keyword = (document.getElementById("reservationCustomerSearch")?.value || "").trim().toLowerCase();
 
-      const options = [`<option value="">顧客を選択</option>`]
-        .concat(customersCache.map(customer => {
-          const phone = customer.phone ? ` / ${customer.phone}` : "";
-          return `<option value="${escapeHtml(customer.id)}">${escapeHtml(customer.name || "未入力")}${escapeHtml(phone)}</option>`;
-        }));
+      const results = customersCache.filter(customer => {
+        if (!keyword) return true;
 
-      select.innerHTML = options.join("");
+        const text = [
+          customer.name,
+          customer.phone,
+          customer.status,
+          customer.line_display_name,
+          customer.memo,
+          ...(customer.vehicles || []).flatMap(v => [
+            v.car_name,
+            v.maker,
+            v.model,
+            v.plate_last4,
+            v.next_shaken_date,
+            v.next_shaken_year,
+            v.next_shaken_month
+          ])
+        ].filter(Boolean).join(" ").toLowerCase();
 
-      if (current) select.value = current;
+        return text.includes(keyword);
+      }).slice(0, 30);
+
+      if (!results.length) {
+        box.innerHTML = `<div class="list-item muted">該当する顧客が見つかりません。</div>`;
+        return;
+      }
+
+      box.innerHTML = results.map(customer => {
+        const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+        const vehicleSummary = vehicles.length
+          ? vehicles.map(v => buildVehicleLabel(v)).join(" / ")
+          : "車両未登録";
+
+        return `
+          <div class="customer-result" onclick="selectReservationCustomer('${customer.id}')">
+            <div>
+              <strong>${escapeHtml(customer.name || "未入力")}</strong>
+              <div class="small muted">
+                ${escapeHtml(customer.phone || "電話未入力")} / ${escapeHtml(vehicleSummary)}
+              </div>
+            </div>
+            <button class="btn btn-primary" type="button">選択</button>
+          </div>
+        `;
+      }).join("");
     }
 
-    function onReservationCustomerChange() {
-      const customerId = document.getElementById("reservationCustomerId").value;
+    function selectReservationCustomer(customerId) {
+      const customer = findCustomer(customerId);
+
+      if (!customer) {
+        showError("選択した顧客が見つかりません。");
+        return;
+      }
+
+      selectedReservationCustomerId = customerId;
+
+      document.getElementById("reservationCustomerSearch").value = customer.name || "";
+      document.getElementById("reservationCustomerResults").innerHTML = "";
+      renderSelectedReservationCustomer();
       populateReservationVehicleSelect(customerId);
+    }
+
+    function renderSelectedReservationCustomer() {
+      const card = document.getElementById("selectedReservationCustomerCard");
+      if (!card) return;
+
+      const customer = selectedReservationCustomerId ? findCustomer(selectedReservationCustomerId) : null;
+
+      if (!customer) {
+        card.classList.remove("active");
+        card.innerHTML = "";
+        return;
+      }
+
+      const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+      const vehicleText = vehicles.length
+        ? vehicles.map(v => escapeHtml(buildVehicleLabel(v))).join("<br>")
+        : "車両未登録";
+
+      card.classList.add("active");
+      card.innerHTML = `
+        <div class="selected-customer-head">
+          <div>
+            <strong>選択中：${escapeHtml(customer.name || "未入力")}</strong>
+            <div class="small muted">
+              電話：${escapeHtml(customer.phone || "未入力")} / ${escapeHtml(customer.line_user_id ? "LINE連携済み" : "LINE未連携")}
+            </div>
+          </div>
+          <button class="btn btn-slate" type="button" onclick="clearSelectedReservationCustomer()">選び直す</button>
+        </div>
+        <div class="small">${vehicleText}</div>
+      `;
+    }
+
+    function clearSelectedReservationCustomer() {
+      selectedReservationCustomerId = "";
+      document.getElementById("reservationCustomerSearch").value = "";
+      renderSelectedReservationCustomer();
+      populateReservationVehicleSelect("");
+      searchReservationCustomers();
     }
 
     function populateReservationVehicleSelect(customerId) {
@@ -2023,14 +2185,73 @@
       const customer = customerId ? findCustomer(customerId) : null;
       const vehicles = customer && Array.isArray(customer.vehicles) ? customer.vehicles : [];
 
+      if (!customer) {
+        select.innerHTML = `<option value="">先に顧客を選択してください</option>`;
+        return;
+      }
+
       const options = [`<option value="">車両を選択</option>`]
         .concat(vehicles.map(vehicle => {
-          const plate = vehicle.plate_last4 ? ` / 下4桁 ${vehicle.plate_last4}` : "";
-          const label = `${vehicle.car_name || vehicle.maker || vehicle.model || "車両名未入力"}${plate}`;
-          return `<option value="${escapeHtml(vehicle.id)}">${escapeHtml(label)}</option>`;
+          return `<option value="${escapeHtml(vehicle.id)}">${escapeHtml(buildVehicleLabel(vehicle))}</option>`;
         }));
 
       select.innerHTML = options.join("");
+
+      if (vehicles.length === 1) {
+        select.value = vehicles[0].id || "";
+      }
+    }
+
+    async function loadReservationTimeOptionsForForm(preferredTime = "") {
+      const date = document.getElementById("reservationDateInput").value;
+      const select = document.getElementById("reservationTimeInput");
+
+      if (!date) {
+        resetReservationTimeSelect("先に入庫日を選択してください");
+        return;
+      }
+
+      resetReservationTimeSelect("時間候補を読み込み中...");
+
+      try {
+        const data = await api(`/api/reservation-time-options?date=${encodeURIComponent(date)}`);
+
+        if (!data.available) {
+          select.innerHTML = `<option value="">${escapeHtml(data.reason || "この日は受付できません")}</option>`;
+          select.disabled = true;
+          showError(data.reason || "この日は受付できません。");
+          return;
+        }
+
+        const times = Array.isArray(data.times) ? data.times : [];
+
+        if (!times.length) {
+          select.innerHTML = `<option value="">選択できる時間がありません</option>`;
+          select.disabled = true;
+          return;
+        }
+
+        select.disabled = false;
+        select.innerHTML = [`<option value="">入庫時間を選択</option>`]
+          .concat(times.map(time => `<option value="${escapeHtml(time)}">${escapeHtml(time)}</option>`))
+          .join("");
+
+        if (preferredTime && times.includes(preferredTime)) {
+          select.value = preferredTime;
+        }
+
+      } catch (error) {
+        resetReservationTimeSelect("時間候補を取得できません");
+        showError(error.message);
+      }
+    }
+
+    function resetReservationTimeSelect(label) {
+      const select = document.getElementById("reservationTimeInput");
+      if (!select) return;
+
+      select.innerHTML = `<option value="">${escapeHtml(label || "先に入庫日を選択してください")}</option>`;
+      select.disabled = true;
     }
 
     function saveReservationForm() {
@@ -2057,7 +2278,7 @@
     }
 
     function buildReservationPayloadFromForm() {
-      const customerId = document.getElementById("reservationCustomerId").value;
+      const customerId = selectedReservationCustomerId;
       const vehicleId = document.getElementById("reservationVehicleId").value;
       const reservationDate = document.getElementById("reservationDateInput").value;
       const reservationTime = document.getElementById("reservationTimeInput").value;
@@ -2068,7 +2289,7 @@
       const inquiryId = document.getElementById("reservationFormBox").dataset.inquiryId || "";
 
       if (!customerId) {
-        showError("顧客を選択してください。");
+        showError("顧客を検索して選択してください。");
         return null;
       }
 
@@ -2083,12 +2304,17 @@
         return null;
       }
 
+      if (!reservationTime) {
+        showError("入庫時間を選択してください。");
+        return null;
+      }
+
       return {
         customerId,
         vehicleId: vehicleId || null,
         inquiryId: inquiryId || null,
         reservationDate,
-        reservationTime: reservationTime || null,
+        reservationTime,
         workType,
         status,
         estimatedAmount: estimatedAmount === "" ? null : Number(estimatedAmount),
@@ -2781,17 +3007,7 @@
 
       setTimeout(async () => {
         await openNewReservationForm();
-        document.getElementById("reservationCustomerId").value = customerId;
-        onReservationCustomerChange();
-
-        const customer = findCustomer(customerId);
-        const vehicle = customer && Array.isArray(customer.vehicles) && customer.vehicles.length
-          ? customer.vehicles[0]
-          : null;
-
-        if (vehicle) {
-          document.getElementById("reservationVehicleId").value = vehicle.id || "";
-        }
+        selectReservationCustomer(customerId);
       }, 350);
     }
 
@@ -2924,7 +3140,7 @@
           body: JSON.stringify({ businessDays })
         });
 
-        showOk("曜日別の営業設定を保存しました。LIFFカレンダーにも反映されます。");
+        showOk("曜日別の営業設定を保存しました。LIFFカレンダーと入庫時間候補にも反映されます。");
         await loadSettings();
 
       } catch (error) {
@@ -2977,7 +3193,7 @@
         document.getElementById("specialDate").value = "";
         document.getElementById("specialReason").value = "";
 
-        showOk("臨時休み・特別営業日を追加しました。LIFFカレンダーにも反映されます。");
+        showOk("臨時休み・特別営業日を追加しました。LIFFカレンダーと入庫予定にも反映されます。");
         await loadSettings();
 
       } catch (error) {
@@ -2987,7 +3203,7 @@
 
     async function deleteSpecialDay(id) {
       showConfirm("この臨時休み設定を削除しますか？", `
-        <p class="muted">削除すると、LIFFカレンダーの休業日設定からも外れます。</p>
+        <p class="muted">削除すると、LIFFカレンダーと入庫予定の休業日設定からも外れます。</p>
       `, async () => {
         clearAlert();
 
