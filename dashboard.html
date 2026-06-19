@@ -554,6 +554,43 @@
     .alert-error { background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; }
     .alert-ok { background: #dcfce7; border: 1px solid #bbf7d0; color: #166534; }
 
+    .add-box {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .add-box.active {
+      display: block;
+    }
+
+    .add-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .form-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 900;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+      width: 100%;
+    }
+
+    .form-wide {
+      grid-column: span 2;
+    }
+
+    .form-full {
+      grid-column: 1 / -1;
+    }
+
     .day-list {
       display: grid;
       gap: 10px;
@@ -585,8 +622,7 @@
     }
 
     .time-field label,
-    .memo-field label,
-    .form-field label {
+    .memo-field label {
       display: block;
       font-size: 11px;
       font-weight: 900;
@@ -595,9 +631,7 @@
     }
 
     .time-field input,
-    .memo-field input,
-    .form-field input,
-    .form-field select {
+    .memo-field input {
       width: 100%;
     }
 
@@ -620,7 +654,8 @@
     @media (max-width: 1180px) {
       .grid4,
       .grid3,
-      .grid2 {
+      .grid2,
+      .add-grid {
         grid-template-columns: 1fr 1fr;
       }
 
@@ -657,8 +692,14 @@
       .grid3,
       .grid2,
       .form-grid,
+      .add-grid,
       .day-row {
         grid-template-columns: 1fr;
+      }
+
+      .form-wide,
+      .form-full {
+        grid-column: 1 / -1;
       }
 
       .content {
@@ -697,8 +738,8 @@
       <div class="side-footer">
         毎日見る場所：<br>
         ✅ 今日やること<br><br>
-        LINE公式 × 車検・整備・カスタム<br>
-        DEMO Dashboard
+        LINE友だち以外の既存客も<br>
+        店舗側で登録可能
       </div>
     </aside>
 
@@ -730,7 +771,6 @@
 
         <div id="alertBox" class="alert"></div>
 
-        <!-- TODAY -->
         <section id="section-today" class="section active">
           <div class="grid4">
             <div class="card kpi">
@@ -828,7 +868,6 @@
           </div>
         </section>
 
-        <!-- INQUIRIES -->
         <section id="section-inquiries" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -877,7 +916,6 @@
           </div>
         </section>
 
-        <!-- RESERVATIONS -->
         <section id="section-reservations" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -914,7 +952,6 @@
           </div>
         </section>
 
-        <!-- OPPORTUNITIES -->
         <section id="section-opportunities" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -959,15 +996,100 @@
           </div>
         </section>
 
-        <!-- CUSTOMERS -->
         <section id="section-customers" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
               <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話で検索" />
               <button class="btn btn-primary" onclick="loadCustomers()">検索</button>
+              <button class="btn btn-green" onclick="toggleAddCustomer()">＋ 顧客を追加</button>
             </div>
             <div class="toolbar-right">
               <button class="btn btn-slate" onclick="openLineManager()">LINE管理画面</button>
+            </div>
+          </div>
+
+          <div id="addCustomerBox" class="card card-pad add-box">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">店舗側で顧客・車両を登録</h3>
+                <div class="small muted">
+                  LINE友だち以外の既存客・店頭客・電話客も登録できます。LINE未連携でも車検管理・営業リスト化ができます。
+                </div>
+              </div>
+              <button class="btn btn-slate" onclick="clearAddCustomerForm()">入力クリア</button>
+            </div>
+
+            <div class="add-grid">
+              <div class="form-field">
+                <label>お名前 必須</label>
+                <input id="newCustomerName" type="text" placeholder="例：佐藤 太郎" />
+              </div>
+
+              <div class="form-field">
+                <label>電話番号</label>
+                <input id="newCustomerPhone" type="tel" placeholder="例：09012345678" />
+              </div>
+
+              <div class="form-field">
+                <label>顧客ステータス</label>
+                <select id="newCustomerStatus">
+                  <option value="店舗登録">店舗登録</option>
+                  <option value="既存客">既存客</option>
+                  <option value="車検見込み">車検見込み</option>
+                  <option value="カスタム見込み">カスタム見込み</option>
+                  <option value="LINE未連携">LINE未連携</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label>最終来店日</label>
+                <input id="newLastVisitDate" type="date" />
+              </div>
+
+              <div class="form-field">
+                <label>車種・車名</label>
+                <input id="newCarName" type="text" placeholder="例：ハイエース" />
+              </div>
+
+              <div class="form-field">
+                <label>メーカー</label>
+                <input id="newMaker" type="text" placeholder="例：トヨタ" />
+              </div>
+
+              <div class="form-field">
+                <label>型式・モデル</label>
+                <input id="newModel" type="text" placeholder="例：200系" />
+              </div>
+
+              <div class="form-field">
+                <label>ナンバー下4桁</label>
+                <input id="newPlateLast4" type="text" maxlength="4" placeholder="例：1234" />
+              </div>
+
+              <div class="form-field">
+                <label>次回車検年月</label>
+                <input id="newNextShakenMonth" type="month" />
+              </div>
+
+              <div class="form-field">
+                <label>前回オイル交換日</label>
+                <input id="newLastOilChangeDate" type="date" />
+              </div>
+
+              <div class="form-field form-wide">
+                <label>店舗メモ</label>
+                <input id="newCustomerMemo" type="text" placeholder="例：店頭で車検案内済み" />
+              </div>
+
+              <div class="form-field form-full">
+                <label>車両メモ</label>
+                <textarea id="newVehicleMemo" placeholder="例：次回車検時にタイヤ交換も提案"></textarea>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px">
+              <button class="btn btn-green" onclick="createCustomer()">この内容で登録</button>
+              <button class="btn btn-slate" onclick="toggleAddCustomer()">閉じる</button>
             </div>
           </div>
 
@@ -1009,7 +1131,6 @@
           </div>
         </section>
 
-        <!-- SETTINGS -->
         <section id="section-settings" class="section">
           <div class="grid2">
             <div class="card card-pad">
@@ -1092,6 +1213,7 @@
     let remindersCache = [];
     let businessDaysCache = [];
     let specialDaysCache = [];
+    let todayTasksCache = [];
 
     const pageMeta = {
       today: {
@@ -1112,7 +1234,7 @@
       },
       customers: {
         title: "顧客・車両",
-        desc: "車検時期やLINE連携状況で絞り込み、すぐ連絡できます。"
+        desc: "LINE友だち以外の既存客も登録し、車検時期で営業できます。"
       },
       settings: {
         title: "店舗設定",
@@ -1240,9 +1362,9 @@
 
     function renderTodayTasks(data) {
       const box = document.getElementById("todayTaskList");
-      const tasks = buildTodayTasks(data);
+      todayTasksCache = buildTodayTasks(data);
 
-      if (!tasks.length) {
+      if (!todayTasksCache.length) {
         box.innerHTML = `<div class="task-card green">
           <div class="task-title">本日の緊急対応はありません</div>
           <div class="task-meta">新規相談・未返信・車検間近の候補が出るとここに表示されます。</div>
@@ -1250,7 +1372,7 @@
         return;
       }
 
-      box.innerHTML = tasks.map(task => `
+      box.innerHTML = todayTasksCache.map((task, index) => `
         <div class="task-card ${task.color}">
           <div class="task-head">
             <div>
@@ -1261,9 +1383,10 @@
           </div>
           <div class="message-box">${escapeHtml(task.message)}</div>
           <div class="task-actions">
-            <button class="btn btn-slate" onclick="copyText('${escapeAttr(task.name || "")}')">名前コピー</button>
-            <button class="btn btn-slate" onclick="copyText('${escapeAttr(task.message || "")}')">文面コピー</button>
-            ${task.lineUserId ? `<button class="btn btn-green" onclick="sendLineMessage('${escapeAttr(task.customerId || "")}', '${escapeAttr(task.lineUserId)}', '${escapeAttr(task.message)}')">LINE送信</button>` : ""}
+            <button class="btn btn-slate" onclick="copyTodayTaskName(${index})">名前コピー</button>
+            <button class="btn btn-slate" onclick="copyTodayTaskPhone(${index})">電話コピー</button>
+            <button class="btn btn-slate" onclick="copyTodayTaskMessage(${index})">文面コピー</button>
+            ${task.lineUserId ? `<button class="btn btn-green" onclick="sendTodayTaskLine(${index})">LINE送信</button>` : ""}
             <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
           </div>
         </div>
@@ -1292,6 +1415,7 @@
             meta: `${row.consult_type || "相談"} / ${row.car_name_snapshot || row.vehicle?.car_name || "車両未入力"}`,
             message: buildInquirySuggestedMessage(row),
             name: row.customer_name_snapshot || row.customer?.name || "",
+            phone: row.phone_snapshot || row.customer?.phone || "",
             lineUserId: row.line_user_id || row.customer?.line_user_id || "",
             customerId: row.customer_id || ""
           });
@@ -1306,6 +1430,7 @@
             meta: `${row.consult_type || "相談"} / 見積もり後未返信`,
             message: buildFollowupMessage(row),
             name: row.customer_name_snapshot || row.customer?.name || "",
+            phone: row.phone_snapshot || row.customer?.phone || "",
             lineUserId: row.line_user_id || row.customer?.line_user_id || "",
             customerId: row.customer_id || ""
           });
@@ -1320,6 +1445,7 @@
             meta: `${formatDate(row.preferred_visit_date)} / ${row.consult_type || "相談"}`,
             message: buildVisitConfirmMessage(row),
             name: row.customer_name_snapshot || row.customer?.name || "",
+            phone: row.phone_snapshot || row.customer?.phone || "",
             lineUserId: row.line_user_id || row.customer?.line_user_id || "",
             customerId: row.customer_id || ""
           });
@@ -1343,6 +1469,7 @@
           meta: `${row.vehicle_name || "車両未入力"} / ${row.trigger_date ? formatDate(row.trigger_date) : ""}`,
           message: row.message_preview || "",
           name: row.customer_name || "",
+          phone: row.phone || "",
           lineUserId: row.line_user_id || "",
           customerId: row.customer_id || ""
         });
@@ -1357,6 +1484,7 @@
           meta: `${row.reminder_type || ""} / ${row.target_date ? formatDate(row.target_date) : ""}`,
           message: row.message_preview || "",
           name: row.customer?.name || "",
+          phone: row.customer?.phone || "",
           lineUserId: row.customer?.line_user_id || row.line_user_id || "",
           customerId: row.customer_id || ""
         });
@@ -1449,8 +1577,9 @@
           <td>
             <div style="display:grid; gap:6px">
               <button class="btn btn-primary" onclick="updateInquiry('${row.id}')">保存</button>
-              <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.customer_name_snapshot || row.customer?.name || "")}')">名前コピー</button>
-              <button class="btn btn-slate" onclick="copyText('${escapeAttr(buildInquirySuggestedMessage(row))}')">文面コピー</button>
+              <button class="btn btn-slate" onclick="copyInquiryName('${row.id}')">名前コピー</button>
+              <button class="btn btn-slate" onclick="copyInquiryPhone('${row.id}')">電話コピー</button>
+              <button class="btn btn-slate" onclick="copyInquiryMessage('${row.id}')">文面コピー</button>
             </div>
           </td>
         </tr>
@@ -1548,7 +1677,7 @@
         return;
       }
 
-      body.innerHTML = rows.map(row => `
+      body.innerHTML = rows.map((row, index) => `
         <tr>
           <td>${badgeTrigger(row.trigger_type)}</td>
           <td>${escapeHtml(row.customer_name || "未入力")}</td>
@@ -1558,9 +1687,9 @@
             ${escapeHtml(row.reason || "")}
             <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
             <div class="task-actions">
-              <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.customer_name || "")}')">名前コピー</button>
-              <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.message_preview || "")}')">文面コピー</button>
-              ${row.line_user_id ? `<button class="btn btn-green" onclick="sendLineMessage('${escapeAttr(row.customer_id || "")}', '${escapeAttr(row.line_user_id)}', '${escapeAttr(row.message_preview || "")}')">LINE送信</button>` : ""}
+              <button class="btn btn-slate" onclick="copyOpportunityName(${index})">名前コピー</button>
+              <button class="btn btn-slate" onclick="copyOpportunityMessage(${index})">文面コピー</button>
+              ${row.line_user_id ? `<button class="btn btn-green" onclick="sendOpportunityLine(${index})">LINE送信</button>` : ""}
               <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
             </div>
           </td>
@@ -1588,8 +1717,9 @@
           </div>
           <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
           <div class="task-actions">
-            <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.customer?.name || "")}')">名前コピー</button>
-            <button class="btn btn-slate" onclick="copyText('${escapeAttr(row.message_preview || "")}')">文面コピー</button>
+            <button class="btn btn-slate" onclick="copyReminderName('${row.id}')">名前コピー</button>
+            <button class="btn btn-slate" onclick="copyReminderPhone('${row.id}')">電話コピー</button>
+            <button class="btn btn-slate" onclick="copyReminderMessage('${row.id}')">文面コピー</button>
             <button class="btn btn-green" onclick="sendReminderLine('${row.id}')">LINE送信</button>
             <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
           </div>
@@ -1610,24 +1740,6 @@
       }
     }
 
-    async function sendReminderLine(id) {
-      clearAlert();
-
-      const row = remindersCache.find(r => r.id === id);
-      if (!row) return;
-
-      const lineUserId = row.customer?.line_user_id || row.line_user_id || "";
-      const customerId = row.customer_id || "";
-      const message = row.message_preview || "";
-
-      if (!lineUserId) {
-        showError("この顧客はLINEユーザーIDがないため、直接送信できません。文面コピーを使ってください。");
-        return;
-      }
-
-      await sendLineMessage(customerId, lineUserId, message, id);
-    }
-
     async function loadCustomers() {
       setLoading(true);
       clearAlert();
@@ -1645,14 +1757,86 @@
       }
     }
 
+    function toggleAddCustomer() {
+      document.getElementById("addCustomerBox").classList.toggle("active");
+    }
+
+    function clearAddCustomerForm() {
+      [
+        "newCustomerName",
+        "newCustomerPhone",
+        "newCustomerMemo",
+        "newCarName",
+        "newMaker",
+        "newModel",
+        "newPlateLast4",
+        "newNextShakenMonth",
+        "newLastOilChangeDate",
+        "newLastVisitDate",
+        "newVehicleMemo"
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+
+      document.getElementById("newCustomerStatus").value = "店舗登録";
+    }
+
+    async function createCustomer() {
+      clearAlert();
+
+      const name = document.getElementById("newCustomerName").value.trim();
+      const phone = document.getElementById("newCustomerPhone").value.trim();
+
+      if (!name) {
+        showError("お名前を入力してください。");
+        return;
+      }
+
+      const payload = {
+        name,
+        phone,
+        status: document.getElementById("newCustomerStatus").value,
+        memo: document.getElementById("newCustomerMemo").value.trim(),
+        lastVisitDate: document.getElementById("newLastVisitDate").value || null,
+        vehicle: {
+          carName: document.getElementById("newCarName").value.trim(),
+          maker: document.getElementById("newMaker").value.trim(),
+          model: document.getElementById("newModel").value.trim(),
+          plateLast4: document.getElementById("newPlateLast4").value.trim(),
+          nextShakenDate: monthToDate(document.getElementById("newNextShakenMonth").value),
+          lastOilChangeDate: document.getElementById("newLastOilChangeDate").value || null,
+          memo: document.getElementById("newVehicleMemo").value.trim()
+        }
+      };
+
+      try {
+        await api("/api/customers", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+
+        showOk("店舗側で顧客・車両を登録しました。");
+        clearAddCustomerForm();
+        currentCustomerFilter = "all";
+        updateCustomerFilterButtons();
+        await loadCustomers();
+
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
     function setCustomerFilter(filter) {
       currentCustomerFilter = filter;
-
-      document.querySelectorAll(".filter-btn").forEach(btn => btn.classList.remove("active"));
-      const active = document.getElementById(`cf-${filter}`);
-      if (active) active.classList.add("active");
-
+      updateCustomerFilterButtons();
       renderCustomers();
+    }
+
+    function updateCustomerFilterButtons() {
+      document.querySelectorAll(".filter-btn").forEach(btn => btn.classList.remove("active"));
+      const active = document.getElementById(`cf-${currentCustomerFilter}`);
+      if (active) active.classList.add("active");
     }
 
     function renderCustomers() {
@@ -1677,19 +1861,19 @@
           : "未入力";
 
         const shakenText = vehicles.length
-          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatDate(v.next_shaken_date) : "未入力")).join("<br>")
+          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatYearMonth(v.next_shaken_date) : "未入力")).join("<br>")
           : "未入力";
 
         return `
           <tr>
             <td>
               <strong>${escapeHtml(customer.name || "未入力")}</strong><br>
-              <span class="muted small">${escapeHtml(customer.line_display_name || "")}</span>
+              <span class="muted small">${escapeHtml(customer.line_display_name || customer.status || "")}</span>
             </td>
             <td>${escapeHtml(customer.phone || "未入力")}</td>
             <td>
               ${customer.line_user_id ? badgeStatus("LINE連携済み") : badgeStatus("LINE未連携")}<br>
-              <span class="muted small">${escapeHtml(customer.line_user_id || "")}</span>
+              <span class="muted small">${escapeHtml(customer.line_user_id || "店舗登録・電話客")}</span>
             </td>
             <td>${vehicleText}</td>
             <td>${shakenText}</td>
@@ -1697,9 +1881,10 @@
             <td><div class="message-box">${escapeHtml(suggested)}</div></td>
             <td>
               <div style="display:grid; gap:6px">
-                <button class="btn btn-slate" onclick="copyText('${escapeAttr(customer.name || "")}')">名前コピー</button>
-                <button class="btn btn-slate" onclick="copyText('${escapeAttr(suggested)}')">文面コピー</button>
-                ${customer.line_user_id ? `<button class="btn btn-green" onclick="sendLineMessage('${escapeAttr(customer.id || "")}', '${escapeAttr(customer.line_user_id)}', '${escapeAttr(suggested)}')">LINE送信</button>` : ""}
+                <button class="btn btn-slate" onclick="copyCustomerName('${customer.id}')">名前コピー</button>
+                <button class="btn btn-slate" onclick="copyCustomerPhone('${customer.id}')">電話コピー</button>
+                <button class="btn btn-slate" onclick="copyCustomerMessage('${customer.id}')">文面コピー</button>
+                ${customer.line_user_id ? `<button class="btn btn-green" onclick="sendCustomerLine('${customer.id}')">LINE送信</button>` : ""}
                 <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
               </div>
             </td>
@@ -2166,7 +2351,7 @@
       clearAlert();
 
       if (!lineUserId) {
-        showError("LINEユーザーIDがないため送信できません。文面コピーを使ってください。");
+        showError("LINEユーザーIDがないため送信できません。LINE未連携の顧客は、文面コピーや電話コピーを使ってください。");
         return;
       }
 
@@ -2192,6 +2377,7 @@
 
         if (currentTab === "opportunities") await loadOpportunities();
         if (currentTab === "today") await loadToday();
+        if (currentTab === "customers") await loadCustomers();
 
       } catch (error) {
         showError(
@@ -2201,8 +2387,126 @@
       }
     }
 
+    function findInquiry(id) {
+      return inquiriesCache.find(row => row.id === id) || null;
+    }
+
+    function findCustomer(id) {
+      return customersCache.find(row => row.id === id) || null;
+    }
+
+    function findReminder(id) {
+      return remindersCache.find(row => row.id === id) || null;
+    }
+
+    function copyInquiryName(id) {
+      const row = findInquiry(id);
+      if (row) copyText(row.customer_name_snapshot || row.customer?.name || "");
+    }
+
+    function copyInquiryPhone(id) {
+      const row = findInquiry(id);
+      if (row) copyText(row.phone_snapshot || row.customer?.phone || "");
+    }
+
+    function copyInquiryMessage(id) {
+      const row = findInquiry(id);
+      if (row) copyText(buildInquirySuggestedMessage(row));
+    }
+
+    function copyCustomerName(id) {
+      const row = findCustomer(id);
+      if (row) copyText(row.name || "");
+    }
+
+    function copyCustomerPhone(id) {
+      const row = findCustomer(id);
+      if (row) copyText(row.phone || "");
+    }
+
+    function copyCustomerMessage(id) {
+      const row = findCustomer(id);
+      if (row) copyText(buildCustomerSuggestedMessage(row));
+    }
+
+    function sendCustomerLine(id) {
+      const row = findCustomer(id);
+      if (!row) return;
+      sendLineMessage(row.id || "", row.line_user_id || "", buildCustomerSuggestedMessage(row));
+    }
+
+    function copyReminderName(id) {
+      const row = findReminder(id);
+      if (row) copyText(row.customer?.name || "");
+    }
+
+    function copyReminderPhone(id) {
+      const row = findReminder(id);
+      if (row) copyText(row.customer?.phone || "");
+    }
+
+    function copyReminderMessage(id) {
+      const row = findReminder(id);
+      if (row) copyText(row.message_preview || "");
+    }
+
+    function sendReminderLine(id) {
+      const row = findReminder(id);
+      if (!row) return;
+
+      sendLineMessage(
+        row.customer_id || "",
+        row.customer?.line_user_id || row.line_user_id || "",
+        row.message_preview || "",
+        id
+      );
+    }
+
+    function copyOpportunityName(index) {
+      const row = opportunitiesCache[index];
+      if (row) copyText(row.customer_name || "");
+    }
+
+    function copyOpportunityMessage(index) {
+      const row = opportunitiesCache[index];
+      if (row) copyText(row.message_preview || "");
+    }
+
+    function sendOpportunityLine(index) {
+      const row = opportunitiesCache[index];
+      if (!row) return;
+
+      sendLineMessage(row.customer_id || "", row.line_user_id || "", row.message_preview || "");
+    }
+
+    function copyTodayTaskName(index) {
+      const task = todayTasksCache[index];
+      if (task) copyText(task.name || "");
+    }
+
+    function copyTodayTaskPhone(index) {
+      const task = todayTasksCache[index];
+      if (task) copyText(task.phone || "");
+    }
+
+    function copyTodayTaskMessage(index) {
+      const task = todayTasksCache[index];
+      if (task) copyText(task.message || "");
+    }
+
+    function sendTodayTaskLine(index) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+      sendLineMessage(task.customerId || "", task.lineUserId || "", task.message || "");
+    }
+
     async function copyText(text) {
       const value = String(text || "");
+
+      if (!value) {
+        showError("コピーする内容がありません。");
+        return;
+      }
 
       try {
         await navigator.clipboard.writeText(value);
@@ -2280,15 +2584,18 @@
         .replace(/'/g, "&#039;");
     }
 
-    function escapeAttr(value) {
-      return escapeHtml(value).replace(/`/g, "&#096;");
-    }
-
     function formatDate(value) {
       if (!value) return "";
       const [y, m, d] = String(value).slice(0, 10).split("-");
       if (!y || !m || !d) return value;
       return `${Number(y)}年${Number(m)}月${Number(d)}日`;
+    }
+
+    function formatYearMonth(value) {
+      if (!value) return "";
+      const [y, m] = String(value).slice(0, 10).split("-");
+      if (!y || !m) return value;
+      return `${Number(y)}年${Number(m)}月`;
     }
 
     function formatDateTime(value) {
@@ -2344,6 +2651,11 @@
       const diff = today.getTime() - target.getTime();
 
       return Math.floor(diff / 86400000);
+    }
+
+    function monthToDate(value) {
+      if (!value) return null;
+      return `${value}-01`;
     }
 
     function timeShort(value) {
