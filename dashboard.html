@@ -1205,6 +1205,7 @@
           <div class="toolbar">
             <div class="toolbar-left">
               <button class="btn btn-primary" onclick="loadOpportunities()">売上チャンス更新</button>
+              <button class="btn btn-green" onclick="loadOpportunities()">売上実績更新</button>
               <button class="btn btn-orange" onclick="generateReminders()">通知候補を生成</button>
             </div>
           </div>
@@ -1241,6 +1242,124 @@
                 </div>
               </div>
               <div id="reminderList" class="list"></div>
+            </div>
+          </div>
+
+          <div style="height:16px"></div>
+
+          <div class="card card-pad">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">売上実績</h3>
+                <div class="small muted">作業完了にした入庫予定を、実売上として確認します。</div>
+              </div>
+              <div class="toolbar-right">
+                <input id="salesFrom" type="date" />
+                <input id="salesTo" type="date" />
+                <button class="btn btn-primary" onclick="loadOpportunities()">売上実績を表示</button>
+              </div>
+            </div>
+
+            <div class="grid4">
+              <div class="card kpi">
+                <div>
+                  <span>完了件数</span>
+                  <strong id="salesCompletedCount">-</strong>
+                  <small>作業完了・売上化済み</small>
+                </div>
+                <div class="icon bg-green">✓</div>
+              </div>
+
+              <div class="card kpi">
+                <div>
+                  <span>売上合計</span>
+                  <strong id="salesTotalActual">-</strong>
+                  <small>実売上優先、未入力は見込み</small>
+                </div>
+                <div class="icon bg-amber">¥</div>
+              </div>
+
+              <div class="card kpi">
+                <div>
+                  <span>平均単価</span>
+                  <strong id="salesAverageActual">-</strong>
+                  <small>完了1件あたり</small>
+                </div>
+                <div class="icon bg-blue">↗</div>
+              </div>
+
+              <div class="card kpi">
+                <div>
+                  <span>直近完了日</span>
+                  <strong id="salesLatestCompleted">-</strong>
+                  <small>最後に売上化した日</small>
+                </div>
+                <div class="icon bg-purple">📅</div>
+              </div>
+            </div>
+
+            <div style="height:16px"></div>
+
+            <div class="grid2">
+              <div class="card">
+                <div class="panel-title">
+                  <div>
+                    <h3>月別売上</h3>
+                    <p>完了件数・売上合計・平均単価</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>月</th>
+                        <th>完了件数</th>
+                        <th>売上合計</th>
+                        <th>実売上合計</th>
+                        <th>平均単価</th>
+                      </tr>
+                    </thead>
+                    <tbody id="monthlySalesTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="panel-title">
+                  <div>
+                    <h3>作業内容別</h3>
+                    <p>どの作業が売上につながっているか</p>
+                  </div>
+                </div>
+                <div id="salesWorkTypeSummary" class="list"></div>
+              </div>
+            </div>
+
+            <div style="height:16px"></div>
+
+            <div class="card">
+              <div class="panel-title">
+                <div>
+                  <h3>完了売上一覧</h3>
+                  <p>作業完了から次回提案まで確認できます。</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>完了日</th>
+                      <th>顧客</th>
+                      <th>車両</th>
+                      <th>作業内容</th>
+                      <th>売上</th>
+                      <th>次回提案</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="completedSalesTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -1473,6 +1592,8 @@
     let customersCache = [];
     let opportunitiesCache = [];
     let remindersCache = [];
+    let completedSalesCache = [];
+    let monthlySalesCache = [];
     let businessDaysCache = [];
     let specialDaysCache = [];
     let todayTasksCache = [];
@@ -1515,6 +1636,7 @@
       initReservationDates();
       initCustomerFormLimits();
       initReservationFormLimits();
+      initSalesDateRange();
       await loadToday();
     });
 
@@ -2651,18 +2773,64 @@
       clearAlert();
 
       try {
-        const data = await api("/api/triggers");
-        opportunitiesCache = data.salesTriggers || [];
-        remindersCache = data.reminderQueue || [];
+        const [triggerData, completedData, monthlyData] = await Promise.all([
+          api("/api/triggers"),
+          api(`/api/completed-sales${buildSalesQuery()}`),
+          api(`/api/monthly-sales${buildMonthlySalesQuery()}`)
+        ]);
+
+        opportunitiesCache = triggerData.salesTriggers || [];
+        remindersCache = triggerData.reminderQueue || [];
+        completedSalesCache = completedData.completedSales || [];
+        monthlySalesCache = monthlyData.monthlySales || [];
 
         renderOpportunities(opportunitiesCache);
         renderReminders(remindersCache);
+        renderSalesDashboard(completedSalesCache, monthlySalesCache);
 
       } catch (error) {
         showError(error.message);
       } finally {
         setLoading(false);
       }
+    }
+
+    function initSalesDateRange() {
+      const from = document.getElementById("salesFrom");
+      const to = document.getElementById("salesTo");
+      if (!from || !to) return;
+
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      if (!from.value) from.value = dateYmd(firstDay);
+      if (!to.value) to.value = dateYmd(today);
+    }
+
+    function buildSalesQuery() {
+      const params = new URLSearchParams();
+      params.set("limit", "500");
+
+      const from = document.getElementById("salesFrom")?.value || "";
+      const to = document.getElementById("salesTo")?.value || "";
+
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+
+      return `?${params.toString()}`;
+    }
+
+    function buildMonthlySalesQuery() {
+      const params = new URLSearchParams();
+      params.set("limit", "24");
+
+      const from = document.getElementById("salesFrom")?.value || "";
+      const to = document.getElementById("salesTo")?.value || "";
+
+      if (from) params.set("from", from.slice(0, 8) + "01");
+      if (to) params.set("to", to);
+
+      return `?${params.toString()}`;
     }
 
     function renderOpportunities(rows) {
@@ -2721,6 +2889,157 @@
           </div>
         </div>
       `).join("");
+    }
+
+    function renderSalesDashboard(completedRows, monthlyRows) {
+      const rows = completedRows || [];
+      const count = rows.length;
+      const total = rows.reduce((sum, row) => sum + Number(row.sales_amount || row.actual_sales_amount || row.estimated_amount || 0), 0);
+      const average = count ? Math.round(total / count) : 0;
+      const latestDate = rows[0]?.completed_date || rows[0]?.reservation_date || "";
+
+      setText("salesCompletedCount", `${count}件`);
+      setText("salesTotalActual", yen(total));
+      setText("salesAverageActual", count ? yen(average) : "-");
+      setText("salesLatestCompleted", latestDate ? formatDate(latestDate) : "-");
+
+      renderMonthlySales(monthlyRows || []);
+      renderSalesWorkTypeSummary(rows);
+      renderCompletedSales(rows);
+    }
+
+    function renderMonthlySales(rows) {
+      const body = document.getElementById("monthlySalesTableBody");
+      if (!body) return;
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="5" class="muted">月別売上はまだありません。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(row => `
+        <tr>
+          <td>${escapeHtml(formatMonth(row.month_start))}</td>
+          <td>${Number(row.completed_count || 0)}件</td>
+          <td><strong>${yen(row.total_sales_amount || 0)}</strong></td>
+          <td>${yen(row.total_actual_sales_amount || 0)}</td>
+          <td>${row.average_actual_sales_amount ? yen(Math.round(Number(row.average_actual_sales_amount))) : "-"}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderSalesWorkTypeSummary(rows) {
+      const box = document.getElementById("salesWorkTypeSummary");
+      if (!box) return;
+
+      if (!rows.length) {
+        box.innerHTML = `<div class="list-item muted">作業内容別の売上はまだありません。</div>`;
+        return;
+      }
+
+      const map = {};
+      rows.forEach(row => {
+        const key = row.work_type || "その他";
+        if (!map[key]) {
+          map[key] = { workType: key, count: 0, total: 0 };
+        }
+        map[key].count += 1;
+        map[key].total += Number(row.sales_amount || row.actual_sales_amount || row.estimated_amount || 0);
+      });
+
+      const list = Object.values(map).sort((a, b) => b.total - a.total);
+
+      box.innerHTML = list.map(item => `
+        <div class="list-item">
+          <div class="list-item-head">
+            <strong>${escapeHtml(item.workType)}</strong>
+            <span class="badge badge-green">${item.count}件</span>
+          </div>
+          <div class="small muted">売上合計</div>
+          <div style="font-size:20px; font-weight:900">${yen(item.total)}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderCompletedSales(rows) {
+      const body = document.getElementById("completedSalesTableBody");
+      if (!body) return;
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="7" class="muted">完了売上はまだありません。入庫予定を「作業完了」にすると表示されます。</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map((row, index) => {
+        const salesAmount = Number(row.sales_amount || row.actual_sales_amount || row.estimated_amount || 0);
+        const actualAmount = row.actual_sales_amount !== null && row.actual_sales_amount !== undefined ? Number(row.actual_sales_amount || 0) : null;
+        const estimatedAmount = row.estimated_amount !== null && row.estimated_amount !== undefined ? Number(row.estimated_amount || 0) : null;
+
+        return `
+          <tr>
+            <td>
+              <strong>${escapeHtml(row.completed_date ? formatDate(row.completed_date) : "未入力")}</strong><br>
+              <span class="muted small">入庫：${escapeHtml(row.reservation_date ? formatDate(row.reservation_date) : "")}</span>
+            </td>
+            <td>
+              <strong>${escapeHtml(row.customer_name || "未入力")}</strong><br>
+              <span class="muted small">${escapeHtml(row.customer_phone || "")}</span>
+            </td>
+            <td>
+              ${escapeHtml(row.car_name || "未入力")}<br>
+              <span class="muted small">${escapeHtml(row.plate_last4 ? "下4桁 " + row.plate_last4 : "")}</span>
+            </td>
+            <td>
+              ${badgeStatus(row.status || "作業完了")}<br>
+              <span class="small">${escapeHtml(row.work_type || "")}</span>
+            </td>
+            <td>
+              <strong>${yen(salesAmount)}</strong><br>
+              <span class="muted small">実売上：${actualAmount !== null ? yen(actualAmount) : "未入力"}</span><br>
+              <span class="muted small">見込み：${estimatedAmount !== null ? yen(estimatedAmount) : "未入力"}</span>
+            </td>
+            <td>
+              <div class="message-box">${escapeHtml(row.next_proposal_memo || "次回提案メモなし")}</div>
+              <div class="small muted" style="margin-top:6px">
+                ${row.next_oil_change_date ? `次回オイル：${escapeHtml(formatDate(row.next_oil_change_date))}<br>` : ""}
+                ${row.next_shaken_year && row.next_shaken_month ? `次回車検：${escapeHtml(row.next_shaken_year + "年" + row.next_shaken_month + "月")}` : ""}
+              </div>
+            </td>
+            <td>
+              <div style="display:grid; gap:6px">
+                <button class="btn btn-slate" onclick="copyCompletedSaleName(${index})">名前コピー</button>
+                <button class="btn btn-slate" onclick="copyCompletedSaleProposal(${index})">提案メモコピー</button>
+                <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function copyCompletedSaleName(index) {
+      const row = completedSalesCache[index];
+      if (!row) return;
+      copyText(row.customer_name || "");
+    }
+
+    function copyCompletedSaleProposal(index) {
+      const row = completedSalesCache[index];
+      if (!row) return;
+
+      const name = row.customer_name || "お客様";
+      const vehicle = row.car_name || "お車";
+      const memo = row.next_proposal_memo || "次回の点検・メンテナンス時期が近づいたら、改めてご案内いたします。";
+
+      const message = `${name}様、先日は${vehicle}のご入庫ありがとうございました。\n${memo}\n気になることがありましたら、いつでもお気軽にご相談ください。`;
+      copyText(message);
+    }
+
+    function formatMonth(value) {
+      const date = normalizeDateInput(value);
+      if (!date) return "";
+      const [year, month] = date.split("-");
+      return `${year}年${Number(month)}月`;
     }
 
     async function generateReminders() {
