@@ -1081,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP 4-15K</p>
+            <p>LINE公式 DEMO / STEP 4-15L</p>
           </div>
         </div>
       </div>
@@ -1467,6 +1467,7 @@
 
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px">
               <button id="reservationSubmitButton" class="btn btn-green" onclick="saveReservationForm()">登録内容を確認</button>
+              <button id="reservationQuickConfirmButton" class="btn btn-primary" onclick="confirmEditingReservationAsConfirmed()" style="display:none;">この日時で確定入庫にする</button>
               <button class="btn btn-slate" onclick="closeReservationForm()">閉じる</button>
             </div>
           </div>
@@ -1475,7 +1476,7 @@
             <div class="panel-title">
               <div>
                 <h3>入庫予定</h3>
-                <p>初期表示は「対応中のみ」です。作業完了・キャンセル・削除済みは履歴として残し、必要な時だけフィルターで表示します。</p>
+                <p>初期表示は「対応中のみ」です。仮入庫は一覧の「確定」ボタン、または編集画面の「この日時で確定入庫にする」からそのまま確定できます。作業完了・キャンセル・削除済みは履歴として残し、必要な時だけフィルターで表示します。</p>
                 <p id="reservationFilterSummary" class="muted small">-</p>
               </div>
             </div>
@@ -3187,6 +3188,7 @@
           <td>${escapeHtml(row.memo || "")}</td>
           <td>
             <div style="display:grid; gap:6px">
+              ${isProvisionalReservationStatus(row.status) ? `<button class="btn btn-green" onclick="confirmReservationQuick('${row.id}')">確定</button>` : ""}
               <button class="btn btn-primary" onclick="openEditReservationForm('${row.id}')">編集</button>
               <button class="btn btn-slate" onclick="copyReservationMessage('${row.id}')">文面コピー</button>
               <button class="btn btn-red" onclick="confirmDeleteReservation('${row.id}')">削除</button>
@@ -3346,7 +3348,7 @@
       selectedReservationCustomerId = "";
 
       document.getElementById("reservationFormTitle").textContent = "入庫予定を編集";
-      document.getElementById("reservationFormHelp").textContent = "変更内容は保存前に確認画面を表示します。";
+      document.getElementById("reservationFormHelp").textContent = "仮入庫を同じ日時のまま確定する場合は、「この日時で確定入庫にする」を押してください。日付・時間・車両を変更する場合は、変更後に確認画面へ進みます。";
       document.getElementById("reservationSubmitButton").textContent = "変更内容を確認";
       document.getElementById("reservationFormBox").classList.add("active");
       document.getElementById("reservationFormBox").dataset.inquiryId = reservation.inquiry_id || "";
@@ -3607,6 +3609,7 @@
     function toggleReservationCompletionFields() {
       const status = document.getElementById("reservationStatus")?.value || "";
       const box = document.getElementById("reservationCompletionBox");
+      syncReservationQuickConfirmButton();
       if (!box) return;
 
       const isCompleted = status === "作業完了";
@@ -3624,6 +3627,15 @@
       if (actualSales && estimated && !actualSales.value && estimated.value) {
         actualSales.value = estimated.value;
       }
+    }
+
+    function syncReservationQuickConfirmButton() {
+      const button = document.getElementById("reservationQuickConfirmButton");
+      const status = document.getElementById("reservationStatus")?.value || "";
+      if (!button) return;
+
+      const shouldShow = Boolean(editingReservationId) && isProvisionalReservationStatus(status);
+      button.style.display = shouldShow ? "inline-flex" : "none";
     }
 
     function buildMonthInputValue(year, month) {
@@ -3915,6 +3927,105 @@
       } finally {
         setLoading(false);
       }
+    }
+
+    function buildReservationPayloadFromReservationRow(row, overrideStatus) {
+      const time = normalizeTime(row.reservation_time || "");
+
+      return {
+        customerId: row.customer_id || row.customer?.id || null,
+        vehicleId: row.vehicle_id || row.vehicle?.id || null,
+        inquiryId: row.inquiry_id || null,
+        reservationDate: normalizeDateInput(row.reservation_date || ""),
+        reservationTime: time,
+        workType: row.work_type || "その他",
+        status: overrideStatus || row.status || "確定入庫",
+        estimatedAmount: row.estimated_amount === "" || row.estimated_amount === null || row.estimated_amount === undefined ? null : Number(row.estimated_amount),
+        memo: row.memo || "",
+        actualSalesAmount: null,
+        completedDate: null,
+        completionMemo: "",
+        nextProposalMemo: "",
+        nextOilChangeDate: "",
+        nextShakenMonth: ""
+      };
+    }
+
+    function confirmEditingReservationAsConfirmed() {
+      if (!editingReservationId) {
+        showError("編集対象の入庫予定がありません。");
+        return;
+      }
+
+      document.getElementById("reservationStatus").value = "確定入庫";
+      toggleReservationCompletionFields();
+
+      const payload = buildReservationPayloadFromForm();
+      if (!payload) return;
+
+      const body = buildReservationConfirmHtml(payload, true) + `
+        <p class="muted" style="margin-bottom:0; margin-top:12px;">
+          現在の入庫日・入庫時間のまま「確定入庫」に変更します。
+        </p>
+      `;
+
+      showConfirm("この日時で確定入庫にしますか？", body, async () => {
+        await updateReservation(payload);
+      }, {
+        okText: "確定入庫にする",
+        danger: false
+      });
+    }
+
+    function confirmReservationQuick(reservationId) {
+      const reservation = reservationsCache.find(row => String(row.id) === String(reservationId));
+      if (!reservation) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+
+      if (!isProvisionalReservationStatus(reservation.status)) {
+        showError("この入庫予定は仮入庫ではありません。");
+        return;
+      }
+
+      const payload = buildReservationPayloadFromReservationRow(reservation, "確定入庫");
+      const customerName = reservation.customer?.name || "お客様";
+      const vehicleName = reservation.vehicle?.car_name || "車両未入力";
+
+      const body = `
+        <p class="muted" style="margin-top:0">
+          日付・時間は変更せず、仮入庫を確定入庫に変更します。
+        </p>
+        <dl>
+          <dt>顧客</dt><dd>${escapeHtml(customerName)}</dd>
+          <dt>車両</dt><dd>${escapeHtml(vehicleName)}</dd>
+          <dt>入庫日</dt><dd>${escapeHtml(payload.reservationDate ? formatDate(payload.reservationDate) : "未入力")}</dd>
+          <dt>入庫時間</dt><dd>${escapeHtml(payload.reservationTime || "未入力")}</dd>
+          <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
+          <dt>状態</dt><dd>仮入庫 → 確定入庫</dd>
+        </dl>
+      `;
+
+      showConfirm("この仮入庫を確定しますか？", body, async () => {
+        clearAlert();
+        setLoading(true);
+        try {
+          await api(`/api/reservations/${reservationId}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+          });
+          showOk("仮入庫を確定入庫に変更しました。");
+          await loadReservations();
+        } catch (error) {
+          showError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      }, {
+        okText: "確定入庫にする",
+        danger: false
+      });
     }
 
     function confirmDeleteReservation(reservationId) {
