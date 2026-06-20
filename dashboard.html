@@ -1442,9 +1442,18 @@
         <section id="section-opportunities" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
-              <button class="btn btn-primary" onclick="loadOpportunities()">売上チャンス更新</button>
-              <button class="btn btn-green" onclick="loadOpportunities()">売上実績更新</button>
-              <button class="btn btn-orange" onclick="generateReminders()">通知候補を生成</button>
+              <button class="btn btn-primary" onclick="loadOpportunities()">営業候補を更新</button>
+              <button class="btn btn-green" onclick="loadOpportunities()">売上実績を更新</button>
+              <button class="btn btn-orange" onclick="generateReminders()">チャット候補を更新</button>
+            </div>
+          </div>
+
+          <div class="card card-pad" style="margin-bottom:14px">
+            <div class="small muted" style="line-height:1.8">
+              <strong style="color:#0f172a">この画面の使い方：</strong>
+              車検・オイル交換・休眠顧客など、今後の売上につながるお客様を確認します。
+              「チャット候補を更新」で個別連絡候補を作り、文面を編集してコピーし、LINE公式チャットへ貼り付けて送信します。
+              送信後は「チャット送信済み」を押すと対応済みとして記録されます。
             </div>
           </div>
 
@@ -1452,8 +1461,8 @@
             <div class="card">
               <div class="panel-title">
                 <div>
-                  <h3>売上チャンス</h3>
-                  <p>車検・オイル交換・休眠顧客を自動抽出します。</p>
+                  <h3>営業候補</h3>
+                  <p>車検・オイル交換・休眠顧客など、連絡した方がよい候補を自動抽出します。</p>
                 </div>
               </div>
               <div class="table-wrap">
@@ -1476,7 +1485,7 @@
               <div class="panel-title">
                 <div>
                   <h3>LINEチャット候補</h3>
-                  <p>送信前のメッセージ候補</p>
+                  <p>LINE公式チャットへ貼り付ける個別連絡の候補です。</p>
                 </div>
               </div>
               <div id="reminderList" class="list"></div>
@@ -1619,7 +1628,7 @@
                 <input id="followupIncludeHandled" type="checkbox" />
                 対応済みも表示
               </label>
-              <button class="btn btn-primary" onclick="loadFollowupCandidates()">チャット候補を更新</button>
+              <button class="btn btn-primary" onclick="loadFollowupCandidates()">配信候補を更新</button>
             </div>
             <div class="toolbar-right">
               <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
@@ -1629,7 +1638,7 @@
           <div class="grid4">
             <div class="card kpi">
               <div>
-                <span>チャット候補</span>
+                <span>配信候補</span>
                 <strong id="followupTotalCount">-</strong>
                 <small>候補全体</small>
               </div>
@@ -2083,8 +2092,8 @@
         desc: "車検・オイル交換・休眠顧客の営業候補を確認します。"
       },
       followups: {
-        title: "チャット候補",
-        desc: "車検・オイル交換・次回提案・LINE未連携のチャット候補を確認します。"
+        title: "配信候補",
+        desc: "車検・オイル交換・次回提案・LINE未連携の配信候補を確認します。"
       },
       customers: {
         title: "顧客・車両",
@@ -2507,7 +2516,7 @@
           badge: "LINE候補",
           title: `${customer.name || row.customer_name || "お客様"}様へのLINEチャット候補`,
           meta: `${row.reminder_type || ""} / ${row.target_date ? formatDate(row.target_date) : ""}`,
-          taskSummary: "LINEチャット候補として作成された案内です。内容を確認して個別チャットで送ります。",
+          taskSummary: "LINEチャット候補として作成された案内です。内容を確認して送信します。",
           message: row.message_preview || row.message_text || "",
           inquiryMessage: row.reason || "",
           proposalMemo: row.next_proposal_memo || row.proposal_memo || "",
@@ -3563,7 +3572,7 @@
       followupVisibleCache = rows;
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="7" class="muted">チャット候補はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="muted">配信候補はありません。</td></tr>`;
         return;
       }
 
@@ -3652,7 +3661,7 @@
         }
         document.getElementById("reservationWorkType").value = normalizeWorkType(row.type_label || row.type || "その他");
         document.getElementById("reservationMemo").value = [
-          row.type_label ? `チャット候補：${row.type_label}` : "チャット候補から作成",
+          row.type_label ? `配信候補：${row.type_label}` : "配信候補から作成",
           row.reason ? `理由：${row.reason}` : "",
           row.proposal_memo ? `次回提案：${row.proposal_memo}` : ""
         ].filter(Boolean).join("\n");
@@ -3757,7 +3766,7 @@
       const box = document.getElementById("reminderList");
 
       if (!rows.length) {
-        box.innerHTML = `<div class="list-item muted">通知候補はありません。</div>`;
+        box.innerHTML = `<div class="list-item muted">チャット候補はありません。</div>`;
         return;
       }
 
@@ -3938,7 +3947,7 @@
 
       try {
         const data = await api("/api/reminders/generate", { method: "POST" });
-        showOk(`通知候補を生成しました。件数：${data.generated || 0}`);
+        showOk(`チャット候補を更新しました。件数：${data.generated || 0}`);
         await loadOpportunities();
 
       } catch (error) {
