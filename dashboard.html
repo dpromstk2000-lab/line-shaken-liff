@@ -1884,7 +1884,7 @@
             <div class="panel-title">
               <div>
                 <h3>顧客・車両</h3>
-                <p>名簿ではなく、連絡すべき顧客を探す営業リストとして使います。</p>
+                <p>一覧は確認用にコンパクト表示しています。細かい操作は「詳細」から行います。</p>
               </div>
               <div class="small muted" id="customerCountLabel"></div>
             </div>
@@ -1893,12 +1893,10 @@
                 <thead>
                   <tr>
                     <th>顧客</th>
-                    <th>電話</th>
-                    <th>LINE</th>
-                    <th>車両</th>
-                    <th>次回車検</th>
+                    <th>登録車両</th>
+                    <th>次回予定</th>
                     <th>自動検知</th>
-                    <th>おすすめ文面</th>
+                    <th>メモ</th>
                     <th>操作</th>
                   </tr>
                 </thead>
@@ -2781,7 +2779,7 @@
           document.getElementById("reservationDateInput").value = normalizeDateInput(task.preferredVisitDate);
         }
         document.getElementById("reservationWorkType").value = normalizeWorkType(task.consultType || task.type || "その他");
-        document.getElementById("reservationStatus").value = (task.type === "inquiry" || task.type === "visit") ? "仮入庫" : "確定入庫";
+        document.getElementById("reservationStatus").value = "確定入庫";
         document.getElementById("reservationEstimatedAmount").value = task.estimatedAmount || "";
         document.getElementById("reservationMemo").value = [
           "今日やることから作成",
@@ -4909,47 +4907,60 @@
         `${filtered.length}件表示 / 全${customersCache.length}件`;
 
       if (!filtered.length) {
-        body.innerHTML = `<tr><td colspan="8" class="muted">該当する顧客はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6" class="muted">該当する顧客はありません。</td></tr>`;
         return;
       }
 
       body.innerHTML = filtered.map(customer => {
         const vehicles = Array.isArray(customer.vehicles) ? customer.vehicles : [];
+        const activeVehicles = vehicles.filter(vehicle => vehicle.status !== "inactive");
+        const visibleVehicles = activeVehicles.slice(0, 2);
+        const extraVehicleCount = Math.max(activeVehicles.length - visibleVehicles.length, 0);
         const suggested = buildCustomerSuggestedMessage(customer);
+        const compactMemo = customer.next_proposal_memo || customer.memo || suggested || "-";
 
-        const vehicleText = vehicles.length
-          ? vehicles.map(v => escapeHtml(`${v.car_name || v.maker || ""} ${v.model || ""}`.trim() || "未入力")).join("<br>")
-          : "未入力";
+        const vehicleText = visibleVehicles.length
+          ? `<div class="vehicle-mini-list">${visibleVehicles.map(v => `
+              <div class="vehicle-mini-line">
+                <strong>${escapeHtml(buildVehicleLabel(v))}</strong><br>
+                <span class="muted small">${escapeHtml(v.maker || "メーカー未入力")} / ${escapeHtml(v.model || "型式未入力")}</span>
+              </div>
+            `).join("")}${extraVehicleCount ? `<div class="small muted">ほか ${extraVehicleCount}台</div>` : ""}</div>`
+          : `<span class="muted">車両未登録</span>`;
 
-        const shakenText = vehicles.length
-          ? vehicles.map(v => escapeHtml(v.next_shaken_date ? formatYearMonth(v.next_shaken_date) : formatVehicleYearMonth(v))).join("<br>")
-          : "未入力";
+        const nextScheduleText = visibleVehicles.length
+          ? visibleVehicles.map(v => {
+              const shaken = v.next_shaken_date ? formatYearMonth(v.next_shaken_date) : formatVehicleYearMonth(v);
+              const oil = v.next_oil_change_date ? formatDate(v.next_oil_change_date) : "";
+              return `
+                <div class="small">
+                  <strong>${escapeHtml(v.car_name || v.maker || "車両")}</strong><br>
+                  車検：${escapeHtml(shaken || "未入力")}${oil ? `<br>次回オイル：${escapeHtml(oil)}` : ""}
+                </div>
+              `;
+            }).join(`<div style="height:6px"></div>`)
+          : `<span class="muted">未入力</span>`;
 
         return `
           <tr>
             <td>
-              <strong>${escapeHtml(customer.name || "未入力")}</strong><br>
-              <span class="muted small">${escapeHtml(customer.line_display_name || customer.status || "")}</span>
-            </td>
-            <td>${escapeHtml(customer.phone || "未入力")}</td>
-            <td>
-              ${customer.line_user_id ? badgeStatus("LINE連携済み") : badgeStatus("LINE未連携")}<br>
-              <span class="muted small">${escapeHtml(customer.line_user_id || "店舗登録・電話客")}</span>
+              <div class="customer-compact-main">
+                <div class="customer-compact-name">${escapeHtml(customer.name || "未入力")}</div>
+                <div class="customer-compact-sub">
+                  ${escapeHtml(customer.phone || "電話未入力")}<br>
+                  ${customer.line_user_id ? "LINE連携済み" : "LINE未連携"}${customer.line_display_name ? ` / ${escapeHtml(customer.line_display_name)}` : ""}<br>
+                  ${escapeHtml(customer.status || "ステータス未入力")}
+                </div>
+              </div>
             </td>
             <td>${vehicleText}</td>
-            <td>${shakenText}</td>
+            <td>${nextScheduleText}</td>
             <td><div class="auto-box">${renderAutoBadgesForCustomer(customer)}</div></td>
-            <td><div class="message-box">${escapeHtml(suggested)}</div></td>
+            <td><div class="customer-compact-note">${escapeHtml(compactMemo)}</div></td>
             <td>
-              <div style="display:grid; gap:6px">
-                <button class="btn btn-green" onclick="openNewReservationForCustomer('${customer.id}')">入庫予定</button>
+              <div class="compact-actions">
                 <button class="btn btn-primary" onclick="openCustomerDetail('${customer.id}')">詳細</button>
-                <button class="btn btn-primary" onclick="openEditCustomerForm('${customer.id}')">編集</button>
-                <button class="btn btn-slate" onclick="copyCustomerName('${customer.id}')">名前コピー</button>
-                <button class="btn btn-slate" onclick="copyCustomerPhone('${customer.id}')">電話コピー</button>
-                <button class="btn btn-slate" onclick="copyCustomerMessage('${customer.id}')">文面コピー</button>
-                <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
-                <button class="btn btn-red" onclick="confirmDeleteCustomer('${customer.id}')">削除</button>
+                <button class="btn btn-green" onclick="openNewReservationForCustomer('${customer.id}')">入庫予定</button>
               </div>
             </td>
           </tr>
@@ -5637,96 +5648,14 @@
             candidateType: task.type,
             actionType,
             customerId: task.customerId,
-            vehicleId: task.vehicleId,
-            inquiryId: task.inquiryId,
-            reservationId: task.reservationId,
             customerName: task.name,
-            vehicleName: buildTodayTaskVehicleText(task),
             phone: task.phone,
-            dueDate: task.dueDate || task.preferredVisitDate || "",
             messageText: getTodayTaskMessage(index),
             memo: task.meta
           })
         });
         showOk(`${label}として記録しました。`);
         await loadToday();
-      } catch (error) {
-        showError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    async function scheduleTodayTaskRecontact(index, days) {
-      const task = todayTasksCache[index];
-      if (!task) return;
-      await createRecontactAction({
-        followupKey: task.followupKey,
-        candidateType: task.type,
-        customerId: task.customerId,
-        vehicleId: task.vehicleId,
-        inquiryId: task.inquiryId,
-        reservationId: task.reservationId,
-        customerName: task.name,
-        vehicleName: buildTodayTaskVehicleText(task),
-        phone: task.phone,
-        dueDate: task.dueDate || task.preferredVisitDate || "",
-        messageText: getTodayTaskMessage(index),
-        memo: task.meta,
-        days,
-        reload: loadToday
-      });
-    }
-
-    async function scheduleFollowupRecontact(index, days) {
-      const row = followupVisibleCache[index];
-      if (!row) return;
-      await createRecontactAction({
-        followupKey: row.id,
-        candidateType: row.type,
-        customerId: row.customer_id,
-        vehicleId: row.vehicle_id,
-        customerName: row.customer_name,
-        vehicleName: buildFollowupVehicleText(row),
-        phone: row.customer_phone,
-        dueDate: row.due_date,
-        messageText: getFollowupMessage(index),
-        memo: row.reason || row.proposal_memo || "",
-        days,
-        reload: loadFollowupCandidates
-      });
-    }
-
-    async function createRecontactAction(input) {
-      const days = Number(input.days || 7);
-      const label = days >= 30 ? "1か月後に再連絡" : "1週間後に再連絡";
-      if (!confirm(`${input.customerName || "対象顧客"}様を「${label}」として記録しますか？\n\n指定日までは今日やること・チャット候補から外れ、再連絡日に再表示されます。`)) {
-        return;
-      }
-
-      try {
-        setLoading(true);
-        await api("/api/followup-actions", {
-          method: "POST",
-          body: JSON.stringify({
-            followupKey: input.followupKey,
-            candidateType: input.candidateType,
-            actionType: "followup_scheduled",
-            hideDays: days,
-            customerId: input.customerId,
-            vehicleId: input.vehicleId,
-            inquiryId: input.inquiryId,
-            reservationId: input.reservationId,
-            customerName: input.customerName,
-            vehicleName: input.vehicleName,
-            phone: input.phone,
-            dueDate: input.dueDate,
-            messageText: input.messageText,
-            memo: input.memo
-          })
-        });
-        showOk(`${label}として記録しました。`);
-        if (typeof input.reload === "function") await input.reload();
       } catch (error) {
         showError(error.message);
       } finally {
