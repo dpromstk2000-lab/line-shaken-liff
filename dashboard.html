@@ -461,6 +461,33 @@
       max-width: 560px;
     }
 
+    .editable-message-box {
+      width: 100%;
+      min-height: 120px;
+      background: #ffffff;
+      border: 2px solid #dbeafe;
+      border-radius: 12px;
+      padding: 10px;
+      color: #0f172a;
+      font-size: 13px;
+      line-height: 1.6;
+      resize: vertical;
+      white-space: pre-wrap;
+    }
+
+    .editable-message-box:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .editable-message-help {
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
     .list {
       display: grid;
       gap: 10px;
@@ -1054,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP 4-10B</p>
+            <p>LINE公式 DEMO / STEP 4-14B</p>
           </div>
         </div>
       </div>
@@ -2251,14 +2278,22 @@
             ` : ""}
             <div class="task-context-row">
               <div class="task-context-label">LINE文面</div>
-              <div class="task-context-text">${escapeHtml(task.message)}</div>
+              <div class="task-context-text">
+                <textarea
+                  id="todayMessage-${index}"
+                  class="editable-message-box"
+                  oninput="updateTodayTaskMessage(${index})"
+                >${escapeHtml(task.editedMessage || task.message || "")}</textarea>
+                <div class="editable-message-help">送る前にこの場で文面を編集できます。編集後の内容がコピー・送信済み記録に使われます。</div>
+              </div>
             </div>
           </div>
 
           <div class="task-actions">
             <button class="btn btn-slate" onclick="copyTodayTaskName(${index})">名前コピー</button>
             <button class="btn btn-slate" onclick="copyTodayTaskPhone(${index})">電話コピー</button>
-            <button class="btn btn-slate" onclick="copyTodayTaskMessage(${index})">文面コピー</button>
+            <button class="btn btn-primary" onclick="copyTodayTaskMessage(${index})">編集後文面コピー</button>
+            <button class="btn btn-slate" onclick="resetTodayTaskMessage(${index})">自動文面に戻す</button>
             ${task.customerId ? `<button class="btn btn-primary" onclick="openTodayTaskCustomerDetail(${index})">顧客詳細</button>` : ""}
             ${task.inquiryId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : task.customerId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : ""}
             ${task.inquiryId ? `<button class="btn btn-slate" onclick="openTodayTaskInquiry(${index})">相談一覧へ</button>` : ""}
@@ -3556,11 +3591,17 @@
             ${row.has_future_reservation ? `<div class="small" style="margin-top:6px;color:var(--green);font-weight:900">今後の入庫予定あり</div>` : ""}
           </td>
           <td>
-            <div class="message-box">${escapeHtml(row.message_text || "")}</div>
+            <textarea
+              id="followupMessage-${index}"
+              class="editable-message-box"
+              oninput="updateFollowupMessage(${index})"
+            >${escapeHtml(row.edited_message_text || row.message_text || "")}</textarea>
+            <div class="editable-message-help">送る前にこの場で文面を編集できます。</div>
             <div class="task-actions">
               <button class="btn btn-slate" onclick="copyFollowupName(${index})">名前コピー</button>
               <button class="btn btn-slate" onclick="copyFollowupPhone(${index})">電話コピー</button>
-              <button class="btn btn-primary" onclick="copyFollowupMessage(${index})">文面コピー</button>
+              <button class="btn btn-primary" onclick="copyFollowupMessage(${index})">編集後文面コピー</button>
+              <button class="btn btn-slate" onclick="resetFollowupMessage(${index})">自動文面に戻す</button>
               <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">LINE送信済み</button>
               <button class="btn btn-slate" onclick="markFollowupHandled(${index}, 'phone_called')">電話済み</button>
               <button class="btn btn-dark" onclick="markFollowupHandled(${index}, 'skipped')">今回は見送り</button>
@@ -5361,7 +5402,7 @@
             vehicleName: buildFollowupVehicleText(row),
             phone: row.customer_phone,
             dueDate: row.due_date,
-            messageText: row.message_text
+            messageText: getFollowupMessage(index)
           })
         });
         showOk(`${label}として記録しました。`);
@@ -5393,7 +5434,7 @@
             customerId: task.customerId,
             customerName: task.name,
             phone: task.phone,
-            messageText: task.message,
+            messageText: getTodayTaskMessage(index),
             memo: task.meta
           })
         });
@@ -5442,6 +5483,52 @@
       return "対応済み";
     }
 
+    function updateTodayTaskMessage(index) {
+      const task = todayTasksCache[index];
+      const textarea = document.getElementById(`todayMessage-${index}`);
+      if (!task || !textarea) return;
+      task.editedMessage = textarea.value;
+    }
+
+    function getTodayTaskMessage(index) {
+      const task = todayTasksCache[index];
+      const textarea = document.getElementById(`todayMessage-${index}`);
+      if (textarea) return String(textarea.value || "").trim();
+      return String((task && (task.editedMessage || task.message)) || "").trim();
+    }
+
+    function resetTodayTaskMessage(index) {
+      const task = todayTasksCache[index];
+      const textarea = document.getElementById(`todayMessage-${index}`);
+      if (!task || !textarea) return;
+      task.editedMessage = "";
+      textarea.value = task.message || "";
+      showOk("自動作成文面に戻しました。");
+    }
+
+    function updateFollowupMessage(index) {
+      const row = followupVisibleCache[index];
+      const textarea = document.getElementById(`followupMessage-${index}`);
+      if (!row || !textarea) return;
+      row.edited_message_text = textarea.value;
+    }
+
+    function getFollowupMessage(index) {
+      const row = followupVisibleCache[index];
+      const textarea = document.getElementById(`followupMessage-${index}`);
+      if (textarea) return String(textarea.value || "").trim();
+      return String((row && (row.edited_message_text || row.message_text)) || "").trim();
+    }
+
+    function resetFollowupMessage(index) {
+      const row = followupVisibleCache[index];
+      const textarea = document.getElementById(`followupMessage-${index}`);
+      if (!row || !textarea) return;
+      row.edited_message_text = "";
+      textarea.value = row.message_text || "";
+      showOk("自動作成文面に戻しました。");
+    }
+
     function copyFollowupName(index) {
       const row = followupVisibleCache[index];
       if (row) copyText(row.customer_name || "");
@@ -5453,8 +5540,7 @@
     }
 
     function copyFollowupMessage(index) {
-      const row = followupVisibleCache[index];
-      if (row) copyText(row.message_text || "");
+      copyText(getFollowupMessage(index));
     }
 
     function copyOpportunityName(index) {
@@ -5485,14 +5571,13 @@
     }
 
     function copyTodayTaskMessage(index) {
-      const task = todayTasksCache[index];
-      if (task) copyText(task.message || "");
+      copyText(getTodayTaskMessage(index));
     }
 
     function sendTodayTaskLine(index) {
       const task = todayTasksCache[index];
       if (!task) return;
-      sendLineMessage(task.customerId || "", task.lineUserId || "", task.message || "");
+      sendLineMessage(task.customerId || "", task.lineUserId || "", getTodayTaskMessage(index));
     }
 
     async function copyText(text) {
