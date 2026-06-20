@@ -1081,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP 4-15A</p>
+            <p>LINE公式 DEMO / STEP 4-15B</p>
           </div>
         </div>
       </div>
@@ -1178,7 +1178,7 @@
             <div class="panel-title">
               <div>
                 <h3>対応状況ボード</h3>
-                <p>未対応・チャット対応・本日の入庫をまとめて確認します。売上金額はこの画面には表示しません。</p>
+                <p>未対応相談・仮入庫・確定入庫・再連絡予定をまとめて確認します。売上金額はこの画面には表示しません。</p>
               </div>
             </div>
             <div class="grid4">
@@ -1193,29 +1193,29 @@
 
               <div class="card kpi">
                 <div>
-                  <span>チャット対応待ち</span>
-                  <strong id="opChatWait">-</strong>
-                  <small>個別チャット候補</small>
+                  <span>仮入庫</span>
+                  <strong id="opProvisionalReservations">-</strong>
+                  <small>希望日あり・店舗確認待ち</small>
                 </div>
-                <div class="icon bg-blue">💬</div>
+                <div class="icon bg-orange">🟡</div>
               </div>
 
               <div class="card kpi">
                 <div>
-                  <span>本日の入庫</span>
-                  <strong id="opTodayReservations">-</strong>
-                  <small>今日の予約・入庫予定</small>
+                  <span>確定入庫</span>
+                  <strong id="opConfirmedReservations">-</strong>
+                  <small>30日以内の確定予定</small>
                 </div>
                 <div class="icon bg-green">📅</div>
               </div>
 
               <div class="card kpi">
                 <div>
-                  <span>作業中・確認中</span>
-                  <strong id="opWorkInProgress">-</strong>
-                  <small>店側の確認が必要</small>
+                  <span>再連絡予定</span>
+                  <strong id="opRecontactScheduled">-</strong>
+                  <small>後日もう一度連絡</small>
                 </div>
-                <div class="icon bg-orange">🔧</div>
+                <div class="icon bg-blue">🔁</div>
               </div>
             </div>
           </div>
@@ -1237,8 +1237,8 @@
             <div class="card">
               <div class="panel-title">
                 <div>
-                  <h3>本日の入庫予定</h3>
-                  <p>今日の予約・入庫予定</p>
+                  <h3>本日の入庫・来店予定</h3>
+                  <p>仮入庫・確定入庫・入庫済みを確認します。</p>
                 </div>
                 <button class="btn btn-slate" onclick="switchTab('reservations')">詳細</button>
               </div>
@@ -1287,6 +1287,7 @@
                 <option value="確認中">確認中</option>
                 <option value="見積もり中">見積もり中</option>
                 <option value="見積もり後未返信">見積もり後未返信</option>
+                <option value="入庫希望あり">入庫希望あり</option>
                 <option value="入庫予約済み">入庫予約済み</option>
                 <option value="作業完了">作業完了</option>
                 <option value="保留">保留</option>
@@ -1341,7 +1342,7 @@
               <div>
                 <h3 id="reservationFormTitle" style="margin:0">入庫予定を追加</h3>
                 <div id="reservationFormHelp" class="small muted">
-                  顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。
+                  顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確定した予定は「確定入庫」、お客様希望日は「仮入庫」にします。
                 </div>
               </div>
               <button class="btn btn-slate" onclick="clearReservationForm()">入力クリア</button>
@@ -1396,7 +1397,9 @@
               <div class="form-field">
                 <label>状態</label>
                 <select id="reservationStatus" onchange="toggleReservationCompletionFields()">
-                  <option value="入庫予定">入庫予定</option>
+                  <option value="仮入庫">仮入庫（お客様希望・確認待ち）</option>
+                  <option value="確定入庫">確定入庫（店舗確認済み）</option>
+                  <option value="入庫予定">入庫予定（旧表示）</option>
                   <option value="入庫済み">入庫済み</option>
                   <option value="作業中">作業中</option>
                   <option value="作業完了">作業完了</option>
@@ -2309,28 +2312,29 @@
 
     function renderOperationBoard(data, stats) {
       const inquiries = data.recentInquiries || [];
-      const reservations = data.todayReservations || [];
-      const reminders = data.reminderQueue || [];
-      const opportunities = data.salesTriggers || [];
+      const todayReservations = data.todayReservations || [];
+      const upcomingReservations = data.upcomingReservations || todayReservations || [];
+      const followupActions = data.followupActions || followupActionsCache || [];
+      const today = dateYmd(new Date());
 
-      const chatWait = reminders.length + opportunities.filter(row => {
-        const type = String(row.trigger_type || "");
-        return type.includes("車検") || type.includes("オイル") || type.includes("休眠");
-      }).length;
-
-      const activeReservations = reservations.filter(row => !isClosedReservationStatus(row.status));
-      const workInProgress = reservations.filter(row => {
-        const status = String(row.status || "");
-        return status.includes("確認") || status.includes("入庫済") || status.includes("作業中");
-      }).length + inquiries.filter(row => {
-        const status = String(row.status || "");
-        return status.includes("確認中") || status.includes("見積もり中");
-      }).length;
+      const provisionalReservations = upcomingReservations.filter(row => isProvisionalReservationStatus(row.status));
+      const confirmedReservations = upcomingReservations.filter(row => isConfirmedReservationStatus(row.status));
+      const recontactScheduled = followupActions.filter(row => String(row.action_type || "") === "followup_scheduled");
 
       setText("opOpenInquiries", `${stats.openInquiries || 0}件`);
-      setText("opChatWait", `${chatWait}件`);
-      setText("opTodayReservations", `${activeReservations.length}件`);
-      setText("opWorkInProgress", `${workInProgress}件`);
+      setText("opProvisionalReservations", `${provisionalReservations.length}件`);
+      setText("opConfirmedReservations", `${confirmedReservations.length}件`);
+      setText("opRecontactScheduled", `${recontactScheduled.length}件`);
+    }
+
+    function isProvisionalReservationStatus(status) {
+      const value = String(status || "");
+      return value.includes("仮入庫") || value === "入庫予定";
+    }
+
+    function isConfirmedReservationStatus(status) {
+      const value = String(status || "");
+      return value.includes("確定入庫") || value.includes("入庫済") || value.includes("作業中");
     }
 
     function isClosedReservationStatus(status) {
@@ -2404,6 +2408,8 @@
             ${task.inquiryId ? `<button class="btn btn-slate" onclick="openTodayTaskInquiry(${index})">相談一覧へ</button>` : ""}
             <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">チャット送信済み</button>
             <button class="btn btn-slate" onclick="markTodayTaskHandled(${index}, 'phone_called')">電話済み</button>
+            <button class="btn btn-slate" onclick="scheduleTodayTaskRecontact(${index}, 7)">1週間後に再連絡</button>
+            <button class="btn btn-dark" onclick="scheduleTodayTaskRecontact(${index}, 30)">1か月後に再連絡</button>
             <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
           </div>
         </div>
@@ -2453,6 +2459,8 @@
       const inquiries = data.recentInquiries || [];
       const opportunities = data.salesTriggers || [];
       const reminders = data.reminderQueue || [];
+      const upcomingReservations = data.upcomingReservations || data.todayReservations || [];
+      const followupActions = data.followupActions || [];
 
       inquiries.forEach(row => {
         const createdDate = row.created_at ? dateYmd(new Date(row.created_at)) : "";
@@ -2632,9 +2640,76 @@
         });
       });
 
+      upcomingReservations
+        .filter(row => isProvisionalReservationStatus(row.status))
+        .filter(row => {
+          const date = normalizeDateInput(row.reservation_date || "");
+          return date && date >= today && date <= dateYmd(addDays(new Date(), 14));
+        })
+        .slice(0, 8)
+        .forEach(row => {
+          const customer = row.customer || {};
+          const vehicle = row.vehicle || {};
+          tasks.push({
+            type: "provisional_reservation",
+            reservationId: row.id || "",
+            inquiryId: row.inquiry_id || "",
+            followupKey: ["today", "provisional_reservation", row.id || row.customer_id || "none"].join("_"),
+            color: "orange",
+            badge: "仮入庫確認",
+            title: `${customer.name || row.customer_name || "お客様"}様の仮入庫確認`,
+            meta: `${formatDate(row.reservation_date)} ${row.reservation_time ? String(row.reservation_time).slice(0, 5) : "時間未定"} / ${row.work_type || "作業未入力"}`,
+            taskSummary: "お客様が希望した入庫日です。店舗側で日時・作業内容を確認し、問題なければ確定入庫に変更します。",
+            message: buildReservationConfirmChatMessage(row),
+            inquiryMessage: row.memo || "",
+            proposalMemo: "仮入庫のままにせず、確認後に確定入庫へ変更してください。",
+            name: customer.name || row.customer_name || "",
+            phone: customer.phone || row.customer_phone || "",
+            lineUserId: customer.line_user_id || row.line_user_id || "",
+            customerId: row.customer_id || customer.id || "",
+            vehicleId: row.vehicle_id || vehicle.id || "",
+            vehicleName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+            carName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+            maker: vehicle.maker || row.maker || "",
+            model: vehicle.model || row.model || "",
+            plateLast4: vehicle.plate_last4 || row.plate_last4 || "",
+            consultType: row.work_type || "入庫確認",
+            preferredVisitDate: row.reservation_date || "",
+            dueDate: row.reservation_date || "",
+            status: row.status || "仮入庫"
+          });
+        });
+
+      followupActions
+        .filter(row => String(row.action_type || "") === "followup_scheduled")
+        .filter(row => normalizeDateInput(row.hide_until || "") <= today)
+        .slice(0, 8)
+        .forEach(row => {
+          tasks.push({
+            type: "recontact",
+            followupKey: ["today", "recontact", row.id || row.followup_key || "none"].join("_"),
+            color: "blue",
+            badge: "再連絡日",
+            title: `${row.customer_name_snapshot || "お客様"}様へ再連絡`,
+            meta: `${row.hide_until ? formatDate(row.hide_until) : "本日"} / ${row.action_label || "再連絡予定"}`,
+            taskSummary: "以前、後日再連絡にしたお客様です。状況確認のチャットまたは電話をします。",
+            message: row.message_text || buildSimpleRecontactMessage(row.customer_name_snapshot || "お客様"),
+            inquiryMessage: row.memo || "",
+            proposalMemo: "再連絡予定からのタスクです。対応後はチャット送信済み・電話済み・再連絡予定のいずれかにしてください。",
+            name: row.customer_name_snapshot || "",
+            phone: row.phone_snapshot || "",
+            customerId: row.customer_id || "",
+            vehicleId: row.vehicle_id || "",
+            vehicleName: row.vehicle_name_snapshot || "",
+            carName: row.vehicle_name_snapshot || "",
+            dueDate: row.hide_until || "",
+            status: "再連絡予定"
+          });
+        });
+
       return tasks
-        .filter(task => !task.followupKey || !handledActionMap.has(task.followupKey))
-        .slice(0, 12);
+        .filter(task => !task.followupKey || !handledActionMap.has(task.followupKey) || task.type === "recontact")
+        .slice(0, 14);
     }
 
     function buildTaskShakenText(year, month, dateValue) {
@@ -2672,6 +2747,15 @@
       const task = todayTasksCache[index];
       if (!task) return;
 
+      if (task.reservationId) {
+        switchTab("reservations");
+        setTimeout(async () => {
+          await ensureReservationsLoadedForTodayTask(task.reservationId);
+          openEditReservationForm(task.reservationId);
+        }, 350);
+        return;
+      }
+
       if (task.inquiryId) {
         await ensureInquiriesLoadedForTodayTask();
         const found = findInquiry(task.inquiryId);
@@ -2697,7 +2781,7 @@
           document.getElementById("reservationDateInput").value = normalizeDateInput(task.preferredVisitDate);
         }
         document.getElementById("reservationWorkType").value = normalizeWorkType(task.consultType || task.type || "その他");
-        document.getElementById("reservationStatus").value = "入庫予定";
+        document.getElementById("reservationStatus").value = (task.type === "inquiry" || task.type === "visit") ? "仮入庫" : "確定入庫";
         document.getElementById("reservationEstimatedAmount").value = task.estimatedAmount || "";
         document.getElementById("reservationMemo").value = [
           "今日やることから作成",
@@ -2716,6 +2800,18 @@
       try {
         const data = await api("/api/inquiries?limit=200");
         inquiriesCache = data.inquiries || [];
+      } catch (error) {
+        console.warn(error);
+      }
+    }
+
+    async function ensureReservationsLoadedForTodayTask(reservationId) {
+      if (Array.isArray(reservationsCache) && reservationsCache.some(row => row.id === reservationId)) return;
+      try {
+        const today = dateYmd(new Date());
+        const to = dateYmd(addDays(new Date(), 30));
+        const data = await api(`/api/reservations?from=${encodeURIComponent(today)}&to=${encodeURIComponent(to)}`);
+        reservationsCache = data.reservations || [];
       } catch (error) {
         console.warn(error);
       }
@@ -2903,7 +2999,7 @@
       clearReservationForm(false);
 
       document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
-      document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。";
+      document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確定した予定は「確定入庫」、お客様希望日は「仮入庫」にします。";
       document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
       document.getElementById("reservationFormBox").classList.add("active");
 
@@ -2930,7 +3026,7 @@
         clearReservationForm(false);
 
         document.getElementById("reservationFormTitle").textContent = "相談から入庫予定を作成";
-        document.getElementById("reservationFormHelp").textContent = "相談内容をもとに入庫予定を作成します。登録すると相談ステータスも入庫予約済みにできます。";
+        document.getElementById("reservationFormHelp").textContent = "相談内容をもとに仮入庫または確定入庫を作成します。お客様希望だけなら仮入庫、店舗確認済みなら確定入庫にします。";
         document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
         document.getElementById("reservationFormBox").classList.add("active");
 
@@ -2946,7 +3042,7 @@
 
         document.getElementById("reservationDateInput").value = normalizeDateInput(inquiry.preferred_visit_date || "");
         document.getElementById("reservationWorkType").value = normalizeWorkType(inquiry.consult_type || "その他");
-        document.getElementById("reservationStatus").value = "入庫予定";
+        document.getElementById("reservationStatus").value = "仮入庫";
         toggleReservationCompletionFields();
         document.getElementById("reservationEstimatedAmount").value = inquiry.estimated_amount || "";
         document.getElementById("reservationMemo").value = [
@@ -3029,7 +3125,7 @@
       });
 
       document.getElementById("reservationWorkType").value = "車検";
-      document.getElementById("reservationStatus").value = "入庫予定";
+      document.getElementById("reservationStatus").value = "確定入庫";
       document.getElementById("reservationFormBox").dataset.inquiryId = "";
 
       selectedReservationCustomerId = "";
@@ -3041,7 +3137,7 @@
       if (resetMode) {
         editingReservationId = "";
         document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
-        document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。";
+        document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確定した予定は「確定入庫」、お客様希望日は「仮入庫」にします。";
         document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
       }
 
@@ -3708,6 +3804,8 @@
               <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">チャット送信済み</button>
               <button class="btn btn-slate" onclick="markFollowupHandled(${index}, 'phone_called')">電話済み</button>
               <button class="btn btn-dark" onclick="markFollowupHandled(${index}, 'skipped')">今回は見送り</button>
+              <button class="btn btn-slate" onclick="scheduleFollowupRecontact(${index}, 7)">1週間後に再連絡</button>
+              <button class="btn btn-dark" onclick="scheduleFollowupRecontact(${index}, 30)">1か月後に再連絡</button>
               ${row.customer_id ? `<button class="btn btn-green" onclick="openReservationFromFollowup(${index})">入庫予定へ</button>` : ""}
               <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
             </div>
@@ -5343,6 +5441,7 @@
         "確認中",
         "見積もり中",
         "見積もり後未返信",
+        "入庫希望あり",
         "入庫予約済み",
         "作業完了",
         "保留",
@@ -5538,8 +5637,13 @@
             candidateType: task.type,
             actionType,
             customerId: task.customerId,
+            vehicleId: task.vehicleId,
+            inquiryId: task.inquiryId,
+            reservationId: task.reservationId,
             customerName: task.name,
+            vehicleName: buildTodayTaskVehicleText(task),
             phone: task.phone,
+            dueDate: task.dueDate || task.preferredVisitDate || "",
             messageText: getTodayTaskMessage(index),
             memo: task.meta
           })
@@ -5551,6 +5655,96 @@
       } finally {
         setLoading(false);
       }
+    }
+
+    async function scheduleTodayTaskRecontact(index, days) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+      await createRecontactAction({
+        followupKey: task.followupKey,
+        candidateType: task.type,
+        customerId: task.customerId,
+        vehicleId: task.vehicleId,
+        inquiryId: task.inquiryId,
+        reservationId: task.reservationId,
+        customerName: task.name,
+        vehicleName: buildTodayTaskVehicleText(task),
+        phone: task.phone,
+        dueDate: task.dueDate || task.preferredVisitDate || "",
+        messageText: getTodayTaskMessage(index),
+        memo: task.meta,
+        days,
+        reload: loadToday
+      });
+    }
+
+    async function scheduleFollowupRecontact(index, days) {
+      const row = followupVisibleCache[index];
+      if (!row) return;
+      await createRecontactAction({
+        followupKey: row.id,
+        candidateType: row.type,
+        customerId: row.customer_id,
+        vehicleId: row.vehicle_id,
+        customerName: row.customer_name,
+        vehicleName: buildFollowupVehicleText(row),
+        phone: row.customer_phone,
+        dueDate: row.due_date,
+        messageText: getFollowupMessage(index),
+        memo: row.reason || row.proposal_memo || "",
+        days,
+        reload: loadFollowupCandidates
+      });
+    }
+
+    async function createRecontactAction(input) {
+      const days = Number(input.days || 7);
+      const label = days >= 30 ? "1か月後に再連絡" : "1週間後に再連絡";
+      if (!confirm(`${input.customerName || "対象顧客"}様を「${label}」として記録しますか？\n\n指定日までは今日やること・チャット候補から外れ、再連絡日に再表示されます。`)) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: input.followupKey,
+            candidateType: input.candidateType,
+            actionType: "followup_scheduled",
+            hideDays: days,
+            customerId: input.customerId,
+            vehicleId: input.vehicleId,
+            inquiryId: input.inquiryId,
+            reservationId: input.reservationId,
+            customerName: input.customerName,
+            vehicleName: input.vehicleName,
+            phone: input.phone,
+            dueDate: input.dueDate,
+            messageText: input.messageText,
+            memo: input.memo
+          })
+        });
+        showOk(`${label}として記録しました。`);
+        if (typeof input.reload === "function") await input.reload();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function buildReservationConfirmChatMessage(row) {
+      const customerName = row.customer?.name || row.customer_name || "お客様";
+      const date = row.reservation_date ? formatDate(row.reservation_date) : "ご希望日";
+      const time = row.reservation_time ? `${String(row.reservation_time).slice(0, 5)}頃` : "";
+      const work = row.work_type || "ご相談内容";
+      return `${customerName}様\nいつもありがとうございます。STREET HOUSE 杵築です。\n${date}${time ? " " + time : ""}の${work}について確認のご連絡です。\nこちらの日時で入庫可能か確認いたしますので、少々お待ちください。`;
+    }
+
+    function buildSimpleRecontactMessage(customerName) {
+      const name = customerName || "お客様";
+      return `${name}様\nいつもありがとうございます。STREET HOUSE 杵築です。\n以前ご相談いただいた件で、その後の状況はいかがでしょうか。\n必要でしたらお気軽にご相談ください。`;
     }
 
     function buildFollowupActionMap(actions) {
@@ -5586,6 +5780,7 @@
       if (actionType === "phone_called") return "電話済み";
       if (actionType === "skipped") return "今回は見送り";
       if (actionType === "reservation_created") return "入庫予定作成済み";
+      if (actionType === "followup_scheduled") return "再連絡予定";
       return "対応済み";
     }
 
@@ -5935,8 +6130,8 @@
     }
 
     function normalizeReservationStatus(value) {
-      const allowed = ["入庫予定", "入庫済み", "作業中", "作業完了", "キャンセル"];
-      return allowed.includes(value) ? value : "入庫予定";
+      const allowed = ["仮入庫", "確定入庫", "入庫予定", "入庫済み", "作業中", "作業完了", "キャンセル"];
+      return allowed.includes(value) ? value : "仮入庫";
     }
 
     function getVehicleMonthValue(vehicle) {
