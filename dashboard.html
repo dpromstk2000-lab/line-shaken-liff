@@ -1281,23 +1281,13 @@
         <section id="section-inquiries" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
-              <select id="inquiryStatusFilter" onchange="loadInquiries()">
-                <option value="">すべての状態</option>
-                <option value="新規相談">新規相談</option>
-                <option value="確認中">確認中</option>
-                <option value="見積もり中">見積もり中</option>
-                <option value="見積もり後未返信">見積もり後未返信</option>
-                <option value="入庫希望あり">入庫希望あり</option>
-                <option value="入庫予約済み">入庫予約済み</option>
-                <option value="チャット対応済み">チャット対応済み</option>
-                <option value="電話対応済み">電話対応済み</option>
-                <option value="再連絡予定">再連絡予定</option>
-                <option value="今回は見送り">今回は見送り</option>
-                <option value="車両登録のみ">車両登録のみ</option>
-                <option value="入庫予定作成済み">入庫予定作成済み</option>
-                <option value="対応済み">対応済み</option>
-                <option value="作業完了">作業完了</option>
-                <option value="保留">保留</option>
+              <select id="inquiryStatusFilter" onchange="renderInquiries(inquiriesCache)">
+                <option value="active" selected>未対応・対応中のみ</option>
+                <option value="open">未対応のみ</option>
+                <option value="recontact">再連絡予定</option>
+                <option value="completed">対応済み・履歴</option>
+                <option value="vehicle_only">車両登録のみ</option>
+                <option value="all">すべて表示</option>
               </select>
             </div>
             <div class="toolbar-right">
@@ -1309,7 +1299,8 @@
             <div class="panel-title">
               <div>
                 <h3>相談一覧</h3>
-                <p>優先順位・追客タイミングを自動表示します。</p>
+                <p>初期表示は「未対応・対応中のみ」です。チャット対応済み・電話対応済み・車両登録のみは履歴として残し、必要な時だけフィルターで表示します。</p>
+                <p id="inquiryFilterSummary" class="muted small">-</p>
               </div>
             </div>
             <div class="table-wrap">
@@ -2148,7 +2139,7 @@
       },
       inquiries: {
         title: "相談一覧",
-        desc: "LIFFから入った相談を管理します。"
+        desc: "LIFFから入った相談を履歴管理します。初期表示は未対応・対応中のみです。"
       },
       reservations: {
         title: "入庫予定",
@@ -2969,12 +2960,7 @@
       clearAlert();
 
       try {
-        const status = document.getElementById("inquiryStatusFilter").value;
-        const path = status
-          ? `/api/inquiries?limit=200&status=${encodeURIComponent(status)}`
-          : `/api/inquiries?limit=200`;
-
-        const data = await api(path);
+        const data = await api(`/api/inquiries?limit=200`);
         inquiriesCache = data.inquiries || [];
         renderInquiries(inquiriesCache);
 
@@ -2985,15 +2971,94 @@
       }
     }
 
+    function getInquiryListFilter() {
+      return document.getElementById("inquiryStatusFilter")?.value || "active";
+    }
+
+    function normalizeInquiryStatus(status) {
+      return String(status || "新規相談").trim();
+    }
+
+    function isArchivedInquiryForList(row) {
+      const status = normalizeInquiryStatus(row.status);
+      return [
+        "チャット対応済み",
+        "電話対応済み",
+        "今回は見送り",
+        "車両登録のみ",
+        "入庫予定作成済み",
+        "入庫予約済み",
+        "対応済み",
+        "作業完了",
+        "失注",
+        "キャンセル"
+      ].some(value => status.includes(value));
+    }
+
+    function isActiveInquiryForList(row) {
+      if (isVehicleRegistrationOnlyInquiry(row)) return false;
+      if (isArchivedInquiryForList(row)) return false;
+
+      const status = normalizeInquiryStatus(row.status);
+      if (!status) return true;
+
+      return [
+        "新規相談",
+        "未対応",
+        "確認中",
+        "見積もり中",
+        "未返信",
+        "入庫希望あり",
+        "再連絡予定",
+        "保留"
+      ].some(value => status.includes(value));
+    }
+
+    function inquiryMatchesListFilter(row, filter) {
+      const status = normalizeInquiryStatus(row.status);
+
+      if (filter === "all") return true;
+      if (filter === "vehicle_only") return isVehicleRegistrationOnlyInquiry(row);
+      if (filter === "completed") return isArchivedInquiryForList(row) && !isVehicleRegistrationOnlyInquiry(row);
+      if (filter === "recontact") return status.includes("再連絡予定");
+      if (filter === "open") {
+        if (isVehicleRegistrationOnlyInquiry(row)) return false;
+        if (isArchivedInquiryForList(row)) return false;
+        return ["新規相談", "未対応", "確認中", "見積もり中", "未返信", "入庫希望あり"].some(value => status.includes(value));
+      }
+
+      return isActiveInquiryForList(row);
+    }
+
     function renderInquiries(rows) {
       const body = document.getElementById("inquiryTableBody");
+      const filter = getInquiryListFilter();
+      const allRows = Array.isArray(rows) ? rows : [];
+      const visibleRows = allRows.filter(row => inquiryMatchesListFilter(row, filter));
+      const summary = document.getElementById("inquiryFilterSummary");
+      const hiddenCount = allRows.length - visibleRows.length;
 
-      if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="10" class="muted">相談はありません。</td></tr>`;
+      if (summary) {
+        const labelMap = {
+          active: "未対応・対応中のみ",
+          open: "未対応のみ",
+          recontact: "再連絡予定",
+          completed: "対応済み・履歴",
+          vehicle_only: "車両登録のみ",
+          all: "すべて表示"
+        };
+        summary.textContent = `${labelMap[filter] || "未対応・対応中のみ"}：${visibleRows.length}件表示 / 全${allRows.length}件${hiddenCount > 0 ? `（${hiddenCount}件は標準では非表示）` : ""}`;
+      }
+
+      if (!visibleRows.length) {
+        const message = filter === "active"
+          ? "現在、対応が必要な相談はありません。対応済み・車両登録のみはフィルターで確認できます。"
+          : "この条件に一致する相談はありません。";
+        body.innerHTML = `<tr><td colspan="10" class="muted">${escapeHtml(message)}</td></tr>`;
         return;
       }
 
-      body.innerHTML = rows.map(row => `
+      body.innerHTML = visibleRows.map(row => `
         <tr>
           <td>${escapeHtml(formatDateTime(row.created_at))}</td>
           <td>
