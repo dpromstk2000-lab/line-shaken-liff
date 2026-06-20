@@ -3015,11 +3015,21 @@
       }
 
       switchTab("reservations");
+      await loadReservations();
 
       const existingReservation = reservationsCache.find(row => {
         const status = String(row.status || "");
-        return String(row.inquiry_id || "") === String(inquiryId || "")
-          && !["削除済み", "キャンセル", "キャンセル済み"].includes(status);
+        if (["削除済み", "キャンセル", "キャンセル済み"].includes(status)) return false;
+
+        if (String(row.inquiry_id || "") === String(inquiryId || "")) return true;
+
+        const sameCustomer = inquiry.customer_id && String(row.customer_id || "") === String(inquiry.customer_id || "");
+        const sameVehicle = inquiry.vehicle_id && String(row.vehicle_id || "") === String(inquiry.vehicle_id || "");
+        const inquiryDate = normalizeDateInput(inquiry.preferred_visit_date || "");
+        const rowDate = normalizeDateInput(row.reservation_date || "");
+        const provisional = ["仮入庫", "入庫予定", "確認待ち"].includes(status);
+
+        return Boolean(sameCustomer && sameVehicle && inquiryDate && rowDate && inquiryDate === rowDate && provisional);
       });
 
       if (existingReservation && existingReservation.id) {
@@ -3043,11 +3053,12 @@
         document.getElementById("reservationFormBox").classList.add("active");
 
         if (inquiry.customer_id) {
-          selectReservationCustomer(inquiry.customer_id);
-
-          if (inquiry.vehicle_id) {
-            document.getElementById("reservationVehicleId").value = inquiry.vehicle_id;
-          }
+          selectReservationCustomer(
+            inquiry.customer_id,
+            inquiry.vehicle_id || "",
+            inquiry.plate_last4 || inquiry.vehicle?.plate_last4 || "",
+            inquiry.car_name_snapshot || inquiry.vehicle?.car_name || ""
+          );
         } else {
           searchReservationCustomers();
         }
@@ -3088,7 +3099,7 @@
       document.getElementById("reservationFormBox").dataset.inquiryId = reservation.inquiry_id || "";
 
       if (reservation.customer_id) {
-        selectReservationCustomer(reservation.customer_id);
+        selectReservationCustomer(reservation.customer_id, reservation.vehicle_id || "", reservation.plate_last4 || reservation.vehicle?.plate_last4 || "", reservation.vehicle?.car_name || "");
       } else {
         searchReservationCustomers();
       }
@@ -3229,7 +3240,7 @@
       }).join("");
     }
 
-    function selectReservationCustomer(customerId) {
+    function selectReservationCustomer(customerId, preferredVehicleId = "", preferredPlateLast4 = "", preferredCarName = "") {
       const customer = findCustomer(customerId);
 
       if (!customer) {
@@ -3242,7 +3253,7 @@
       document.getElementById("reservationCustomerSearch").value = customer.name || "";
       document.getElementById("reservationCustomerResults").innerHTML = "";
       renderSelectedReservationCustomer();
-      populateReservationVehicleSelect(customerId);
+      populateReservationVehicleSelect(customerId, preferredVehicleId, preferredPlateLast4, preferredCarName);
     }
 
     function renderSelectedReservationCustomer() {
@@ -3285,28 +3296,59 @@
       searchReservationCustomers();
     }
 
-    function populateReservationVehicleSelect(customerId) {
+    function populateReservationVehicleSelect(customerId, preferredVehicleId = "", preferredPlateLast4 = "", preferredCarName = "") {
       const select = document.getElementById("reservationVehicleId");
       if (!select) return;
 
       const customer = customerId ? findCustomer(customerId) : null;
-      const vehicles = customer && Array.isArray(customer.vehicles) ? customer.vehicles : [];
+      const vehicles = customer && Array.isArray(customer.vehicles)
+        ? customer.vehicles.filter(vehicle => vehicle.status !== "inactive")
+        : [];
 
       if (!customer) {
         select.innerHTML = `<option value="">先に顧客を選択してください</option>`;
         return;
       }
 
-      const options = [`<option value="">車両を選択</option>`]
-        .concat(vehicles.map(vehicle => {
-          return `<option value="${escapeHtml(vehicle.id)}">${escapeHtml(buildVehicleLabel(vehicle))}</option>`;
-        }));
+      if (!vehicles.length) {
+        select.innerHTML = `<option value="">車両未登録</option>`;
+        select.value = "";
+        return;
+      }
+
+      const options = vehicles.map(vehicle => {
+        return `<option value="${escapeHtml(vehicle.id)}">${escapeHtml(buildVehicleLabel(vehicle))}</option>`;
+      });
 
       select.innerHTML = options.join("");
 
-      if (vehicles.length === 1) {
-        select.value = vehicles[0].id || "";
+      let selectedId = preferredVehicleId || "";
+
+      if (selectedId && !vehicles.some(vehicle => String(vehicle.id) === String(selectedId))) {
+        selectedId = "";
       }
+
+      if (!selectedId && preferredPlateLast4) {
+        const matchedByPlate = vehicles.find(vehicle =>
+          String(vehicle.plate_last4 || "") === String(preferredPlateLast4 || "")
+        );
+        if (matchedByPlate) selectedId = matchedByPlate.id;
+      }
+
+      if (!selectedId && preferredCarName) {
+        const normalizedName = String(preferredCarName || "").toLowerCase();
+        const matchedByName = vehicles.find(vehicle => {
+          const text = [vehicle.car_name, vehicle.maker, vehicle.model].filter(Boolean).join(" ").toLowerCase();
+          return text && normalizedName && (text.includes(normalizedName) || normalizedName.includes(text));
+        });
+        if (matchedByName) selectedId = matchedByName.id;
+      }
+
+      if (!selectedId) {
+        selectedId = vehicles[0].id || "";
+      }
+
+      select.value = selectedId;
     }
 
     function toggleReservationCompletionFields() {
