@@ -691,7 +691,10 @@
           </div>
 
           <div class="field">
-            <label>希望入庫日<span class="optional">任意</span></label>
+            <label>希望入庫日（仮希望）<span class="optional">任意</span></label>
+            <div class="notice">
+              ここで選ぶ日付は「仮希望」です。この時点では予約確定ではありません。スタッフが確認後、正式な入庫日時をご連絡します。
+            </div>
 
             <input id="preferredVisitDate" type="hidden" />
 
@@ -721,7 +724,7 @@
               <div id="selectedDateBox" class="selected-date-box hidden"></div>
 
               <div class="calendar-note">
-                定休日・臨時休業日は選択できません。
+                定休日・臨時休業日は選択できません。選択した日は仮希望として店舗へ送信されます。
               </div>
             </div>
           </div>
@@ -784,10 +787,11 @@
 
       <div id="successArea" class="success">
         <div class="success-icon">✓</div>
-        <h2>送信が完了しました</h2>
+        <h2>ご希望内容を送信しました</h2>
         <p>
           ご相談内容をSTREET HOUSE 杵築へ送信しました。<br />
-          内容を確認後、スタッフよりLINEまたはご希望の方法でご連絡します。
+          この時点では予約確定ではありません。<br />
+          スタッフが内容を確認後、正式な入庫日時をLINEまたはご希望の方法でご連絡します。
         </p>
 
         <div class="summary-box" id="successSummary"></div>
@@ -797,7 +801,7 @@
     </div>
 
     <div class="footer">
-      STREET HOUSE Kitsuki LINE DEMO / STEP 4-11C
+      STREET HOUSE Kitsuki LINE DEMO / STEP 4-15C
     </div>
   </div>
 
@@ -1302,7 +1306,7 @@
           `<div class="calendar-loading">営業カレンダーを取得できませんでした。時間をおいて再読み込みしてください。</div>`;
 
         showError(
-          "営業カレンダーの取得に失敗しました。\n定休日・臨時休みを反映できないため、希望入庫日は選択できません。"
+          "営業カレンダーの取得に失敗しました。\n定休日・臨時休みを反映できないため、希望入庫日（仮希望）は選択できません。"
         );
       }
     }
@@ -1410,7 +1414,7 @@
 
       const box = document.getElementById("selectedDateBox");
       box.classList.remove("hidden");
-      box.textContent = `希望入庫日：${formatDateJa(ymd)} を選択中`;
+      box.textContent = `希望入庫日（仮）：${formatDateJa(ymd)} を選択中`;
 
       renderCalendar();
     }
@@ -1607,7 +1611,7 @@
         <div><strong>電話番号：</strong>${escapeHtml(phoneText)}</div>
         <div><strong>お車：</strong>${escapeHtml(carText)}</div>
         <div><strong>相談内容：</strong>${escapeHtml(payload.consultType)}</div>
-        <div><strong>希望入庫日：</strong>${escapeHtml(visitText)}</div>
+        <div><strong>希望入庫日（仮）：</strong>${escapeHtml(visitText)}</div>
         <div><strong>次回車検：</strong>${escapeHtml(shakenText)}</div>
       `;
 
