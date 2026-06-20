@@ -3016,6 +3016,20 @@
 
       switchTab("reservations");
 
+      const existingReservation = reservationsCache.find(row => {
+        const status = String(row.status || "");
+        return String(row.inquiry_id || "") === String(inquiryId || "")
+          && !["削除済み", "キャンセル", "キャンセル済み"].includes(status);
+      });
+
+      if (existingReservation && existingReservation.id) {
+        showOk("この相談には既に仮入庫があります。新規作成ではなく、既存の入庫予定を編集します。");
+        setTimeout(async () => {
+          await openEditReservationForm(existingReservation.id);
+        }, 350);
+        return;
+      }
+
       setTimeout(async () => {
         await ensureCustomersLoaded();
 
