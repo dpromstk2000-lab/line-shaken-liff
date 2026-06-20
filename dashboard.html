@@ -1091,7 +1091,7 @@
         <button id="nav-inquiries" onclick="switchTab('inquiries')">📝 相談一覧</button>
         <button id="nav-reservations" onclick="switchTab('reservations')">📅 入庫予定</button>
         <button id="nav-opportunities" onclick="switchTab('opportunities')">💰 売上チャンス</button>
-        <button id="nav-followups" onclick="switchTab('followups')">📣 配信候補</button>
+        <button id="nav-followups" onclick="switchTab('followups')">💬 チャット候補</button>
         <button id="nav-customers" onclick="switchTab('customers')">👥 顧客・車両</button>
         <button id="nav-settings" onclick="switchTab('settings')">⚙️ 店舗設定</button>
       </nav>
@@ -1109,7 +1109,7 @@
         <div>
           <button class="btn btn-slate mobile-menu" onclick="toggleSidebar()">☰</button>
           <h2 id="pageTitle">今日やること</h2>
-          <p id="pageDesc">今日対応すべき相談・車検営業・LINE送信候補をまとめます。</p>
+          <p id="pageDesc">今日対応すべき相談・車検営業・LINEチャット候補をまとめます。</p>
         </div>
         <div class="top-actions">
           <button class="btn btn-slate" onclick="toggleTokenBox()">認証設定</button>
@@ -1220,9 +1220,9 @@
 
             <div class="card kpi">
               <div>
-                <span>LINE送信候補</span>
+                <span>LINEチャット候補</span>
                 <strong id="kpiReminderQueue">-</strong>
-                <small>文面コピー・LINE送信可能</small>
+                <small>文面編集・チャット送信用</small>
               </div>
               <div class="icon bg-purple">📨</div>
             </div>
@@ -1475,7 +1475,7 @@
             <div class="card">
               <div class="panel-title">
                 <div>
-                  <h3>LINE送信候補</h3>
+                  <h3>LINEチャット候補</h3>
                   <p>送信前のメッセージ候補</p>
                 </div>
               </div>
@@ -1619,17 +1619,17 @@
                 <input id="followupIncludeHandled" type="checkbox" />
                 対応済みも表示
               </label>
-              <button class="btn btn-primary" onclick="loadFollowupCandidates()">配信候補を更新</button>
+              <button class="btn btn-primary" onclick="loadFollowupCandidates()">チャット候補を更新</button>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+              <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
             </div>
           </div>
 
           <div class="grid4">
             <div class="card kpi">
               <div>
-                <span>配信候補</span>
+                <span>チャット候補</span>
                 <strong id="followupTotalCount">-</strong>
                 <small>候補全体</small>
               </div>
@@ -1669,8 +1669,8 @@
           <div class="card card-pad">
             <div class="toolbar">
               <div>
-                <h3 style="margin:0">LINE配信候補</h3>
-                <div class="small muted">候補を確認して、文面コピーからLINE公式管理画面へ貼り付けて送ります。</div>
+                <h3 style="margin:0">LINEチャット候補</h3>
+                <div class="small muted">候補を確認して、文面を編集・コピーし、LINE公式の個別チャットへ貼り付けて送ります。</div>
               </div>
               <div class="small muted" id="followupGeneratedAt">未更新</div>
             </div>
@@ -1710,7 +1710,7 @@
               <button class="btn btn-green" onclick="openNewCustomerForm()">＋ 顧客を追加</button>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-slate" onclick="openLineManager()">LINE管理画面</button>
+              <button class="btn btn-slate" onclick="openLineManager()">LINE公式チャット</button>
             </div>
           </div>
 
@@ -2068,7 +2068,7 @@
     const pageMeta = {
       today: {
         title: "今日やること",
-        desc: "今日対応すべき相談・車検営業・LINE送信候補をまとめます。"
+        desc: "今日対応すべき相談・車検営業・LINEチャット候補をまとめます。"
       },
       inquiries: {
         title: "相談一覧",
@@ -2083,8 +2083,8 @@
         desc: "車検・オイル交換・休眠顧客の営業候補を確認します。"
       },
       followups: {
-        title: "配信候補",
-        desc: "車検・オイル交換・次回提案・LINE未連携の配信候補を確認します。"
+        title: "チャット候補",
+        desc: "車検・オイル交換・次回提案・LINE未連携のチャット候補を確認します。"
       },
       customers: {
         title: "顧客・車両",
@@ -2277,14 +2277,14 @@
               </div>
             ` : ""}
             <div class="task-context-row">
-              <div class="task-context-label">LINE文面</div>
+              <div class="task-context-label">LINEチャット文面</div>
               <div class="task-context-text">
                 <textarea
                   id="todayMessage-${index}"
                   class="editable-message-box"
                   oninput="updateTodayTaskMessage(${index})"
                 >${escapeHtml(task.editedMessage || task.message || "")}</textarea>
-                <div class="editable-message-help">送る前にこの場で文面を編集できます。編集後の内容がコピー・送信済み記録に使われます。</div>
+                <div class="editable-message-help">個別チャットへ貼り付ける前に、この場で文面を編集できます。編集後の内容がコピー・チャット送信済み記録に使われます。</div>
               </div>
             </div>
           </div>
@@ -2297,10 +2297,9 @@
             ${task.customerId ? `<button class="btn btn-primary" onclick="openTodayTaskCustomerDetail(${index})">顧客詳細</button>` : ""}
             ${task.inquiryId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : task.customerId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : ""}
             ${task.inquiryId ? `<button class="btn btn-slate" onclick="openTodayTaskInquiry(${index})">相談一覧へ</button>` : ""}
-            ${task.lineUserId ? `<button class="btn btn-green" onclick="sendTodayTaskLine(${index})">LINE送信</button>` : ""}
-            <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">LINE送信済み</button>
+            <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">チャット送信済み</button>
             <button class="btn btn-slate" onclick="markTodayTaskHandled(${index}, 'phone_called')">電話済み</button>
-            <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+            <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
           </div>
         </div>
       `).join("");
@@ -2475,7 +2474,7 @@
           badge: triggerType,
           title: `${row.customer_name || "お客様"}様の${triggerType}`,
           meta: `${row.vehicle_name || "車両未入力"} / ${row.trigger_date ? formatDate(row.trigger_date) : ""}`,
-          taskSummary: "顧客・車両情報から自動抽出された営業チャンスです。必要に応じてLINE文面をコピーして連絡します。",
+          taskSummary: "顧客・車両情報から自動抽出された営業チャンスです。必要に応じて文面を編集・コピーし、個別チャットで連絡します。",
           message: row.message_preview || "",
           inquiryMessage: row.reason || "",
           proposalMemo: row.next_proposal_memo || row.proposal_memo || row.memo || "",
@@ -2506,9 +2505,9 @@
           followupKey: buildTodayReminderKey(row),
           color: "blue",
           badge: "LINE候補",
-          title: `${customer.name || row.customer_name || "お客様"}様へのLINE送信候補`,
+          title: `${customer.name || row.customer_name || "お客様"}様へのLINEチャット候補`,
           meta: `${row.reminder_type || ""} / ${row.target_date ? formatDate(row.target_date) : ""}`,
-          taskSummary: "LINE配信候補として作成された案内です。内容を確認して送信します。",
+          taskSummary: "LINEチャット候補として作成された案内です。内容を確認して個別チャットで送ります。",
           message: row.message_preview || row.message_text || "",
           inquiryMessage: row.reason || "",
           proposalMemo: row.next_proposal_memo || row.proposal_memo || "",
@@ -3564,7 +3563,7 @@
       followupVisibleCache = rows;
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="7" class="muted">配信候補はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="muted">チャット候補はありません。</td></tr>`;
         return;
       }
 
@@ -3596,17 +3595,17 @@
               class="editable-message-box"
               oninput="updateFollowupMessage(${index})"
             >${escapeHtml(row.edited_message_text || row.message_text || "")}</textarea>
-            <div class="editable-message-help">送る前にこの場で文面を編集できます。</div>
+            <div class="editable-message-help">個別チャットへ貼り付ける前に、この場で文面を編集できます。</div>
             <div class="task-actions">
               <button class="btn btn-slate" onclick="copyFollowupName(${index})">名前コピー</button>
               <button class="btn btn-slate" onclick="copyFollowupPhone(${index})">電話コピー</button>
               <button class="btn btn-primary" onclick="copyFollowupMessage(${index})">編集後文面コピー</button>
               <button class="btn btn-slate" onclick="resetFollowupMessage(${index})">自動文面に戻す</button>
-              <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">LINE送信済み</button>
+              <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">チャット送信済み</button>
               <button class="btn btn-slate" onclick="markFollowupHandled(${index}, 'phone_called')">電話済み</button>
               <button class="btn btn-dark" onclick="markFollowupHandled(${index}, 'skipped')">今回は見送り</button>
               ${row.customer_id ? `<button class="btn btn-green" onclick="openReservationFromFollowup(${index})">入庫予定へ</button>` : ""}
-              <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+              <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
             </div>
           </td>
         </tr>
@@ -3653,7 +3652,7 @@
         }
         document.getElementById("reservationWorkType").value = normalizeWorkType(row.type_label || row.type || "その他");
         document.getElementById("reservationMemo").value = [
-          row.type_label ? `配信候補：${row.type_label}` : "配信候補から作成",
+          row.type_label ? `チャット候補：${row.type_label}` : "チャット候補から作成",
           row.reason ? `理由：${row.reason}` : "",
           row.proposal_memo ? `次回提案：${row.proposal_memo}` : ""
         ].filter(Boolean).join("\n");
@@ -3747,8 +3746,7 @@
             <div class="task-actions">
               <button class="btn btn-slate" onclick="copyOpportunityName(${index})">名前コピー</button>
               <button class="btn btn-slate" onclick="copyOpportunityMessage(${index})">文面コピー</button>
-              ${row.line_user_id ? `<button class="btn btn-green" onclick="sendOpportunityLine(${index})">LINE送信</button>` : ""}
-              <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+              <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
             </div>
           </td>
         </tr>
@@ -3778,8 +3776,7 @@
             <button class="btn btn-slate" onclick="copyReminderName('${row.id}')">名前コピー</button>
             <button class="btn btn-slate" onclick="copyReminderPhone('${row.id}')">電話コピー</button>
             <button class="btn btn-slate" onclick="copyReminderMessage('${row.id}')">文面コピー</button>
-            <button class="btn btn-green" onclick="sendReminderLine('${row.id}')">LINE送信</button>
-            <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+            <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
           </div>
         </div>
       `).join("");
@@ -3903,7 +3900,7 @@
               <div style="display:grid; gap:6px">
                 <button class="btn btn-slate" onclick="copyCompletedSaleName(${index})">名前コピー</button>
                 <button class="btn btn-slate" onclick="copyCompletedSaleProposal(${index})">提案メモコピー</button>
-                <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+                <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
               </div>
             </td>
           </tr>
@@ -4749,8 +4746,7 @@
                 <button class="btn btn-slate" onclick="copyCustomerName('${customer.id}')">名前コピー</button>
                 <button class="btn btn-slate" onclick="copyCustomerPhone('${customer.id}')">電話コピー</button>
                 <button class="btn btn-slate" onclick="copyCustomerMessage('${customer.id}')">文面コピー</button>
-                ${customer.line_user_id ? `<button class="btn btn-green" onclick="sendCustomerLine('${customer.id}')">LINE送信</button>` : ""}
-                <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
+                <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
                 <button class="btn btn-red" onclick="confirmDeleteCustomer('${customer.id}')">削除</button>
               </div>
             </td>
@@ -5255,17 +5251,17 @@
       clearAlert();
 
       if (!lineUserId) {
-        showError("LINEユーザーIDがないため送信できません。LINE未連携の顧客は、文面コピーや電話コピーを使ってください。");
+        showError("LINE未連携の顧客は、電話コピーなどで対応してください。");
         return;
       }
 
       if (!message) {
-        showError("送信するメッセージがありません。");
+        showError("コピーまたは記録する文面がありません。");
         return;
       }
 
-      showConfirm("このLINEメッセージを送信しますか？", `
-        <p class="muted">以下の文面をLINEで送信します。</p>
+      showConfirm("チャット送信済みにしますか？", `
+        <p class="muted">以下の文面をLINE公式チャットで送信した記録にします。</p>
         <div class="message-box">${escapeHtml(message)}</div>
       `, async () => {
         try {
@@ -5279,7 +5275,7 @@
             })
           });
 
-          showOk("LINEメッセージを送信しました。");
+          showOk("LINEチャット送信済みとして記録しました。");
 
           if (currentTab === "opportunities") await loadOpportunities();
           if (currentTab === "today") await loadToday();
@@ -5288,11 +5284,11 @@
         } catch (error) {
           showError(
             error.message +
-            "\n\nDEMO用の架空LINEユーザーIDの場合、直接送信は失敗します。その場合は「文面コピー」→「LINE管理画面」で確認してください。"
+            "\n\nDEMO用の架空LINEユーザーIDの場合、このDEMOでは個別チャットへの貼り付け運用を推奨しています。"
           );
         }
       }, {
-        okText: "送信する",
+        okText: "記録する",
         danger: false
       });
     }
@@ -5476,7 +5472,7 @@
     }
 
     function followupActionLabel(actionType) {
-      if (actionType === "line_sent") return "LINE送信済み";
+      if (actionType === "line_sent") return "チャット送信済み";
       if (actionType === "phone_called") return "電話済み";
       if (actionType === "skipped") return "今回は見送り";
       if (actionType === "reservation_created") return "入庫予定作成済み";
