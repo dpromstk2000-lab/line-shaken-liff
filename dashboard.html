@@ -1516,6 +1516,10 @@
                 <input id="followupIncludeLineUnlinked" type="checkbox" checked />
                 LINE未連携も表示
               </label>
+              <label class="small" style="display:flex;align-items:center;gap:6px;font-weight:800;color:var(--muted)">
+                <input id="followupIncludeHandled" type="checkbox" />
+                対応済みも表示
+              </label>
               <button class="btn btn-primary" onclick="loadFollowupCandidates()">配信候補を更新</button>
             </div>
             <div class="toolbar-right">
@@ -1947,6 +1951,7 @@
     let completedSalesCache = [];
     let followupCandidatesCache = [];
     let followupVisibleCache = [];
+    let followupActionsCache = [];
     let currentFollowupFilter = "all";
     let monthlySalesCache = [];
     let businessDaysCache = [];
@@ -2106,6 +2111,7 @@
         reservationsCache = data.todayReservations || [];
         opportunitiesCache = data.salesTriggers || [];
         remindersCache = data.reminderQueue || [];
+        followupActionsCache = data.followupActions || [];
 
         const customerSample = data.latestCustomers || [];
         const stats = calcCustomerStats(customerSample, opportunitiesCache, remindersCache, inquiriesCache);
@@ -2155,6 +2161,8 @@
             <button class="btn btn-slate" onclick="copyTodayTaskPhone(${index})">電話コピー</button>
             <button class="btn btn-slate" onclick="copyTodayTaskMessage(${index})">文面コピー</button>
             ${task.lineUserId ? `<button class="btn btn-green" onclick="sendTodayTaskLine(${index})">LINE送信</button>` : ""}
+            <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">LINE送信済み</button>
+            <button class="btn btn-slate" onclick="markTodayTaskHandled(${index}, 'phone_called')">電話済み</button>
             <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
           </div>
         </div>
@@ -2163,6 +2171,7 @@
 
     function buildTodayTasks(data) {
       const tasks = [];
+      const handledActionMap = buildFollowupActionMap(data.followupActions || followupActionsCache || []);
       const today = dateYmd(new Date());
       const tomorrow = dateYmd(addDays(new Date(), 1));
 
@@ -2177,6 +2186,7 @@
         if (createdDate === today && isOpenStatus(status)) {
           tasks.push({
             type: "inquiry",
+            followupKey: buildTodayInquiryKey(row, "new"),
             color: "red",
             badge: "本日対応",
             title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様の新規相談`,
@@ -2192,6 +2202,7 @@
         if (String(status).includes("未返信")) {
           tasks.push({
             type: "followup",
+            followupKey: buildTodayInquiryKey(row, "followup"),
             color: "purple",
             badge: "追客推奨",
             title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様へ追客`,
@@ -2207,6 +2218,7 @@
         if (row.preferred_visit_date === today || row.preferred_visit_date === tomorrow) {
           tasks.push({
             type: "visit",
+            followupKey: buildTodayInquiryKey(row, "visit"),
             color: row.preferred_visit_date === today ? "red" : "orange",
             badge: row.preferred_visit_date === today ? "本日入庫希望" : "明日入庫希望",
             title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様の入庫希望日が近いです`,
@@ -2231,6 +2243,7 @@
 
         tasks.push({
           type: "opportunity",
+          followupKey: buildTodayOpportunityKey(row),
           color: triggerType.includes("車検") ? "orange" : triggerType.includes("オイル") ? "green" : "purple",
           badge: triggerType,
           title: `${row.customer_name || "お客様"}様の${triggerType}`,
@@ -2246,6 +2259,7 @@
       reminders.slice(0, 5).forEach(row => {
         tasks.push({
           type: "reminder",
+          followupKey: buildTodayReminderKey(row),
           color: "blue",
           badge: "LINE候補",
           title: `${row.customer?.name || "お客様"}様へのLINE送信候補`,
@@ -2258,7 +2272,9 @@
         });
       });
 
-      return tasks.slice(0, 12);
+      return tasks
+        .filter(task => !task.followupKey || !handledActionMap.has(task.followupKey))
+        .slice(0, 12);
     }
 
     function renderTodayReservations(rows) {
@@ -3137,9 +3153,11 @@
       try {
         const days = Number(document.getElementById("followupDays")?.value || 120);
         const includeLineUnlinked = document.getElementById("followupIncludeLineUnlinked")?.checked !== false;
+        const includeHandled = document.getElementById("followupIncludeHandled")?.checked === true;
         const params = new URLSearchParams();
         params.set("days", String(days));
         params.set("includeLineUnlinked", includeLineUnlinked ? "true" : "false");
+        params.set("includeHandled", includeHandled ? "true" : "false");
         params.set("limit", "500");
 
         const data = await api(`/api/followup-candidates?${params.toString()}`);
@@ -3211,7 +3229,10 @@
 
       body.innerHTML = rows.map((row, index) => `
         <tr>
-          <td>${badgeFollowupType(row.type_label || row.type)}</td>
+          <td>
+            ${badgeFollowupType(row.type_label || row.type)}
+            ${row.is_handled ? `<div style="margin-top:6px"><span class="badge badge-green">${escapeHtml(row.handled_label || "対応済み")}</span></div>` : ""}
+          </td>
           <td>${badgeFollowupPriority(row.priority)}</td>
           <td>
             <strong>${escapeHtml(row.customer_name || "未入力")}</strong><br>
@@ -3234,6 +3255,9 @@
               <button class="btn btn-slate" onclick="copyFollowupName(${index})">名前コピー</button>
               <button class="btn btn-slate" onclick="copyFollowupPhone(${index})">電話コピー</button>
               <button class="btn btn-primary" onclick="copyFollowupMessage(${index})">文面コピー</button>
+              <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">LINE送信済み</button>
+              <button class="btn btn-slate" onclick="markFollowupHandled(${index}, 'phone_called')">電話済み</button>
+              <button class="btn btn-dark" onclick="markFollowupHandled(${index}, 'skipped')">今回は見送り</button>
               ${row.customer_id ? `<button class="btn btn-green" onclick="openReservationFromFollowup(${index})">入庫予定へ</button>` : ""}
               <button class="btn btn-dark" onclick="openLineManager()">LINE管理画面</button>
             </div>
@@ -5005,6 +5029,111 @@
         row.message_preview || "",
         id
       );
+    }
+
+
+    async function markFollowupHandled(index, actionType) {
+      const row = followupVisibleCache[index];
+      if (!row) return;
+
+      const label = followupActionLabel(actionType);
+      if (!confirm(`${row.customer_name || "対象顧客"}様を「${label}」として記録しますか？\n\n記録後、この候補は一定期間一覧から外れます。`)) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: row.id,
+            candidateType: row.type,
+            actionType,
+            customerId: row.customer_id,
+            vehicleId: row.vehicle_id,
+            customerName: row.customer_name,
+            vehicleName: buildFollowupVehicleText(row),
+            phone: row.customer_phone,
+            dueDate: row.due_date,
+            messageText: row.message_text
+          })
+        });
+        showOk(`${label}として記録しました。`);
+        await loadFollowupCandidates();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function markTodayTaskHandled(index, actionType) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+
+      const label = followupActionLabel(actionType);
+      if (!confirm(`${task.title || "この対応"}を「${label}」として記録しますか？\n\n記録後、今日やることから外れます。`)) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: task.followupKey,
+            candidateType: task.type,
+            actionType,
+            customerId: task.customerId,
+            customerName: task.name,
+            phone: task.phone,
+            messageText: task.message,
+            memo: task.meta
+          })
+        });
+        showOk(`${label}として記録しました。`);
+        await loadToday();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function buildFollowupActionMap(actions) {
+      const map = new Map();
+      (actions || []).forEach(action => {
+        const key = String(action.followup_key || "");
+        if (key && !map.has(key)) map.set(key, action);
+      });
+      return map;
+    }
+
+    function buildTodayInquiryKey(row, suffix) {
+      return ["today", suffix || "inquiry", row.id || row.inquiry_id || row.customer_id || row.customer?.id || "none"].join("_");
+    }
+
+    function buildTodayOpportunityKey(row) {
+      return [
+        "today",
+        "opportunity",
+        row.customer_id || "customer",
+        row.vehicle_id || row.vehicle?.id || "vehicle",
+        row.trigger_type || "trigger",
+        row.trigger_date || "none"
+      ].join("_");
+    }
+
+    function buildTodayReminderKey(row) {
+      return ["today", "reminder", row.id || row.reminder_id || row.customer_id || "none"].join("_");
+    }
+
+    function followupActionLabel(actionType) {
+      if (actionType === "line_sent") return "LINE送信済み";
+      if (actionType === "phone_called") return "電話済み";
+      if (actionType === "skipped") return "今回は見送り";
+      if (actionType === "reservation_created") return "入庫予定作成済み";
+      return "対応済み";
     }
 
     function copyFollowupName(index) {
