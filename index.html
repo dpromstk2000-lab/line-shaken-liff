@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>STREET HOUSE 杵築｜車検・整備・カスタム相談</title>
+  <title>STREET HOUSE 杵築｜車検・整備・カスタム相談 STEP 4-15F</title>
 
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -650,7 +650,7 @@
           <div id="vehicleSelectBox" class="field hidden">
             <label for="registeredVehicleSelect">お車を選択してください<span class="optional">登録済み</span></label>
             <select id="registeredVehicleSelect" onchange="onVehicleSelectChange()"></select>
-            <div class="small-help">登録済みの車両がある場合は、ここで選ぶだけで進めます。</div>
+            <div class="small-help">登録済みの車両がある場合は、ここで選ぶだけで進めます。2台目以降を追加するときだけ「2台目・別の車を登録」を選んでください。</div>
           </div>
 
           <div id="newVehicleFields">
@@ -662,7 +662,7 @@
             <div class="field">
               <label for="plateLast4">ナンバー下4桁<span class="optional">任意</span></label>
               <input id="plateLast4" type="tel" inputmode="numeric" maxlength="4" placeholder="例：1234" />
-              <div class="small-help">新しいお車の次回車検年月は、次の画面のあとに入力できます。</div>
+              <div class="small-help">2台目・別の車を登録する場合だけ入力してください。次回車検年月はQ3で入力できます。</div>
             </div>
           </div>
 
@@ -681,6 +681,7 @@
               <option value="異音・トラブルの点検">⚠️ 異音・トラブルの点検</option>
               <option value="パーツ持ち込み取付・カスタム">🏁 パーツ持ち込み取付・カスタム</option>
               <option value="カスタム相談">🛠 カスタム相談</option>
+              <option value="2台目・別車両の登録">🚘 2台目・別車両の登録</option>
               <option value="その他（相談・質問など）">💬 その他（相談・質問など）</option>
             </select>
           </div>
@@ -1008,7 +1009,7 @@
       document.getElementById("vehicleSelectBox").classList.add("hidden");
       document.getElementById("newVehicleFields").style.display = "block";
       document.getElementById("vehicleId").value = "new";
-      selectedVehicleLabel = "新しいお車";
+      selectedVehicleLabel = "2台目・別のお車";
       updateSelectedVehicleStepBox();
     }
 
@@ -1047,7 +1048,7 @@
       if (!registeredVehicles.length) {
         vehicleBox.classList.add("hidden");
         document.getElementById("vehicleId").value = "new";
-        selectedVehicleLabel = "新しいお車";
+        selectedVehicleLabel = "2台目・別のお車";
         document.getElementById("newVehicleFields").style.display = "block";
         updateSelectedVehicleStepBox();
         return;
@@ -1062,10 +1063,10 @@
 
       const addOption = document.createElement("option");
       addOption.value = "new";
-      addOption.textContent = "別の車を追加する";
+      addOption.textContent = "2台目・別の車を登録する";
       select.appendChild(addOption);
 
-      const defaultVehicleId = defaults.selectedVehicleId || (registeredVehicles.length === 1 ? registeredVehicles[0].id : "");
+      const defaultVehicleId = defaults.selectedVehicleId || (registeredVehicles.length ? registeredVehicles[0].id : "");
       if (defaultVehicleId) {
         select.value = defaultVehicleId;
       }
@@ -1094,7 +1095,7 @@
       vehicleIdInput.value = value;
 
       if (value === "new") {
-        selectedVehicleLabel = "新しいお車";
+        selectedVehicleLabel = "2台目・別のお車";
         newVehicleFields.style.display = "block";
         document.getElementById("carName").value = "";
         document.getElementById("plateLast4").value = "";
@@ -1655,6 +1656,11 @@
         pageUrl: window.location.href
       };
 
+      const confirmText = buildSubmitConfirmText(payload);
+      if (!window.confirm(confirmText)) {
+        return;
+      }
+
       try {
         setSubmitting(true);
 
@@ -1693,6 +1699,32 @@
       } finally {
         setSubmitting(false);
       }
+    }
+
+    function buildSubmitConfirmText(payload) {
+      const shakenText = payload.shakenYear && payload.shakenMonth
+        ? `${payload.shakenYear}年${payload.shakenMonth}月`
+        : "未入力";
+      const visitText = payload.preferredVisitDate
+        ? `${formatDateJa(payload.preferredVisitDate)} ${payload.preferredVisitTime || "時間未選択"}`
+        : "未入力";
+      const carText = payload.vehicleLabel || payload.carName || "未入力";
+      const messageText = payload.message ? `
+ご要望：${payload.message}` : "";
+
+      return [
+        "この内容で送信します。",
+        "",
+        `お名前：${payload.name || "未入力"}`,
+        `電話番号：${payload.phone || "未入力"}`,
+        `お車：${carText}`,
+        `相談内容：${payload.consultType || "未入力"}`,
+        `希望入庫日（仮）：${visitText}`,
+        `次回車検：${shakenText}`,
+        messageText,
+        "",
+        "この時点では予約確定ではありません。スタッフ確認後、正式な入庫日時をご連絡します。"
+      ].filter(Boolean).join("\n");
     }
 
     function showSuccess(payload, result) {
