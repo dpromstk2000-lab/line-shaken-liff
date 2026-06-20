@@ -2137,7 +2137,7 @@
     const pageMeta = {
       today: {
         title: "今日やること",
-        desc: "今日対応すべき相談・車検営業・LINEチャット候補をまとめます。"
+        desc: "今日対応すべき相談・仮入庫・再連絡・LINEチャット候補をまとめます。件数は表示中の一覧と連動します。"
       },
       inquiries: {
         title: "相談一覧",
@@ -2287,18 +2287,10 @@
         followupActionsCache = data.followupActions || [];
 
         const customerSample = data.latestCustomers || [];
-        const stats = calcCustomerStats(customerSample, opportunitiesCache, remindersCache, inquiriesCache);
-
-        setText("kpiLineMembers", `${s.line_members ?? 0}名`);
-        setText("kpiShakenKnown", `${stats.shakenKnown}台`);
-        setText("kpiOpenInquiries", `${stats.openInquiries}件`);
-        renderOperationBoard(data, stats);
-        setText("kpiShaken60", `${stats.shaken60}件`);
-        setText("kpiShaken90", `${stats.shaken90}件`);
-        setText("kpiReminderQueue", `${remindersCache.length}件`);
+        const rawStats = calcCustomerStats(customerSample, opportunitiesCache, remindersCache, inquiriesCache);
 
         renderTodayTasks(data);
-        setText("kpiTodayTasks", `${todayTasksCache.length}件`);
+        syncTodayAndOperationCounts(data, rawStats);
         renderTodayReservations(reservationsCache);
 
       } catch (error) {
@@ -2309,20 +2301,112 @@
     }
 
     function renderOperationBoard(data, stats) {
-      const inquiries = data.recentInquiries || [];
-      const todayReservations = data.todayReservations || [];
-      const upcomingReservations = data.upcomingReservations || todayReservations || [];
-      const followupActions = data.followupActions || followupActionsCache || [];
+      const visible = stats || calcVisibleDashboardStats(data || dashboardCache || {}, todayTasksCache, {});
+
+      setText("opOpenInquiries", `${visible.openInquiries || 0}件`);
+      setText("opProvisionalReservations", `${visible.provisionalReservations || 0}件`);
+      setText("opConfirmedReservations", `${visible.confirmedReservations || 0}件`);
+      setText("opRecontactScheduled", `${visible.recontactScheduled || 0}件`);
+    }
+
+    function syncTodayAndOperationCounts(data, rawStats = {}) {
+      const visible = calcVisibleDashboardStats(data || dashboardCache || {}, todayTasksCache, rawStats || {});
+
+      setText("kpiLineMembers", `${visible.lineMembers || 0}名`);
+      setText("kpiShakenKnown", `${visible.shakenKnown || 0}台`);
+      setText("kpiOpenInquiries", `${visible.openInquiries || 0}件`);
+      setText("kpiTodayTasks", `${visible.todayTasks || 0}件`);
+      setText("kpiShaken60", `${visible.shaken60 || 0}件`);
+      setText("kpiShaken90", `${visible.shaken90 || 0}件`);
+      setText("kpiReminderQueue", `${visible.chatCandidates || 0}件`);
+      renderOperationBoard(data, visible);
+    }
+
+    function calcVisibleDashboardStats(data, visibleTasks, rawStats = {}) {
+      const source = data || {};
+      const actionMap = buildFollowupActionMap(source.followupActions || followupActionsCache || []);
+      const inquiries = source.recentInquiries || inquiriesCache || [];
+      const opportunities = source.salesTriggers || opportunitiesCache || [];
+      const reminders = source.reminderQueue || remindersCache || [];
+      const upcomingReservations = source.upcomingReservations || source.todayReservations || reservationsCache || [];
+      const followupActions = source.followupActions || followupActionsCache || [];
+      const summary = source.summary || {};
       const today = dateYmd(new Date());
 
-      const provisionalReservations = upcomingReservations.filter(row => isProvisionalReservationStatus(row.status));
-      const confirmedReservations = upcomingReservations.filter(row => isConfirmedReservationStatus(row.status));
-      const recontactScheduled = followupActions.filter(row => String(row.action_type || "") === "followup_scheduled");
+      const visibleOpportunityRows = opportunities.filter(row => isVisibleOpportunityForCounts(row, actionMap));
+      const visibleReminderRows = reminders.filter(row => isVisibleReminderForCounts(row, actionMap));
+      const visibleOpenInquiries = inquiries.filter(row => isVisibleOpenInquiryForCounts(row, actionMap));
 
-      setText("opOpenInquiries", `${stats.openInquiries || 0}件`);
-      setText("opProvisionalReservations", `${provisionalReservations.length}件`);
-      setText("opConfirmedReservations", `${confirmedReservations.length}件`);
-      setText("opRecontactScheduled", `${recontactScheduled.length}件`);
+      const shaken60 = visibleOpportunityRows.filter(row => {
+        const trigger = String(row.trigger_type || "");
+        const due = daysUntil(normalizeDateInput(row.trigger_date || row.next_shaken_date || ""));
+        return trigger.includes("車検") && due !== null && due >= 0 && due <= 60;
+      }).length;
+
+      const shaken90 = visibleOpportunityRows.filter(row => {
+        const trigger = String(row.trigger_type || "");
+        const due = daysUntil(normalizeDateInput(row.trigger_date || row.next_shaken_date || ""));
+        return trigger.includes("車検") && due !== null && due >= 0 && due <= 90;
+      }).length;
+
+      const provisionalReservations = upcomingReservations.filter(row => !isClosedReservationStatus(row.status) && isProvisionalReservationStatus(row.status));
+      const confirmedReservations = upcomingReservations.filter(row => !isClosedReservationStatus(row.status) && isConfirmedReservationStatus(row.status));
+      const recontactScheduled = followupActions.filter(row => {
+        if (String(row.action_type || "") !== "followup_scheduled") return false;
+        const hideUntil = normalizeDateInput(row.hide_until || "");
+        return !hideUntil || hideUntil >= today;
+      });
+
+      return {
+        lineMembers: Number(summary.line_members ?? 0),
+        shakenKnown: Number(rawStats.shakenKnown ?? 0),
+        openInquiries: visibleOpenInquiries.length,
+        todayTasks: Array.isArray(visibleTasks) ? visibleTasks.length : 0,
+        shaken60,
+        shaken90,
+        chatCandidates: visibleReminderRows.length,
+        provisionalReservations: provisionalReservations.length,
+        confirmedReservations: confirmedReservations.length,
+        recontactScheduled: recontactScheduled.length
+      };
+    }
+
+    function isVisibleOpenInquiryForCounts(row, actionMap) {
+      const status = String(row.status || "");
+      const open = isOpenStatus(status) || status.includes("未返信") || status.includes("確認中") || status.includes("見積もり中") || status.includes("入庫希望");
+      if (!open) return false;
+
+      const keys = [
+        buildTodayInquiryKey(row, "new"),
+        buildTodayInquiryKey(row, "followup"),
+        buildTodayInquiryKey(row, "visit")
+      ];
+
+      return !keys.some(key => isFollowupKeyCurrentlyHidden(key, actionMap));
+    }
+
+    function isVisibleOpportunityForCounts(row, actionMap) {
+      return !isFollowupKeyCurrentlyHidden(buildTodayOpportunityKey(row), actionMap);
+    }
+
+    function isVisibleReminderForCounts(row, actionMap) {
+      return !isFollowupKeyCurrentlyHidden(buildTodayReminderKey(row), actionMap);
+    }
+
+    function isFollowupKeyCurrentlyHidden(key, actionMap) {
+      if (!key || !actionMap || !actionMap.has(key)) return false;
+      const action = actionMap.get(key);
+      if (!action) return false;
+
+      const type = String(action.action_type || "");
+      const today = dateYmd(new Date());
+      const hideUntil = normalizeDateInput(action.hide_until || "");
+
+      if (type === "followup_scheduled") {
+        return hideUntil ? hideUntil > today : true;
+      }
+
+      return true;
     }
 
     function isProvisionalReservationStatus(status) {
@@ -3787,11 +3871,11 @@
         line_unlinked: rows.filter(row => row.type === "line_unlinked").length
       };
 
-      const total = Number(summary.total ?? calc.total ?? 0);
-      const shaken = Number(summary.shaken ?? calc.shaken ?? 0);
-      const oil = Number(summary.oil ?? calc.oil ?? 0);
-      const proposal = Number(summary.proposal ?? calc.proposal ?? 0);
-      const lineUnlinked = Number(summary.line_unlinked ?? calc.line_unlinked ?? 0);
+      const total = Number(calc.total || 0);
+      const shaken = Number(calc.shaken || 0);
+      const oil = Number(calc.oil || 0);
+      const proposal = Number(calc.proposal || 0);
+      const lineUnlinked = Number(calc.line_unlinked || 0);
 
       setText("followupTotalCount", `${total}件`);
       setText("followupShakenCount", `${shaken}件`);
@@ -3816,7 +3900,7 @@
       followupVisibleCache = rows;
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="7" class="muted">配信候補はありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="muted">チャット候補はありません。</td></tr>`;
         return;
       }
 
@@ -5677,7 +5761,7 @@
           })
         });
         showOk(`${label}として記録しました。`);
-        await loadFollowupCandidates();
+        await refreshCountsAfterAction({ followups: true });
       } catch (error) {
         showError(error.message);
       } finally {
@@ -5710,12 +5794,115 @@
           })
         });
         showOk(`${label}として記録しました。`);
-        await loadToday();
+        await refreshCountsAfterAction({ today: true });
       } catch (error) {
         showError(error.message);
       } finally {
         setLoading(false);
       }
+    }
+
+    async function scheduleTodayTaskRecontact(index, days) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+
+      const hideDays = Number(days || 7);
+      const hideUntil = dateYmd(addDays(new Date(), hideDays));
+      const label = hideDays >= 30 ? "1か月後に再連絡" : "1週間後に再連絡";
+
+      if (!confirm(`${task.title || "この対応"}を「${label}」として記録しますか？\n\n${formatDate(hideUntil)}に今日やることへ再表示されます。`)) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: task.followupKey,
+            candidateType: task.type,
+            actionType: "followup_scheduled",
+            hideDays,
+            hideUntil,
+            customerId: task.customerId,
+            vehicleId: task.vehicleId,
+            inquiryId: task.inquiryId,
+            reservationId: task.reservationId,
+            customerName: task.name,
+            vehicleName: buildTodayTaskVehicleText(task),
+            phone: task.phone,
+            dueDate: task.dueDate || task.preferredVisitDate || "",
+            messageText: getTodayTaskMessage(index),
+            memo: task.meta
+          })
+        });
+        showOk(`${label}として記録しました。`);
+        await refreshCountsAfterAction({ today: true });
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function scheduleFollowupRecontact(index, days) {
+      const row = followupVisibleCache[index];
+      if (!row) return;
+
+      const hideDays = Number(days || 7);
+      const hideUntil = dateYmd(addDays(new Date(), hideDays));
+      const label = hideDays >= 30 ? "1か月後に再連絡" : "1週間後に再連絡";
+
+      if (!confirm(`${row.customer_name || "対象顧客"}様を「${label}」として記録しますか？\n\n${formatDate(hideUntil)}に今日やることへ再表示されます。`)) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: row.id,
+            candidateType: row.type,
+            actionType: "followup_scheduled",
+            hideDays,
+            hideUntil,
+            customerId: row.customer_id,
+            vehicleId: row.vehicle_id,
+            customerName: row.customer_name,
+            vehicleName: buildFollowupVehicleText(row),
+            phone: row.customer_phone,
+            dueDate: row.due_date,
+            messageText: getFollowupMessage(index),
+            memo: row.reason || row.proposal_memo || ""
+          })
+        });
+        showOk(`${label}として記録しました。`);
+        await refreshCountsAfterAction({ followups: true });
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function refreshCountsAfterAction(options = {}) {
+      if (options.today || currentTab === "today") {
+        await loadToday();
+        return;
+      }
+
+      if (options.followups || currentTab === "followups") {
+        await loadFollowupCandidates();
+        return;
+      }
+
+      if (currentTab === "opportunities" || currentTab === "ownerSales") {
+        await loadOpportunities();
+        return;
+      }
+
+      refreshCurrentTab();
     }
 
     function buildReservationConfirmChatMessage(row) {
@@ -5733,7 +5920,13 @@
 
     function buildFollowupActionMap(actions) {
       const map = new Map();
-      (actions || []).forEach(action => {
+      const rows = [...(actions || [])].sort((a, b) => {
+        const ad = new Date(a.acted_at || a.created_at || a.updated_at || 0).getTime();
+        const bd = new Date(b.acted_at || b.created_at || b.updated_at || 0).getTime();
+        return bd - ad;
+      });
+
+      rows.forEach(action => {
         const key = String(action.followup_key || "");
         if (key && !map.has(key)) map.set(key, action);
       });
