@@ -547,6 +547,26 @@
       font-size: 12px;
     }
 
+    .selected-vehicle-box {
+      background: rgba(230, 126, 34, 0.1);
+      border: 1px solid rgba(230, 126, 34, 0.35);
+      color: #ffd5ad;
+      padding: 11px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+
+    .selected-vehicle-box strong {
+      color: #ffffff;
+    }
+
+    .shaken-help {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 5px;
+    }
+
     @media (max-width: 360px) {
       .wrap {
         padding-left: 12px;
@@ -642,6 +662,7 @@
             <div class="field">
               <label for="plateLast4">ナンバー下4桁<span class="optional">任意</span></label>
               <input id="plateLast4" type="tel" inputmode="numeric" maxlength="4" placeholder="例：1234" />
+              <div class="small-help">新しいお車の次回車検年月は、次の画面のあとに入力できます。</div>
             </div>
           </div>
 
@@ -723,6 +744,8 @@
         <section id="step3" class="step">
           <div class="step-title">Q3. 車検時期・ご要望を教えてください</div>
 
+          <div id="selectedVehicleStepBox" class="selected-vehicle-box hidden"></div>
+
           <div class="notice">
             次回車検年月を登録しておくと、店舗側で車検時期の近いお客様を確認できます。選択できるのは最大3年先までです。
           </div>
@@ -738,6 +761,7 @@
               <select id="shakenMonth"></select>
             </div>
           </div>
+          <div id="vehicleShakenHelp" class="shaken-help">選択中のお車の次回車検年月を入力できます。</div>
 
           <div class="field">
             <label for="mileageKm">現在の走行距離<span class="optional">任意</span></label>
@@ -773,7 +797,7 @@
     </div>
 
     <div class="footer">
-      STREET HOUSE Kitsuki LINE DEMO / STEP 4-11B
+      STREET HOUSE Kitsuki LINE DEMO / STEP 4-11C
     </div>
   </div>
 
@@ -971,6 +995,9 @@
       document.getElementById("customerInputFields").style.display = "block";
       document.getElementById("vehicleSelectBox").classList.add("hidden");
       document.getElementById("newVehicleFields").style.display = "block";
+      document.getElementById("vehicleId").value = "new";
+      selectedVehicleLabel = "新しいお車";
+      updateSelectedVehicleStepBox();
     }
 
     function renderRegisteredCustomerBox() {
@@ -1008,8 +1035,9 @@
       if (!registeredVehicles.length) {
         vehicleBox.classList.add("hidden");
         document.getElementById("vehicleId").value = "new";
-        selectedVehicleLabel = "";
+        selectedVehicleLabel = "新しいお車";
         document.getElementById("newVehicleFields").style.display = "block";
+        updateSelectedVehicleStepBox();
         return;
       }
 
@@ -1054,10 +1082,12 @@
       vehicleIdInput.value = value;
 
       if (value === "new") {
-        selectedVehicleLabel = "";
+        selectedVehicleLabel = "新しいお車";
         newVehicleFields.style.display = "block";
         document.getElementById("carName").value = "";
         document.getElementById("plateLast4").value = "";
+        clearVehicleShakenFields();
+        updateSelectedVehicleStepBox();
         return;
       }
 
@@ -1067,9 +1097,11 @@
       if (vehicle) {
         document.getElementById("carName").value = vehicle.car_name || vehicle.maker || vehicle.model || "";
         document.getElementById("plateLast4").value = vehicle.plate_last4 || "";
+        setVehicleShakenFields(vehicle.next_shaken_year, vehicle.next_shaken_month);
       }
 
       newVehicleFields.style.display = "none";
+      updateSelectedVehicleStepBox(vehicle);
     }
 
     function buildVehicleLabel(vehicle) {
@@ -1080,6 +1112,73 @@
         ? ` / 車検 ${vehicle.next_shaken_year}年${vehicle.next_shaken_month}月`
         : "";
       return `${name}${plate}${shaken}`;
+    }
+
+    function setVehicleShakenFields(year, month) {
+      const yearSelect = document.getElementById("shakenYear");
+      const monthSelect = document.getElementById("shakenMonth");
+
+      if (!yearSelect || !monthSelect) return;
+
+      if (!year || !month) {
+        clearVehicleShakenFields();
+        return;
+      }
+
+      yearSelect.value = String(year);
+
+      if (yearSelect.value !== String(year)) {
+        clearVehicleShakenFields();
+        return;
+      }
+
+      updateMonths(String(month));
+
+      const help = document.getElementById("vehicleShakenHelp");
+      if (help) {
+        help.textContent = `登録済みの次回車検は ${year}年${month}月 です。変更があればこの画面で修正できます。`;
+      }
+    }
+
+    function clearVehicleShakenFields() {
+      const yearSelect = document.getElementById("shakenYear");
+      const monthSelect = document.getElementById("shakenMonth");
+
+      if (yearSelect) yearSelect.value = "";
+      updateMonths();
+      if (monthSelect) monthSelect.value = "";
+
+      const help = document.getElementById("vehicleShakenHelp");
+      if (help) {
+        help.textContent = "選択中のお車の次回車検年月を入力できます。新しいお車の場合もここで入力してください。";
+      }
+    }
+
+    function updateSelectedVehicleStepBox(vehicle) {
+      const box = document.getElementById("selectedVehicleStepBox");
+      if (!box) return;
+
+      const vehicleId = getValue("vehicleId");
+      const carName = getValue("carName");
+      const plateLast4 = getValue("plateLast4");
+      const label = selectedVehicleLabel || carName || "新しいお車";
+
+      if (!vehicleId && !label) {
+        box.classList.add("hidden");
+        box.textContent = "";
+        return;
+      }
+
+      if (vehicleId === "new") {
+        box.innerHTML = `選択中のお車：<strong>${escapeHtml(carName || "新しいお車")}</strong>${plateLast4 ? ` / ${escapeHtml(plateLast4)}` : ""}<br>この新しいお車の次回車検年月を下で入力できます。`;
+      } else {
+        const shakenText = vehicle && vehicle.next_shaken_year && vehicle.next_shaken_month
+          ? `現在登録：${vehicle.next_shaken_year}年${vehicle.next_shaken_month}月`
+          : "現在登録：未登録";
+        box.innerHTML = `選択中のお車：<strong>${escapeHtml(label)}</strong><br>${escapeHtml(shakenText)}。変更があれば下で修正できます。`;
+      }
+
+      box.classList.remove("hidden");
     }
 
     function applyConsultTypeFromQuery() {
@@ -1339,13 +1438,14 @@
       updateMonths();
     }
 
-    function updateMonths() {
+    function updateMonths(preferredMonth = "") {
       const monthSelect = document.getElementById("shakenMonth");
       const selectedYear = Number(document.getElementById("shakenYear").value);
       const today = new Date();
 
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1;
+      const previousValue = preferredMonth || monthSelect.value || "";
 
       monthSelect.innerHTML = '<option value="">未選択</option>';
 
@@ -1369,6 +1469,10 @@
         option.textContent = `${month}月`;
 
         monthSelect.appendChild(option);
+      }
+
+      if (previousValue) {
+        monthSelect.value = String(previousValue);
       }
     }
 
