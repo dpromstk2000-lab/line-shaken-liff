@@ -2289,7 +2289,6 @@
         const customerSample = data.latestCustomers || [];
         const stats = calcCustomerStats(customerSample, opportunitiesCache, remindersCache, inquiriesCache);
 
-        setText("kpiTodayTasks", `${stats.todayTasks}件`);
         setText("kpiLineMembers", `${s.line_members ?? 0}名`);
         setText("kpiShakenKnown", `${stats.shakenKnown}台`);
         setText("kpiOpenInquiries", `${stats.openInquiries}件`);
@@ -2299,6 +2298,7 @@
         setText("kpiReminderQueue", `${remindersCache.length}件`);
 
         renderTodayTasks(data);
+        setText("kpiTodayTasks", `${todayTasksCache.length}件`);
         renderTodayReservations(reservationsCache);
 
       } catch (error) {
@@ -3015,7 +3015,6 @@
       }
 
       switchTab("reservations");
-      await loadReservations();
 
       const existingReservation = reservationsCache.find(row => {
         const status = String(row.status || "");
