@@ -938,7 +938,7 @@
         const info = calendarDayMap[ymd];
         const isPast = ymd < todayYmd;
         const isOver = ymd > maxYmd;
-        const isOpen = info ? Boolean(info.is_open) : false;
+        const isOpen = info ? Boolean(info.is_open ?? info.available) : false;
         const isClosed = !isOpen || isPast || isOver;
         const selectedClass = ymd === selectedVisitDate ? "selected" : "";
         const closedClass = isClosed ? "closed" : "open";
@@ -1000,7 +1000,7 @@
     function selectVisitDate(ymd) {
       const info = calendarDayMap[ymd];
 
-      if (!info || !info.is_open) {
+      if (!info || !Boolean(info.is_open ?? info.available)) {
         showError("この日は定休日または臨時休業日のため選択できません。");
         return;
       }
