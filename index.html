@@ -727,6 +727,14 @@
                 定休日・臨時休業日は選択できません。選択した日は仮希望として店舗へ送信されます。
               </div>
             </div>
+
+            <div id="preferredVisitTimeBox" class="field hidden" style="margin-top:12px;">
+              <label for="preferredVisitTime">希望入庫時間（仮希望）<span class="required">日付を選んだ場合は必須</span></label>
+              <select id="preferredVisitTime" disabled>
+                <option value="">先に希望入庫日を選択してください</option>
+              </select>
+              <div class="small-help">この時間も仮希望です。スタッフ確認後、正式な入庫日時をご連絡します。</div>
+            </div>
           </div>
 
           <div class="field">
@@ -1236,6 +1244,11 @@
           showError("その他の内容を入力してください。");
           return;
         }
+
+        if (getValue("preferredVisitDate") && !getValue("preferredVisitTime")) {
+          showError("希望入庫日を選んだ場合は、希望入庫時間も選択してください。予約確定ではなく仮希望として送信されます。");
+          return;
+        }
       }
 
       document.querySelectorAll(".step").forEach((step) => {
@@ -1416,7 +1429,92 @@
       box.classList.remove("hidden");
       box.textContent = `希望入庫日（仮）：${formatDateJa(ymd)} を選択中`;
 
+      resetPreferredVisitTimeSelect("時間候補を読み込み中...");
       renderCalendar();
+      loadPreferredVisitTimeOptions(ymd);
+    }
+
+    async function loadPreferredVisitTimeOptions(ymd) {
+      const box = document.getElementById("preferredVisitTimeBox");
+      const select = document.getElementById("preferredVisitTime");
+
+      if (!box || !select) return;
+
+      if (!ymd) {
+        box.classList.add("hidden");
+        resetPreferredVisitTimeSelect("先に希望入庫日を選択してください");
+        return;
+      }
+
+      box.classList.remove("hidden");
+      resetPreferredVisitTimeSelect("時間候補を読み込み中...");
+
+      try {
+        const response = await fetch(`${WORKER_API_BASE}/api/public/reservation-time-options?date=${encodeURIComponent(ymd)}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.ok || !result.available) {
+          select.innerHTML = `<option value="">${escapeHtml(result.reason || result.message || "この日は受付できません")}</option>`;
+          select.disabled = true;
+          return;
+        }
+
+        const slots = Array.isArray(result.slots) ? result.slots : [];
+        const times = Array.isArray(result.times) ? result.times : [];
+        const slotItems = slots.length
+          ? slots.map(slot => ({
+              time: normalizeTimeValue(slot.time),
+              remaining: Number(slot.remaining ?? Math.max(Number(slot.limit || result.slotLimit || 1) - Number(slot.used || 0), 0)),
+              isFull: Boolean(slot.isFull ?? slot.is_full)
+            })).filter(slot => slot.time)
+          : times.map(time => ({
+              time: normalizeTimeValue(time),
+              remaining: Number(result.slotLimit || 1),
+              isFull: false
+            })).filter(slot => slot.time);
+
+        if (!slotItems.length) {
+          select.innerHTML = `<option value="">選択できる時間がありません</option>`;
+          select.disabled = true;
+          return;
+        }
+
+        const options = slotItems.map(slot => {
+          const disabled = slot.isFull || slot.remaining <= 0;
+          const label = disabled
+            ? `${slot.time}（満枠）`
+            : `${slot.time}（残り${slot.remaining}）`;
+          return `<option value="${escapeHtml(slot.time)}"${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
+        });
+
+        select.innerHTML = [`<option value="">希望入庫時間を選択</option>`].concat(options).join("");
+        select.disabled = !slotItems.some(slot => !slot.isFull && slot.remaining > 0);
+
+        if (select.disabled) {
+          showError("選択した日の入庫時間は満枠です。別の日を選択してください。");
+        }
+      } catch (error) {
+        console.error(error);
+        resetPreferredVisitTimeSelect("時間候補を取得できませんでした");
+      }
+    }
+
+    function resetPreferredVisitTimeSelect(label) {
+      const box = document.getElementById("preferredVisitTimeBox");
+      const select = document.getElementById("preferredVisitTime");
+
+      if (box) box.classList.remove("hidden");
+      if (!select) return;
+
+      select.innerHTML = `<option value="">${escapeHtml(label || "先に希望入庫日を選択してください")}</option>`;
+      select.disabled = true;
+    }
+
+    function normalizeTimeValue(value) {
+      const text = String(value || "").trim();
+      const match = text.match(/^(\d{1,2}):(\d{2})/);
+      if (!match) return "";
+      return `${String(Number(match[1])).padStart(2, "0")}:${match[2]}`;
     }
 
     // =====================================================
@@ -1517,6 +1615,12 @@
         return;
       }
 
+      if (getValue("preferredVisitDate") && !getValue("preferredVisitTime")) {
+        showError("希望入庫日を選んだ場合は、希望入庫時間も選択してください。");
+        goStep(2);
+        return;
+      }
+
       const payload = {
         shopCode: SHOP_CODE,
 
@@ -1537,6 +1641,7 @@
         otherConsultDetail: otherConsultDetail,
 
         preferredVisitDate: getValue("preferredVisitDate"),
+        preferredVisitTime: getValue("preferredVisitTime"),
         preferredContactMethod: getValue("preferredContactMethod"),
 
         shakenYear: getValue("shakenYear"),
@@ -1605,6 +1710,7 @@
       const visitText = payload.preferredVisitDate
         ? formatDateJa(payload.preferredVisitDate)
         : "未入力";
+      const visitTimeText = payload.preferredVisitTime || "未入力";
 
       document.getElementById("successSummary").innerHTML = `
         <div><strong>お名前：</strong>${escapeHtml(payload.name)}</div>
@@ -1612,6 +1718,7 @@
         <div><strong>お車：</strong>${escapeHtml(carText)}</div>
         <div><strong>相談内容：</strong>${escapeHtml(payload.consultType)}</div>
         <div><strong>希望入庫日（仮）：</strong>${escapeHtml(visitText)}</div>
+        <div><strong>希望入庫時間（仮）：</strong>${escapeHtml(visitTimeText)}</div>
         <div><strong>次回車検：</strong>${escapeHtml(shakenText)}</div>
       `;
 
