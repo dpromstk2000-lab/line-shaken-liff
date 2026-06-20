@@ -528,6 +528,78 @@
       margin-top: 10px;
     }
 
+    .task-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .task-detail-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 9px 10px;
+      min-width: 0;
+    }
+
+    .task-detail-item dt {
+      margin: 0 0 3px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .task-detail-item dd {
+      margin: 0;
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .task-detail-wide {
+      grid-column: 1 / -1;
+    }
+
+    .task-context-box {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .task-context-row {
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 10px 11px;
+    }
+
+    .task-context-label {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+
+    .task-context-text {
+      color: #111827;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 760px) {
+      .task-detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .task-detail-wide {
+        grid-column: auto;
+      }
+    }
+
     .token-box {
       display: none;
       padding: 14px;
@@ -2155,11 +2227,41 @@
             </div>
             ${autoBadge(task.badge, task.color)}
           </div>
-          <div class="message-box">${escapeHtml(task.message)}</div>
+
+          ${renderTodayTaskDetail(task)}
+
+          <div class="task-context-box">
+            ${task.taskSummary ? `
+              <div class="task-context-row">
+                <div class="task-context-label">今日やること</div>
+                <div class="task-context-text">${escapeHtml(task.taskSummary)}</div>
+              </div>
+            ` : ""}
+            ${task.inquiryMessage ? `
+              <div class="task-context-row">
+                <div class="task-context-label">相談内容・お客様メッセージ</div>
+                <div class="task-context-text">${escapeHtml(task.inquiryMessage)}</div>
+              </div>
+            ` : ""}
+            ${task.proposalMemo ? `
+              <div class="task-context-row">
+                <div class="task-context-label">次回提案メモ・店舗メモ</div>
+                <div class="task-context-text">${escapeHtml(task.proposalMemo)}</div>
+              </div>
+            ` : ""}
+            <div class="task-context-row">
+              <div class="task-context-label">LINE文面</div>
+              <div class="task-context-text">${escapeHtml(task.message)}</div>
+            </div>
+          </div>
+
           <div class="task-actions">
             <button class="btn btn-slate" onclick="copyTodayTaskName(${index})">名前コピー</button>
             <button class="btn btn-slate" onclick="copyTodayTaskPhone(${index})">電話コピー</button>
             <button class="btn btn-slate" onclick="copyTodayTaskMessage(${index})">文面コピー</button>
+            ${task.customerId ? `<button class="btn btn-primary" onclick="openTodayTaskCustomerDetail(${index})">顧客詳細</button>` : ""}
+            ${task.inquiryId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : task.customerId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : ""}
+            ${task.inquiryId ? `<button class="btn btn-slate" onclick="openTodayTaskInquiry(${index})">相談一覧へ</button>` : ""}
             ${task.lineUserId ? `<button class="btn btn-green" onclick="sendTodayTaskLine(${index})">LINE送信</button>` : ""}
             <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">LINE送信済み</button>
             <button class="btn btn-slate" onclick="markTodayTaskHandled(${index}, 'phone_called')">電話済み</button>
@@ -2167,6 +2269,41 @@
           </div>
         </div>
       `).join("");
+    }
+
+    function renderTodayTaskDetail(task) {
+      const items = [];
+
+      items.push(renderTaskDetailItem("お客様", task.name || "未入力"));
+      items.push(renderTaskDetailItem("電話番号", task.phone || "未入力"));
+      items.push(renderTaskDetailItem("LINE", task.lineUserId ? "LINE連携済み" : "未連携 / 電話対応"));
+      items.push(renderTaskDetailItem("車両", buildTodayTaskVehicleText(task)));
+
+      if (task.consultType) items.push(renderTaskDetailItem("相談種別", task.consultType));
+      if (task.preferredVisitDate) items.push(renderTaskDetailItem("希望入庫日", formatDate(task.preferredVisitDate)));
+      if (task.nextShakenText) items.push(renderTaskDetailItem("次回車検", task.nextShakenText));
+      if (task.dueDate) items.push(renderTaskDetailItem("対象日", formatDate(task.dueDate)));
+      if (task.estimatedAmount) items.push(renderTaskDetailItem("概算・見込み", yen(task.estimatedAmount)));
+      if (task.status) items.push(renderTaskDetailItem("状態", task.status));
+
+      return `<dl class="task-detail-grid">${items.join("")}</dl>`;
+    }
+
+    function renderTaskDetailItem(label, value) {
+      return `
+        <div class="task-detail-item">
+          <dt>${escapeHtml(label)}</dt>
+          <dd>${escapeHtml(value || "未入力")}</dd>
+        </div>
+      `;
+    }
+
+    function buildTodayTaskVehicleText(task) {
+      const parts = [];
+      const vehicleName = [task.maker, task.vehicleName || task.carName || task.model].filter(Boolean).join(" ").trim();
+      if (vehicleName) parts.push(vehicleName);
+      if (task.plateLast4) parts.push(`下4桁 ${task.plateLast4}`);
+      return parts.length ? parts.join(" / ") : "車両未入力";
     }
 
     function buildTodayTasks(data) {
@@ -2182,52 +2319,107 @@
       inquiries.forEach(row => {
         const createdDate = row.created_at ? dateYmd(new Date(row.created_at)) : "";
         const status = row.status || "";
+        const customerName = row.customer_name_snapshot || row.customer?.name || "お客様";
+        const phone = row.phone_snapshot || row.customer?.phone || "";
+        const carName = row.car_name_snapshot || row.vehicle?.car_name || "";
+        const plateLast4 = row.vehicle?.plate_last4 || row.plate_last4 || "";
+        const nextShakenText = buildTaskShakenText(row.next_shaken_year || row.vehicle?.next_shaken_year, row.next_shaken_month || row.vehicle?.next_shaken_month, row.vehicle?.next_shaken_date || row.next_shaken_date);
+        const inquiryText = row.message || row.shop_memo || "";
+        const memoText = [
+          row.shop_memo ? `店舗メモ：${row.shop_memo}` : "",
+          row.other_consult_detail ? `その他内容：${row.other_consult_detail}` : ""
+        ].filter(Boolean).join("\n");
 
         if (createdDate === today && isOpenStatus(status)) {
           tasks.push({
             type: "inquiry",
+            inquiryId: row.id || "",
             followupKey: buildTodayInquiryKey(row, "new"),
             color: "red",
             badge: "本日対応",
-            title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様の新規相談`,
-            meta: `${row.consult_type || "相談"} / ${row.car_name_snapshot || row.vehicle?.car_name || "車両未入力"}`,
+            title: `${customerName}様の新規相談`,
+            meta: `${row.consult_type || "相談"} / ${carName || "車両未入力"}`,
+            taskSummary: "新しく届いた相談です。内容を確認して、LINEまたは電話で初回返信します。",
             message: buildInquirySuggestedMessage(row),
-            name: row.customer_name_snapshot || row.customer?.name || "",
-            phone: row.phone_snapshot || row.customer?.phone || "",
+            inquiryMessage: inquiryText,
+            proposalMemo: memoText,
+            name: customerName,
+            phone,
             lineUserId: row.line_user_id || row.customer?.line_user_id || "",
-            customerId: row.customer_id || ""
+            customerId: row.customer_id || row.customer?.id || "",
+            vehicleId: row.vehicle_id || row.vehicle?.id || "",
+            vehicleName: carName,
+            carName,
+            maker: row.vehicle?.maker || "",
+            model: row.vehicle?.model || "",
+            plateLast4,
+            consultType: row.consult_type || "相談",
+            preferredVisitDate: row.preferred_visit_date || "",
+            nextShakenText,
+            estimatedAmount: row.estimated_amount || "",
+            status
           });
         }
 
         if (String(status).includes("未返信")) {
           tasks.push({
             type: "followup",
+            inquiryId: row.id || "",
             followupKey: buildTodayInquiryKey(row, "followup"),
             color: "purple",
             badge: "追客推奨",
-            title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様へ追客`,
+            title: `${customerName}様へ追客`,
             meta: `${row.consult_type || "相談"} / 見積もり後未返信`,
+            taskSummary: "見積もり後・案内後に未返信の相談です。状況確認のLINEまたは電話をします。",
             message: buildFollowupMessage(row),
-            name: row.customer_name_snapshot || row.customer?.name || "",
-            phone: row.phone_snapshot || row.customer?.phone || "",
+            inquiryMessage: inquiryText,
+            proposalMemo: memoText,
+            name: customerName,
+            phone,
             lineUserId: row.line_user_id || row.customer?.line_user_id || "",
-            customerId: row.customer_id || ""
+            customerId: row.customer_id || row.customer?.id || "",
+            vehicleId: row.vehicle_id || row.vehicle?.id || "",
+            vehicleName: carName,
+            carName,
+            maker: row.vehicle?.maker || "",
+            model: row.vehicle?.model || "",
+            plateLast4,
+            consultType: row.consult_type || "相談",
+            preferredVisitDate: row.preferred_visit_date || "",
+            nextShakenText,
+            estimatedAmount: row.estimated_amount || "",
+            status
           });
         }
 
         if (row.preferred_visit_date === today || row.preferred_visit_date === tomorrow) {
           tasks.push({
             type: "visit",
+            inquiryId: row.id || "",
             followupKey: buildTodayInquiryKey(row, "visit"),
             color: row.preferred_visit_date === today ? "red" : "orange",
             badge: row.preferred_visit_date === today ? "本日入庫希望" : "明日入庫希望",
-            title: `${row.customer_name_snapshot || row.customer?.name || "お客様"}様の入庫希望日が近いです`,
+            title: `${customerName}様の入庫希望日が近いです`,
             meta: `${formatDate(row.preferred_visit_date)} / ${row.consult_type || "相談"}`,
+            taskSummary: "希望入庫日が近い相談です。入庫時間・作業内容・代車の有無を確認します。",
             message: buildVisitConfirmMessage(row),
-            name: row.customer_name_snapshot || row.customer?.name || "",
-            phone: row.phone_snapshot || row.customer?.phone || "",
+            inquiryMessage: inquiryText,
+            proposalMemo: memoText,
+            name: customerName,
+            phone,
             lineUserId: row.line_user_id || row.customer?.line_user_id || "",
-            customerId: row.customer_id || ""
+            customerId: row.customer_id || row.customer?.id || "",
+            vehicleId: row.vehicle_id || row.vehicle?.id || "",
+            vehicleName: carName,
+            carName,
+            maker: row.vehicle?.maker || "",
+            model: row.vehicle?.model || "",
+            plateLast4,
+            consultType: row.consult_type || "相談",
+            preferredVisitDate: row.preferred_visit_date || "",
+            nextShakenText,
+            estimatedAmount: row.estimated_amount || "",
+            status
           });
         }
       });
@@ -2248,33 +2440,147 @@
           badge: triggerType,
           title: `${row.customer_name || "お客様"}様の${triggerType}`,
           meta: `${row.vehicle_name || "車両未入力"} / ${row.trigger_date ? formatDate(row.trigger_date) : ""}`,
+          taskSummary: "顧客・車両情報から自動抽出された営業チャンスです。必要に応じてLINE文面をコピーして連絡します。",
           message: row.message_preview || "",
+          inquiryMessage: row.reason || "",
+          proposalMemo: row.next_proposal_memo || row.proposal_memo || row.memo || "",
           name: row.customer_name || "",
           phone: row.phone || "",
           lineUserId: row.line_user_id || "",
-          customerId: row.customer_id || ""
+          customerId: row.customer_id || "",
+          vehicleId: row.vehicle_id || row.vehicle?.id || "",
+          vehicleName: row.vehicle_name || row.car_name || "",
+          carName: row.vehicle_name || row.car_name || "",
+          maker: row.maker || "",
+          model: row.model || "",
+          plateLast4: row.plate_last4 || "",
+          consultType: triggerType,
+          preferredVisitDate: "",
+          dueDate: row.trigger_date || "",
+          nextShakenText: row.next_shaken_date ? formatYearMonth(row.next_shaken_date) : buildTaskShakenText(row.next_shaken_year, row.next_shaken_month, ""),
+          estimatedAmount: row.estimated_amount || "",
+          status: row.has_future_reservation ? "今後の入庫予定あり" : "未対応"
         });
       });
 
       reminders.slice(0, 5).forEach(row => {
+        const customer = row.customer || {};
+        const vehicle = row.vehicle || {};
         tasks.push({
           type: "reminder",
           followupKey: buildTodayReminderKey(row),
           color: "blue",
           badge: "LINE候補",
-          title: `${row.customer?.name || "お客様"}様へのLINE送信候補`,
+          title: `${customer.name || row.customer_name || "お客様"}様へのLINE送信候補`,
           meta: `${row.reminder_type || ""} / ${row.target_date ? formatDate(row.target_date) : ""}`,
-          message: row.message_preview || "",
-          name: row.customer?.name || "",
-          phone: row.customer?.phone || "",
-          lineUserId: row.customer?.line_user_id || row.line_user_id || "",
-          customerId: row.customer_id || ""
+          taskSummary: "LINE配信候補として作成された案内です。内容を確認して送信します。",
+          message: row.message_preview || row.message_text || "",
+          inquiryMessage: row.reason || "",
+          proposalMemo: row.next_proposal_memo || row.proposal_memo || "",
+          name: customer.name || row.customer_name || "",
+          phone: customer.phone || row.customer_phone || "",
+          lineUserId: customer.line_user_id || row.line_user_id || "",
+          customerId: row.customer_id || customer.id || "",
+          vehicleId: row.vehicle_id || vehicle.id || "",
+          vehicleName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+          carName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+          maker: vehicle.maker || row.maker || "",
+          model: vehicle.model || row.model || "",
+          plateLast4: vehicle.plate_last4 || row.plate_last4 || "",
+          consultType: row.reminder_type || "LINE候補",
+          dueDate: row.target_date || "",
+          nextShakenText: vehicle.next_shaken_date ? formatYearMonth(vehicle.next_shaken_date) : buildTaskShakenText(vehicle.next_shaken_year || row.next_shaken_year, vehicle.next_shaken_month || row.next_shaken_month, ""),
+          status: row.has_future_reservation ? "今後の入庫予定あり" : "未対応"
         });
       });
 
       return tasks
         .filter(task => !task.followupKey || !handledActionMap.has(task.followupKey))
         .slice(0, 12);
+    }
+
+    function buildTaskShakenText(year, month, dateValue) {
+      if (dateValue) return formatYearMonth(dateValue);
+      if (year && month) return `${Number(year)}年${Number(month)}月`;
+      return "";
+    }
+
+    async function openTodayTaskCustomerDetail(index) {
+      const task = todayTasksCache[index];
+      if (!task || !task.customerId) {
+        showError("顧客詳細を開けません。顧客情報がありません。");
+        return;
+      }
+      await openCustomerDetail(task.customerId);
+    }
+
+    function openTodayTaskInquiry(index) {
+      const task = todayTasksCache[index];
+      if (!task || !task.inquiryId) {
+        showError("対象の相談が見つかりません。");
+        return;
+      }
+      switchTab("inquiries");
+      setTimeout(() => {
+        const target = document.getElementById(`status-${task.inquiryId}`);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          target.focus();
+        }
+      }, 350);
+    }
+
+    async function openReservationFromTodayTask(index) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+
+      if (task.inquiryId) {
+        await ensureInquiriesLoadedForTodayTask();
+        const found = findInquiry(task.inquiryId);
+        if (found) {
+          openReservationFromInquiry(task.inquiryId);
+          return;
+        }
+      }
+
+      if (!task.customerId) {
+        showError("入庫予定を作成する顧客情報がありません。");
+        return;
+      }
+
+      switchTab("reservations");
+      setTimeout(async () => {
+        await openNewReservationForm();
+        selectReservationCustomer(task.customerId);
+        if (task.vehicleId) {
+          document.getElementById("reservationVehicleId").value = task.vehicleId;
+        }
+        if (task.preferredVisitDate) {
+          document.getElementById("reservationDateInput").value = normalizeDateInput(task.preferredVisitDate);
+        }
+        document.getElementById("reservationWorkType").value = normalizeWorkType(task.consultType || task.type || "その他");
+        document.getElementById("reservationStatus").value = "入庫予定";
+        document.getElementById("reservationEstimatedAmount").value = task.estimatedAmount || "";
+        document.getElementById("reservationMemo").value = [
+          "今日やることから作成",
+          task.badge ? `種別：${task.badge}` : "",
+          task.inquiryMessage ? `相談内容：${task.inquiryMessage}` : "",
+          task.proposalMemo ? `メモ：${task.proposalMemo}` : ""
+        ].filter(Boolean).join("\n");
+        toggleReservationCompletionFields();
+        await loadReservationTimeOptionsForForm();
+        scrollToReservationForm();
+      }, 350);
+    }
+
+    async function ensureInquiriesLoadedForTodayTask() {
+      if (Array.isArray(inquiriesCache) && inquiriesCache.length) return;
+      try {
+        const data = await api("/api/inquiries?limit=200");
+        inquiriesCache = data.inquiries || [];
+      } catch (error) {
+        console.warn(error);
+      }
     }
 
     function renderTodayReservations(rows) {
