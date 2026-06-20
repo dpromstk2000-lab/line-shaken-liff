@@ -1081,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP 4-14B</p>
+            <p>LINE公式 DEMO / STEP 4-15A</p>
           </div>
         </div>
       </div>
@@ -1090,8 +1090,9 @@
         <button id="nav-today" class="active" onclick="switchTab('today')">✅ 今日やること</button>
         <button id="nav-inquiries" onclick="switchTab('inquiries')">📝 相談一覧</button>
         <button id="nav-reservations" onclick="switchTab('reservations')">📅 入庫予定</button>
-        <button id="nav-opportunities" onclick="switchTab('opportunities')">💰 売上チャンス</button>
+        <button id="nav-opportunities" onclick="switchTab('opportunities')">📌 営業候補</button>
         <button id="nav-followups" onclick="switchTab('followups')">💬 チャット候補</button>
+        <button id="nav-ownerSales" onclick="switchTab('ownerSales')">🔒 オーナー確認</button>
         <button id="nav-customers" onclick="switchTab('customers')">👥 顧客・車両</button>
         <button id="nav-settings" onclick="switchTab('settings')">⚙️ 店舗設定</button>
       </nav>
@@ -1100,7 +1101,7 @@
         毎日見る場所：<br>
         ✅ 今日やること<br><br>
         顧客検索 → 入庫予定作成<br>
-        営業時間外の誤登録を防止
+        売上情報はオーナー確認へ
       </div>
     </aside>
 
@@ -1163,11 +1164,59 @@
 
             <div class="card kpi">
               <div>
-                <span>今月の見込み</span>
-                <strong id="kpiMonthlyAmount">-</strong>
-                <small>相談ベースの概算</small>
+                <span>未対応相談</span>
+                <strong id="kpiOpenInquiries">-</strong>
+                <small>新規・確認中・未返信</small>
               </div>
-              <div class="icon bg-amber">¥</div>
+              <div class="icon bg-purple">📝</div>
+            </div>
+          </div>
+
+          <div style="height:16px"></div>
+
+          <div class="card card-pad">
+            <div class="panel-title">
+              <div>
+                <h3>対応状況ボード</h3>
+                <p>未対応・チャット対応・本日の入庫をまとめて確認します。売上金額はこの画面には表示しません。</p>
+              </div>
+            </div>
+            <div class="grid4">
+              <div class="card kpi">
+                <div>
+                  <span>未対応相談</span>
+                  <strong id="opOpenInquiries">-</strong>
+                  <small>新規・確認中・未返信</small>
+                </div>
+                <div class="icon bg-red">📝</div>
+              </div>
+
+              <div class="card kpi">
+                <div>
+                  <span>チャット対応待ち</span>
+                  <strong id="opChatWait">-</strong>
+                  <small>個別チャット候補</small>
+                </div>
+                <div class="icon bg-blue">💬</div>
+              </div>
+
+              <div class="card kpi">
+                <div>
+                  <span>本日の入庫</span>
+                  <strong id="opTodayReservations">-</strong>
+                  <small>今日の予約・入庫予定</small>
+                </div>
+                <div class="icon bg-green">📅</div>
+              </div>
+
+              <div class="card kpi">
+                <div>
+                  <span>作業中・確認中</span>
+                  <strong id="opWorkInProgress">-</strong>
+                  <small>店側の確認が必要</small>
+                </div>
+                <div class="icon bg-orange">🔧</div>
+              </div>
             </div>
           </div>
 
@@ -1443,8 +1492,8 @@
           <div class="toolbar">
             <div class="toolbar-left">
               <button class="btn btn-primary" onclick="loadOpportunities()">営業候補を更新</button>
-              <button class="btn btn-green" onclick="loadOpportunities()">売上実績を更新</button>
               <button class="btn btn-orange" onclick="generateReminders()">チャット候補を更新</button>
+              <button class="btn btn-slate" onclick="switchTab('ownerSales')">オーナー確認へ</button>
             </div>
           </div>
 
@@ -1492,13 +1541,23 @@
             </div>
           </div>
 
+        </section>
+
+        <section id="section-ownerSales" class="section">
+          <div class="card card-pad" style="margin-bottom:14px">
+            <div class="small muted" style="line-height:1.8">
+              <strong style="color:#0f172a">オーナー確認用：</strong>
+              この画面は作業完了後の売上実績を確認する場所です。日常業務では「今日やること」「入庫予定」「営業候補」を中心に使い、売上金額は必要な時だけ確認します。
+            </div>
+          </div>
+
           <div style="height:16px"></div>
 
           <div class="card card-pad">
             <div class="toolbar">
               <div>
-                <h3 style="margin:0">売上実績</h3>
-                <div class="small muted">作業完了にした入庫予定を、実売上として確認します。</div>
+                <h3 style="margin:0">オーナー確認：売上実績</h3>
+                <div class="small muted">売上金額は従業員・店頭では見せにくい情報のため、通常のトップ画面から分けています。</div>
               </div>
               <div class="toolbar-right">
                 <input id="salesFrom" type="date" />
@@ -2088,12 +2147,16 @@
         desc: "顧客検索と営業時間内の時間選択で、入庫予定を登録します。"
       },
       opportunities: {
-        title: "売上チャンス",
-        desc: "車検・オイル交換・休眠顧客の営業候補を確認します。"
+        title: "営業候補",
+        desc: "車検・オイル交換・休眠顧客など、個別チャットで連絡したい候補を確認します。"
       },
       followups: {
-        title: "配信候補",
-        desc: "車検・オイル交換・次回提案・LINE未連携の配信候補を確認します。"
+        title: "チャット候補",
+        desc: "LINE公式チャットへ貼り付ける個別連絡候補を確認します。"
+      },
+      ownerSales: {
+        title: "オーナー確認",
+        desc: "作業完了後の売上実績を、必要な時だけ確認します。"
       },
       customers: {
         title: "顧客・車両",
@@ -2137,6 +2200,7 @@
       if (tab === "reservations") loadReservations();
       if (tab === "opportunities") loadOpportunities();
       if (tab === "followups") loadFollowupCandidates();
+      if (tab === "ownerSales") loadOpportunities();
       if (tab === "customers") loadCustomers();
       if (tab === "settings") loadSettings();
     }
@@ -2227,7 +2291,8 @@
         setText("kpiTodayTasks", `${stats.todayTasks}件`);
         setText("kpiLineMembers", `${s.line_members ?? 0}名`);
         setText("kpiShakenKnown", `${stats.shakenKnown}台`);
-        setText("kpiMonthlyAmount", yen(s.monthly_estimated_amount || 0));
+        setText("kpiOpenInquiries", `${stats.openInquiries}件`);
+        renderOperationBoard(data, stats);
         setText("kpiShaken60", `${stats.shaken60}件`);
         setText("kpiShaken90", `${stats.shaken90}件`);
         setText("kpiReminderQueue", `${remindersCache.length}件`);
@@ -2240,6 +2305,37 @@
       } finally {
         setLoading(false);
       }
+    }
+
+    function renderOperationBoard(data, stats) {
+      const inquiries = data.recentInquiries || [];
+      const reservations = data.todayReservations || [];
+      const reminders = data.reminderQueue || [];
+      const opportunities = data.salesTriggers || [];
+
+      const chatWait = reminders.length + opportunities.filter(row => {
+        const type = String(row.trigger_type || "");
+        return type.includes("車検") || type.includes("オイル") || type.includes("休眠");
+      }).length;
+
+      const activeReservations = reservations.filter(row => !isClosedReservationStatus(row.status));
+      const workInProgress = reservations.filter(row => {
+        const status = String(row.status || "");
+        return status.includes("確認") || status.includes("入庫済") || status.includes("作業中");
+      }).length + inquiries.filter(row => {
+        const status = String(row.status || "");
+        return status.includes("確認中") || status.includes("見積もり中");
+      }).length;
+
+      setText("opOpenInquiries", `${stats.openInquiries || 0}件`);
+      setText("opChatWait", `${chatWait}件`);
+      setText("opTodayReservations", `${activeReservations.length}件`);
+      setText("opWorkInProgress", `${workInProgress}件`);
+    }
+
+    function isClosedReservationStatus(status) {
+      const value = String(status || "");
+      return value.includes("キャンセル") || value.includes("削除");
     }
 
     function renderTodayTasks(data) {
@@ -2326,7 +2422,6 @@
       if (task.preferredVisitDate) items.push(renderTaskDetailItem("希望入庫日", formatDate(task.preferredVisitDate)));
       if (task.nextShakenText) items.push(renderTaskDetailItem("次回車検", task.nextShakenText));
       if (task.dueDate) items.push(renderTaskDetailItem("対象日", formatDate(task.dueDate)));
-      if (task.estimatedAmount) items.push(renderTaskDetailItem("概算・見込み", yen(task.estimatedAmount)));
       if (task.status) items.push(renderTaskDetailItem("状態", task.status));
 
       return `<dl class="task-detail-grid">${items.join("")}</dl>`;
@@ -3739,7 +3834,7 @@
       const body = document.getElementById("opportunityTableBody");
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="5" class="muted">売上チャンスはありません。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="5" class="muted">営業候補はありません。</td></tr>`;
         return;
       }
 
@@ -5005,6 +5100,11 @@
         return created === today && isOpenStatus(i.status);
       }).length;
 
+      const openInquiries = inquiries.filter(i => {
+        const status = String(i.status || "");
+        return isOpenStatus(status) || status.includes("未返信") || status.includes("確認中") || status.includes("見積もり中");
+      }).length;
+
       const todayTasks =
         todayInquiries +
         (opportunities || []).slice(0, 10).length +
@@ -5014,7 +5114,8 @@
         shakenKnown,
         shaken60,
         shaken90,
-        todayTasks
+        todayTasks,
+        openInquiries
       };
     }
 
