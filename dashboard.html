@@ -1289,6 +1289,13 @@
                 <option value="見積もり後未返信">見積もり後未返信</option>
                 <option value="入庫希望あり">入庫希望あり</option>
                 <option value="入庫予約済み">入庫予約済み</option>
+                <option value="チャット対応済み">チャット対応済み</option>
+                <option value="電話対応済み">電話対応済み</option>
+                <option value="再連絡予定">再連絡予定</option>
+                <option value="今回は見送り">今回は見送り</option>
+                <option value="車両登録のみ">車両登録のみ</option>
+                <option value="入庫予定作成済み">入庫予定作成済み</option>
+                <option value="対応済み">対応済み</option>
                 <option value="作業完了">作業完了</option>
                 <option value="保留">保留</option>
               </select>
@@ -2545,6 +2552,8 @@
       const followupActions = data.followupActions || [];
 
       inquiries.forEach(row => {
+        if (isVehicleRegistrationOnlyInquiry(row)) return;
+
         const createdDate = row.created_at ? dateYmd(new Date(row.created_at)) : "";
         const status = row.status || "";
         const customerName = row.customer_name_snapshot || row.customer?.name || "お客様";
@@ -2792,6 +2801,40 @@
       return tasks
         .filter(task => !task.followupKey || !handledActionMap.has(task.followupKey) || task.type === "recontact")
         .slice(0, 14);
+    }
+
+    function isVehicleRegistrationOnlyInquiry(row) {
+      const status = String(row.status || "");
+      if (status === "車両登録のみ") return true;
+
+      const text = [
+        row.consult_type,
+        row.other_consult_detail,
+        row.message,
+        row.shop_memo
+      ].map(value => String(value || "")).join(" ");
+
+      const looksVehicleRegistration =
+        text.includes("2台目") ||
+        text.includes("二台目") ||
+        text.includes("別の車") ||
+        text.includes("別車両") ||
+        text.includes("車両登録") ||
+        text.includes("車を登録");
+
+      const hasWorkIntent =
+        text.includes("車検") ||
+        text.includes("整備") ||
+        text.includes("修理") ||
+        text.includes("カスタム") ||
+        text.includes("見積") ||
+        text.includes("オイル") ||
+        text.includes("異音") ||
+        text.includes("点検");
+
+      const hasVisitIntent = Boolean(row.preferred_visit_date);
+
+      return looksVehicleRegistration && !hasWorkIntent && !hasVisitIntent;
     }
 
     function buildTaskShakenText(year, month, dateValue) {
@@ -5593,6 +5636,13 @@
         "見積もり後未返信",
         "入庫希望あり",
         "入庫予約済み",
+        "チャット対応済み",
+        "電話対応済み",
+        "再連絡予定",
+        "今回は見送り",
+        "車両登録のみ",
+        "入庫予定作成済み",
+        "対応済み",
         "作業完了",
         "保留",
         "失注"
@@ -5787,8 +5837,13 @@
             candidateType: task.type,
             actionType,
             customerId: task.customerId,
+            vehicleId: task.vehicleId,
+            inquiryId: task.inquiryId,
+            reservationId: task.reservationId,
             customerName: task.name,
+            vehicleName: buildTodayTaskVehicleText(task),
             phone: task.phone,
+            dueDate: task.dueDate || task.preferredVisitDate || "",
             messageText: getTodayTaskMessage(index),
             memo: task.meta
           })
@@ -5889,6 +5944,7 @@
     async function refreshCountsAfterAction(options = {}) {
       if (options.today || currentTab === "today") {
         await loadToday();
+        if (currentTab === "inquiries") await loadInquiries();
         return;
       }
 
@@ -5920,13 +5976,7 @@
 
     function buildFollowupActionMap(actions) {
       const map = new Map();
-      const rows = [...(actions || [])].sort((a, b) => {
-        const ad = new Date(a.acted_at || a.created_at || a.updated_at || 0).getTime();
-        const bd = new Date(b.acted_at || b.created_at || b.updated_at || 0).getTime();
-        return bd - ad;
-      });
-
-      rows.forEach(action => {
+      (actions || []).forEach(action => {
         const key = String(action.followup_key || "");
         if (key && !map.has(key)) map.set(key, action);
       });
