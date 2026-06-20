@@ -1081,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP 4-15L</p>
+            <p>LINE公式 DEMO / STEP 4-15M</p>
           </div>
         </div>
       </div>
@@ -1178,7 +1178,7 @@
             <div class="panel-title">
               <div>
                 <h3>対応状況ボード</h3>
-                <p>未対応相談・仮入庫・確定入庫・再連絡予定をまとめて確認します。売上金額はこの画面には表示しません。</p>
+                <p>未対応相談・仮入庫・入庫予定・再連絡予定をまとめて確認します。売上金額はこの画面には表示しません。</p>
               </div>
             </div>
             <div class="grid4">
@@ -1202,9 +1202,9 @@
 
               <div class="card kpi">
                 <div>
-                  <span>確定入庫</span>
+                  <span>入庫予定</span>
                   <strong id="opConfirmedReservations">-</strong>
-                  <small>30日以内の確定予定</small>
+                  <small>30日以内の来店予定</small>
                 </div>
                 <div class="icon bg-green">📅</div>
               </div>
@@ -1238,7 +1238,7 @@
               <div class="panel-title">
                 <div>
                   <h3>本日の入庫・来店予定</h3>
-                  <p>仮入庫・確定入庫・入庫済みを確認します。</p>
+                  <p>仮入庫・入庫予定・入庫済みを確認します。</p>
                 </div>
                 <button class="btn btn-slate" onclick="switchTab('reservations')">詳細</button>
               </div>
@@ -1335,7 +1335,7 @@
                 <option value="today">本日</option>
                 <option value="next7">今後7日</option>
                 <option value="provisional">仮入庫のみ</option>
-                <option value="confirmed">確定・作業中</option>
+                <option value="confirmed">入庫予定・作業中</option>
                 <option value="completed">作業完了</option>
                 <option value="hidden">キャンセル・削除済み</option>
                 <option value="all">すべて表示</option>
@@ -1350,7 +1350,7 @@
               <div>
                 <h3 id="reservationFormTitle" style="margin:0">入庫予定を追加</h3>
                 <div id="reservationFormHelp" class="small muted">
-                  顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確定した予定は「確定入庫」、お客様希望日は「仮入庫」にします。
+                  顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確認した予定は「入庫予定」、お客様希望日は「仮入庫」にします。
                 </div>
               </div>
               <button class="btn btn-slate" onclick="clearReservationForm()">入力クリア</button>
@@ -1406,8 +1406,7 @@
                 <label>状態</label>
                 <select id="reservationStatus" onchange="toggleReservationCompletionFields()">
                   <option value="仮入庫">仮入庫（お客様希望・確認待ち）</option>
-                  <option value="確定入庫">確定入庫（店舗確認済み）</option>
-                  <option value="入庫予定">入庫予定（旧表示）</option>
+                  <option value="入庫予定">入庫予定（店舗確認済み）</option>
                   <option value="入庫済み">入庫済み</option>
                   <option value="作業中">作業中</option>
                   <option value="作業完了">作業完了</option>
@@ -1467,7 +1466,7 @@
 
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px">
               <button id="reservationSubmitButton" class="btn btn-green" onclick="saveReservationForm()">登録内容を確認</button>
-              <button id="reservationQuickConfirmButton" class="btn btn-primary" onclick="confirmEditingReservationAsConfirmed()" style="display:none;">この日時で確定入庫にする</button>
+              <button id="reservationQuickConfirmButton" class="btn btn-primary" onclick="confirmEditingReservationAsConfirmed()" style="display:none;">この日時で入庫予定にする</button>
               <button class="btn btn-slate" onclick="closeReservationForm()">閉じる</button>
             </div>
           </div>
@@ -1476,7 +1475,7 @@
             <div class="panel-title">
               <div>
                 <h3>入庫予定</h3>
-                <p>初期表示は「対応中のみ」です。仮入庫は一覧の「確定」ボタン、または編集画面の「この日時で確定入庫にする」からそのまま確定できます。作業完了・キャンセル・削除済みは履歴として残し、必要な時だけフィルターで表示します。</p>
+                <p>初期表示は「対応中のみ」です。仮入庫は一覧の「入庫予定にする」ボタン、または編集画面の「この日時で入庫予定にする」からそのまま入庫予定にできます。作業完了・キャンセル・削除済みは履歴として残し、必要な時だけフィルターで表示します。</p>
                 <p id="reservationFilterSummary" class="muted small">-</p>
               </div>
             </div>
@@ -2421,12 +2420,12 @@
 
     function isProvisionalReservationStatus(status) {
       const value = String(status || "");
-      return value.includes("仮入庫") || value === "入庫予定";
+      return value.includes("仮入庫");
     }
 
     function isConfirmedReservationStatus(status) {
       const value = String(status || "");
-      return value.includes("確定入庫") || value.includes("入庫済") || value.includes("作業中");
+      return value.includes("入庫予定") || value.includes("確定入庫") || value.includes("入庫済") || value.includes("作業中");
     }
 
     function isClosedReservationStatus(status) {
@@ -2753,10 +2752,10 @@
             badge: "仮入庫確認",
             title: `${customer.name || row.customer_name || "お客様"}様の仮入庫確認`,
             meta: `${formatDate(row.reservation_date)} ${row.reservation_time ? String(row.reservation_time).slice(0, 5) : "時間未定"} / ${row.work_type || "作業未入力"}`,
-            taskSummary: "お客様が希望した入庫日です。店舗側で日時・作業内容を確認し、問題なければ確定入庫に変更します。",
+            taskSummary: "お客様が希望した入庫日です。店舗側で日時・作業内容を確認し、問題なければ入庫予定に変更します。",
             message: buildReservationConfirmChatMessage(row),
             inquiryMessage: row.memo || "",
-            proposalMemo: "仮入庫のままにせず、確認後に確定入庫へ変更してください。",
+            proposalMemo: "仮入庫のままにせず、確認後に入庫予定へ変更してください。",
             name: customer.name || row.customer_name || "",
             phone: customer.phone || row.customer_phone || "",
             lineUserId: customer.line_user_id || row.line_user_id || "",
@@ -2909,7 +2908,7 @@
           document.getElementById("reservationDateInput").value = normalizeDateInput(task.preferredVisitDate);
         }
         document.getElementById("reservationWorkType").value = normalizeWorkType(task.consultType || task.type || "その他");
-        document.getElementById("reservationStatus").value = "確定入庫";
+        document.getElementById("reservationStatus").value = "入庫予定";
         document.getElementById("reservationEstimatedAmount").value = task.estimatedAmount || "";
         document.getElementById("reservationMemo").value = [
           "今日やることから作成",
@@ -3188,7 +3187,7 @@
           <td>${escapeHtml(row.memo || "")}</td>
           <td>
             <div style="display:grid; gap:6px">
-              ${isProvisionalReservationStatus(row.status) ? `<button class="btn btn-green" onclick="confirmReservationQuick('${row.id}')">確定</button>` : ""}
+              ${isProvisionalReservationStatus(row.status) ? `<button class="btn btn-green" onclick="confirmReservationQuick('${row.id}')">入庫予定にする</button>` : ""}
               <button class="btn btn-primary" onclick="openEditReservationForm('${row.id}')">編集</button>
               <button class="btn btn-slate" onclick="copyReservationMessage('${row.id}')">文面コピー</button>
               <button class="btn btn-red" onclick="confirmDeleteReservation('${row.id}')">削除</button>
@@ -3236,7 +3235,7 @@
         today: "本日",
         next7: "今後7日",
         provisional: "仮入庫のみ",
-        confirmed: "確定・作業中",
+        confirmed: "入庫予定・作業中",
         completed: "作業完了",
         hidden: "キャンセル・削除済み",
         all: "すべて表示"
@@ -3253,7 +3252,7 @@
       clearReservationForm(false);
 
       document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
-      document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確定した予定は「確定入庫」、お客様希望日は「仮入庫」にします。";
+      document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確認した予定は「入庫予定」、お客様希望日は「仮入庫」にします。";
       document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
       document.getElementById("reservationFormBox").classList.add("active");
 
@@ -3303,7 +3302,7 @@
         clearReservationForm(false);
 
         document.getElementById("reservationFormTitle").textContent = "相談から入庫予定を作成";
-        document.getElementById("reservationFormHelp").textContent = "相談内容をもとに仮入庫または確定入庫を作成します。お客様希望だけなら仮入庫、店舗確認済みなら確定入庫にします。";
+        document.getElementById("reservationFormHelp").textContent = "相談内容をもとに仮入庫または入庫予定を作成します。お客様希望だけなら仮入庫、店舗確認済みなら入庫予定にします。";
         document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
         document.getElementById("reservationFormBox").classList.add("active");
 
@@ -3348,7 +3347,7 @@
       selectedReservationCustomerId = "";
 
       document.getElementById("reservationFormTitle").textContent = "入庫予定を編集";
-      document.getElementById("reservationFormHelp").textContent = "仮入庫を同じ日時のまま確定する場合は、「この日時で確定入庫にする」を押してください。日付・時間・車両を変更する場合は、変更後に確認画面へ進みます。";
+      document.getElementById("reservationFormHelp").textContent = "仮入庫を同じ日時のまま入庫予定にする場合は、「この日時で入庫予定にする」を押してください。日付・時間・車両を変更する場合は、変更後に確認画面へ進みます。";
       document.getElementById("reservationSubmitButton").textContent = "変更内容を確認";
       document.getElementById("reservationFormBox").classList.add("active");
       document.getElementById("reservationFormBox").dataset.inquiryId = reservation.inquiry_id || "";
@@ -3403,7 +3402,7 @@
       });
 
       document.getElementById("reservationWorkType").value = "車検";
-      document.getElementById("reservationStatus").value = "確定入庫";
+      document.getElementById("reservationStatus").value = "入庫予定";
       document.getElementById("reservationFormBox").dataset.inquiryId = "";
 
       selectedReservationCustomerId = "";
@@ -3415,7 +3414,7 @@
       if (resetMode) {
         editingReservationId = "";
         document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";
-        document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確定した予定は「確定入庫」、お客様希望日は「仮入庫」にします。";
+        document.getElementById("reservationFormHelp").textContent = "顧客を検索して選択し、営業時間内の候補から入庫時間を選びます。店舗側で確認した予定は「入庫予定」、お客様希望日は「仮入庫」にします。";
         document.getElementById("reservationSubmitButton").textContent = "登録内容を確認";
       }
 
@@ -3939,7 +3938,7 @@
         reservationDate: normalizeDateInput(row.reservation_date || ""),
         reservationTime: time,
         workType: row.work_type || "その他",
-        status: overrideStatus || row.status || "確定入庫",
+        status: overrideStatus || row.status || "入庫予定",
         estimatedAmount: row.estimated_amount === "" || row.estimated_amount === null || row.estimated_amount === undefined ? null : Number(row.estimated_amount),
         memo: row.memo || "",
         actualSalesAmount: null,
@@ -3957,7 +3956,7 @@
         return;
       }
 
-      document.getElementById("reservationStatus").value = "確定入庫";
+      document.getElementById("reservationStatus").value = "入庫予定";
       toggleReservationCompletionFields();
 
       const payload = buildReservationPayloadFromForm();
@@ -3965,14 +3964,14 @@
 
       const body = buildReservationConfirmHtml(payload, true) + `
         <p class="muted" style="margin-bottom:0; margin-top:12px;">
-          現在の入庫日・入庫時間のまま「確定入庫」に変更します。
+          現在の入庫日・入庫時間のまま「入庫予定」に変更します。
         </p>
       `;
 
-      showConfirm("この日時で確定入庫にしますか？", body, async () => {
+      showConfirm("この日時で入庫予定にしますか？", body, async () => {
         await updateReservation(payload);
       }, {
-        okText: "確定入庫にする",
+        okText: "入庫予定にする",
         danger: false
       });
     }
@@ -3989,13 +3988,13 @@
         return;
       }
 
-      const payload = buildReservationPayloadFromReservationRow(reservation, "確定入庫");
+      const payload = buildReservationPayloadFromReservationRow(reservation, "入庫予定");
       const customerName = reservation.customer?.name || "お客様";
       const vehicleName = reservation.vehicle?.car_name || "車両未入力";
 
       const body = `
         <p class="muted" style="margin-top:0">
-          日付・時間は変更せず、仮入庫を確定入庫に変更します。
+          日付・時間は変更せず、仮入庫を入庫予定に変更します。
         </p>
         <dl>
           <dt>顧客</dt><dd>${escapeHtml(customerName)}</dd>
@@ -4003,11 +4002,11 @@
           <dt>入庫日</dt><dd>${escapeHtml(payload.reservationDate ? formatDate(payload.reservationDate) : "未入力")}</dd>
           <dt>入庫時間</dt><dd>${escapeHtml(payload.reservationTime || "未入力")}</dd>
           <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
-          <dt>状態</dt><dd>仮入庫 → 確定入庫</dd>
+          <dt>状態</dt><dd>仮入庫 → 入庫予定</dd>
         </dl>
       `;
 
-      showConfirm("この仮入庫を確定しますか？", body, async () => {
+      showConfirm("この仮入庫を入庫予定にしますか？", body, async () => {
         clearAlert();
         setLoading(true);
         try {
@@ -4015,7 +4014,7 @@
             method: "PATCH",
             body: JSON.stringify(payload)
           });
-          showOk("仮入庫を確定入庫に変更しました。");
+          showOk("仮入庫を入庫予定に変更しました。");
           await loadReservations();
         } catch (error) {
           showError(error.message);
@@ -4023,7 +4022,7 @@
           setLoading(false);
         }
       }, {
-        okText: "確定入庫にする",
+        okText: "入庫予定にする",
         danger: false
       });
     }
@@ -5831,7 +5830,8 @@
     }
 
     function badgeStatus(status) {
-      const s = status || "";
+      const rawStatus = status || "";
+      const s = rawStatus === "確定入庫" ? "入庫予定" : rawStatus;
       let cls = "badge-slate";
 
       if (s.includes("新規") || s.includes("確認") || s.includes("予約") || s.includes("予定") || s.includes("連携済み")) cls = "badge-blue";
@@ -6595,7 +6595,8 @@
     }
 
     function normalizeReservationStatus(value) {
-      const allowed = ["仮入庫", "確定入庫", "入庫予定", "入庫済み", "作業中", "作業完了", "キャンセル"];
+      if (value === "確定入庫") return "入庫予定";
+      const allowed = ["仮入庫", "入庫予定", "入庫済み", "作業中", "作業完了", "キャンセル"];
       return allowed.includes(value) ? value : "仮入庫";
     }
 
