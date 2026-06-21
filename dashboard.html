@@ -1081,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP 4-15M</p>
+            <p>LINE公式 DEMO / STEP KSH-9-3</p>
           </div>
         </div>
       </div>
@@ -1916,6 +1916,20 @@
         </section>
 
         <section id="section-settings" class="section">
+          <div class="card card-pad" style="margin-bottom:16px; border:2px solid #fed7aa; background:#fff7ed;">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">営業前DEMO準備</h3>
+                <div class="small muted" style="line-height:1.7; margin-top:6px;">
+                  営業前に押すと、顧客・車両・相談・入庫予定を今日基準で作り直します。<br>
+                  STREET HOUSE 杵築のDEMOデータだけをリセットします。
+                </div>
+              </div>
+              <button id="kshDemoResetButton" class="btn btn-orange" onclick="resetKshDemoData()">営業前DEMOを準備する</button>
+            </div>
+            <div id="kshDemoResetMessage" class="small muted" style="line-height:1.7;"></div>
+          </div>
+
           <div class="grid2">
             <div class="card card-pad">
               <h3 style="margin-top:0">曜日別の営業設定</h3>
@@ -2112,6 +2126,7 @@
 
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
+    const KSH_DEMO_RESET_WORKER_URL = "https://ksh-demo-reset.dpromstk2000.workers.dev";
     const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
 
@@ -2174,7 +2189,7 @@
       },
       settings: {
         title: "店舗設定",
-        desc: "定休日・臨時休み・営業時間を管理します。"
+        desc: "定休日・臨時休み・営業時間、営業前DEMO準備を管理します。"
       }
     };
 
@@ -2278,6 +2293,95 @@
       }
 
       return data;
+    }
+
+    function setKshDemoResetMessage(message, type = "") {
+      const box = document.getElementById("kshDemoResetMessage");
+      if (!box) return;
+      box.className = `small ${type === "error" ? "" : "muted"}`;
+      box.style.color = type === "error" ? "#991b1b" : (type === "success" ? "#166534" : "#64748b");
+      box.textContent = message || "";
+    }
+
+    async function resetKshDemoData() {
+      clearAlert();
+
+      if (!KSH_DEMO_RESET_WORKER_URL) {
+        showError("KSH_DEMO_RESET_WORKER_URL が設定されていません。");
+        return;
+      }
+
+      const ok = confirm(
+        "STREET HOUSE 杵築の営業前DEMOデータを作り直しますか？\n\n" +
+        "・顧客、車両、相談、入庫予定を今日基準で作り直します\n" +
+        "・ksh_demo_ 系テーブルだけを対象にします\n" +
+        "・現在のDEMO用テストデータはリセットされます"
+      );
+
+      if (!ok) return;
+
+      const password = prompt("DEMO準備パスワードを入力してください");
+      if (password === null) return;
+
+      const button = document.getElementById("kshDemoResetButton");
+      if (button) {
+        button.disabled = true;
+        button.textContent = "DEMO準備中...";
+      }
+
+      setLoading(true);
+      setKshDemoResetMessage("DEMOデータを準備しています...", "");
+
+      try {
+        const response = await fetch(KSH_DEMO_RESET_WORKER_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-ksh-demo-reset-secret": password.trim()
+          },
+          body: JSON.stringify({})
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result || result.ok === false) {
+          const detail = result?.error || result?.message || result?.detail || "不明なエラー";
+          throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+        }
+
+        const rpcResult = result.result || {};
+        const summary = [
+          "営業前DEMOデータを準備しました。",
+          rpcResult.customers != null ? `顧客：${rpcResult.customers}件` : "",
+          rpcResult.vehicles != null ? `車両：${rpcResult.vehicles}件` : "",
+          rpcResult.inquiries != null ? `相談：${rpcResult.inquiries}件` : "",
+          rpcResult.reservations != null ? `入庫予定：${rpcResult.reservations}件` : "",
+          rpcResult.today_reservations != null ? `本日の入庫：${rpcResult.today_reservations}件` : ""
+        ].filter(Boolean).join(" / ");
+
+        setKshDemoResetMessage(summary, "success");
+        showOk("STREET HOUSE 杵築の営業前DEMOデータを準備しました。");
+
+        await loadSettings();
+        await loadToday();
+
+        if (currentTab === "inquiries") await loadInquiries();
+        if (currentTab === "reservations") await loadReservations();
+        if (currentTab === "opportunities") await loadOpportunities();
+        if (currentTab === "followups") await loadFollowupCandidates();
+        if (currentTab === "ownerSales") await loadOpportunities();
+        if (currentTab === "customers") await loadCustomers();
+
+      } catch (error) {
+        setKshDemoResetMessage("DEMO準備に失敗しました。" + (error.message ? " " + error.message : ""), "error");
+        showError("DEMO準備に失敗しました。\n" + error.message);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = "営業前DEMOを準備する";
+        }
+        setLoading(false);
+      }
     }
 
     async function loadToday() {
