@@ -227,6 +227,38 @@
       min-height: 104px;
     }
 
+    .summary-card.action-card {
+      cursor: pointer;
+      position: relative;
+      transition: transform .08s ease, box-shadow .16s ease, border-color .16s ease;
+    }
+
+    .summary-card.action-card:hover {
+      transform: translateY(-1px);
+      border-color: #cbd5e1;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.11);
+    }
+
+    .summary-card.action-card:active {
+      transform: translateY(1px);
+    }
+
+    .summary-card.action-card:focus {
+      outline: 3px solid rgba(30, 58, 138, 0.18);
+      outline-offset: 2px;
+    }
+
+    .summary-card .tap-hint {
+      display: inline-flex;
+      margin-top: 9px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #1e3a8a;
+      font-size: 11px;
+      font-weight: 950;
+    }
+
     .summary-card span {
       display: block;
       color: var(--muted);
@@ -263,6 +295,26 @@
       border-radius: 20px;
       box-shadow: var(--shadow);
       overflow: hidden;
+    }
+
+    .section-anchor {
+      scroll-margin-top: 155px;
+    }
+
+    .priority-panel {
+      border: 2px solid #fed7aa;
+      background: #fffaf5;
+    }
+
+    .panel.panel-flash,
+    .work-card.panel-flash {
+      animation: panelFlash 1.05s ease;
+    }
+
+    @keyframes panelFlash {
+      0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.48); }
+      55% { box-shadow: 0 0 0 8px rgba(234, 88, 12, 0.12); }
+      100% { box-shadow: var(--shadow); }
     }
 
     .panel-head {
@@ -749,30 +801,45 @@
         </div>
 
         <div class="summary-grid">
-          <div class="summary-card">
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayReservationPanel')" onkeydown="summaryCardKey(event, 'todayReservationPanel')">
             <span>本日の入庫</span>
             <strong id="countTodayReservations">-</strong>
             <small>今日の来店・作業予定</small>
+            <em class="tap-hint">押すと表示</em>
           </div>
-          <div class="summary-card">
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('provisionalPanel')" onkeydown="summaryCardKey(event, 'provisionalPanel')">
             <span>仮入庫確認</span>
             <strong id="countProvisional">-</strong>
             <small>日時確認が必要</small>
+            <em class="tap-hint">押すと表示</em>
           </div>
-          <div class="summary-card">
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayTaskPanel')" onkeydown="summaryCardKey(event, 'todayTaskPanel')">
             <span>未対応相談</span>
             <strong id="countOpenTasks">-</strong>
             <small>返信・電話が必要</small>
+            <em class="tap-hint">押すと表示</em>
           </div>
-          <div class="summary-card">
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayReservationPanel')" onkeydown="summaryCardKey(event, 'todayReservationPanel')">
             <span>作業中</span>
             <strong id="countWorking">-</strong>
             <small>現場で進行中</small>
+            <em class="tap-hint">押すと表示</em>
           </div>
         </div>
 
+        <div id="provisionalPanel" class="panel priority-panel section-anchor" style="margin-bottom:16px;">
+          <div class="panel-head">
+            <div>
+              <h3>仮入庫確認</h3>
+              <p>お客様の希望日時です。問題なければ「この日時で入庫予定にする」を押します。</p>
+            </div>
+            <button class="btn btn-orange" onclick="switchTab('reservations'); setReservationFilter('provisional')">仮入庫だけ見る</button>
+          </div>
+          <div id="provisionalReservationList" class="panel-body card-list"></div>
+        </div>
+
         <div class="grid2">
-          <div class="panel">
+          <div id="todayReservationPanel" class="panel section-anchor">
             <div class="panel-head">
               <div>
                 <h3>本日の入庫・作業</h3>
@@ -782,7 +849,7 @@
             <div id="todayReservationList" class="panel-body card-list"></div>
           </div>
 
-          <div class="panel">
+          <div id="todayTaskPanel" class="panel section-anchor">
             <div class="panel-head">
               <div>
                 <h3>今日やること</h3>
@@ -914,6 +981,7 @@
 
     let dashboardCache = null;
     let todayReservationsCache = [];
+    let provisionalReservationsCache = [];
     let reservationsCache = [];
     let todayTasksCache = [];
     let customersCache = [];
@@ -966,6 +1034,25 @@
       if (currentTab === "today") loadToday();
       if (currentTab === "reservations") loadReservations();
       if (currentTab === "customers") searchCustomers();
+    }
+
+    function summaryCardKey(event, targetId) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        jumpToday(targetId);
+      }
+    }
+
+    function jumpToday(targetId) {
+      if (currentTab !== "today") switchTab("today");
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.remove("panel-flash");
+        void el.offsetWidth;
+        el.classList.add("panel-flash");
+      }, 80);
     }
 
     function toggleTokenBox() {
@@ -1028,13 +1115,25 @@
 
         const today = dateYmd(new Date());
         const upcoming = data.upcomingReservations || data.todayReservations || [];
-        todayReservationsCache = (data.todayReservations || upcoming.filter(row => normalizeDateInput(row.reservation_date) === today))
-          .filter(row => !isHiddenReservation(row));
+        const visibleUpcoming = upcoming.filter(row => !isHiddenReservation(row));
+        const provisionalLimit = dateYmd(addDays(new Date(), 14));
 
-        reservationsCache = upcoming.filter(row => !isHiddenReservation(row));
-        todayTasksCache = buildTodayTasks(data);
+        reservationsCache = visibleUpcoming;
+        provisionalReservationsCache = uniqueReservations(
+          visibleUpcoming.filter(row => {
+            const date = normalizeDateInput(row.reservation_date || "");
+            return isProvisionalReservationStatus(row.status) && date && date >= today && date <= provisionalLimit;
+          })
+        ).sort(sortReservations);
+
+        todayReservationsCache = (data.todayReservations || visibleUpcoming.filter(row => normalizeDateInput(row.reservation_date) === today))
+          .filter(row => !isHiddenReservation(row))
+          .filter(row => !isProvisionalReservationStatus(row.status));
+
+        todayTasksCache = buildTodayTasks(data).filter(task => task.type !== "provisional_reservation");
 
         renderTodaySummary();
+        renderProvisionalReservations();
         renderTodayReservations();
         renderTodayTasks();
       } catch (error) {
@@ -1045,15 +1144,26 @@
     }
 
     function renderTodaySummary() {
-      const provisionalCount = todayTasksCache.filter(task => task.type === "provisional_reservation").length +
-        reservationsCache.filter(row => isProvisionalReservationStatus(row.status)).length;
-      const openTaskCount = todayTasksCache.filter(task => task.type !== "provisional_reservation").length;
+      const openTaskCount = todayTasksCache.length;
       const workingCount = reservationsCache.filter(row => String(row.status || "").includes("作業中") || String(row.status || "").includes("入庫済")).length;
 
       setText("countTodayReservations", `${todayReservationsCache.length}件`);
-      setText("countProvisional", `${provisionalCount}件`);
+      setText("countProvisional", `${provisionalReservationsCache.length}件`);
       setText("countOpenTasks", `${openTaskCount}件`);
       setText("countWorking", `${workingCount}件`);
+    }
+
+    function renderProvisionalReservations() {
+      const box = document.getElementById("provisionalReservationList");
+      if (!box) return;
+
+      const rows = provisionalReservationsCache.slice().sort(sortReservations);
+      if (!rows.length) {
+        box.innerHTML = `<div class="empty">現在、確認が必要な仮入庫はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = rows.map(row => renderReservationCard(row, "provisional")).join("");
     }
 
     function renderTodayReservations() {
@@ -1073,7 +1183,7 @@
       try {
         const today = dateYmd(new Date());
         const from = today;
-        const to = dateYmd(addDays(new Date(), reservationFilter === "active" ? 30 : 7));
+        const to = dateYmd(addDays(new Date(), (reservationFilter === "active" || reservationFilter === "provisional") ? 30 : 7));
         const data = await api(`/api/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
         reservationsCache = (data.reservations || []).filter(row => !isHiddenReservation(row));
         renderReservations();
@@ -1120,7 +1230,7 @@
       return `
         <article class="work-card ${cardClass}">
           <div class="work-head">
-            <div class="time-badge">${escapeHtml(time)}<small>${escapeHtml(mode === "today" ? "本日" : formatDateShort(date))}</small></div>
+            <div class="time-badge">${escapeHtml(time)}<small>${escapeHtml(mode === "today" ? "本日" : (mode === "provisional" ? "希望日" : formatDateShort(date)))}</small></div>
             <div class="work-title">
               <div class="customer-name">${escapeHtml(customerName)} 様</div>
               <div class="work-sub">${escapeHtml(vehicleText)} / ${escapeHtml(work)}</div>
@@ -1139,7 +1249,7 @@
           <div class="memo-box"><strong>メモ</strong>${escapeHtml(memo || "メモなし")}</div>
 
           <div class="actions">
-            ${isProvisionalReservationStatus(status) ? `<button class="btn btn-green" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫予定')">この日時で確定</button>` : ""}
+            ${isProvisionalReservationStatus(status) ? `<button class="btn btn-green" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫予定')">この日時で入庫予定にする</button>` : ""}
             ${canShowStatusButton(status, "入庫済み") ? `<button class="btn btn-primary" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫済み')">入庫済み</button>` : ""}
             ${canShowStatusButton(status, "作業中") ? `<button class="btn btn-purple" onclick="changeReservationStatus('${escapeAttr(row.id)}','作業中')">作業中</button>` : ""}
             ${!isCompletedReservation(status) ? `<button class="btn btn-orange" onclick="openCompleteModal('${escapeAttr(row.id)}')">作業完了</button>` : ""}
@@ -1758,7 +1868,16 @@
     }
 
     function findReservation(id) {
-      return [...todayReservationsCache, ...reservationsCache].find(row => String(row.id) === String(id)) || null;
+      return [...todayReservationsCache, ...provisionalReservationsCache, ...reservationsCache].find(row => String(row.id) === String(id)) || null;
+    }
+
+    function uniqueReservations(rows) {
+      const map = new Map();
+      (rows || []).forEach(row => {
+        const key = String(row.id || [row.customer_id, row.vehicle_id, row.reservation_date, row.reservation_time, row.work_type].join("_"));
+        if (!map.has(key)) map.set(key, row);
+      });
+      return Array.from(map.values());
     }
 
     function reservationMatchesFilter(row, filter) {
