@@ -222,6 +222,37 @@
       gap: 12px;
     }
 
+    .shortcut-kpi {
+      cursor: pointer;
+      transition: transform 0.08s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+      user-select: none;
+    }
+
+    .shortcut-kpi:hover {
+      transform: translateY(-1px);
+      border-color: #bfdbfe;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+    }
+
+    .shortcut-kpi:active {
+      transform: translateY(0);
+    }
+
+    .shortcut-kpi:focus-visible {
+      outline: 3px solid rgba(30, 58, 138, 0.24);
+      outline-offset: 3px;
+    }
+
+    .shortcut-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      color: #1e3a8a;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
     .kpi span {
       color: var(--muted);
       font-size: 12px;
@@ -1136,11 +1167,12 @@
 
         <section id="section-today" class="section active">
           <div class="grid4">
-            <div class="card kpi">
+            <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="今日やること一覧へ移動" aria-label="今日やること一覧へ移動" onclick="openDashboardShortcut('todayTasks')" onkeydown="handleShortcutCardKey(event, 'todayTasks')">
               <div>
                 <span>今日やること</span>
                 <strong id="kpiTodayTasks">-</strong>
                 <small>対応推奨の合計</small>
+                <em class="shortcut-hint">押すと一覧へ</em>
               </div>
               <div class="icon bg-red">✅</div>
             </div>
@@ -1163,11 +1195,12 @@
               <div class="icon bg-blue">🚗</div>
             </div>
 
-            <div class="card kpi">
+            <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="未対応相談一覧へ移動" aria-label="未対応相談一覧へ移動" onclick="openDashboardShortcut('openInquiries')" onkeydown="handleShortcutCardKey(event, 'openInquiries')">
               <div>
                 <span>未対応相談</span>
                 <strong id="kpiOpenInquiries">-</strong>
                 <small>新規・確認中・未返信</small>
+                <em class="shortcut-hint">押すと相談一覧へ</em>
               </div>
               <div class="icon bg-purple">📝</div>
             </div>
@@ -1183,38 +1216,42 @@
               </div>
             </div>
             <div class="grid4">
-              <div class="card kpi">
+              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="未対応相談だけ確認" aria-label="未対応相談だけ確認" onclick="openDashboardShortcut('openInquiries')" onkeydown="handleShortcutCardKey(event, 'openInquiries')">
                 <div>
                   <span>未対応相談</span>
                   <strong id="opOpenInquiries">-</strong>
                   <small>新規・確認中・未返信</small>
+                  <em class="shortcut-hint">押すと相談一覧へ</em>
                 </div>
                 <div class="icon bg-red">📝</div>
               </div>
 
-              <div class="card kpi">
+              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="仮入庫のみ確認" aria-label="仮入庫のみ確認" onclick="openDashboardShortcut('provisionalReservations')" onkeydown="handleShortcutCardKey(event, 'provisionalReservations')">
                 <div>
                   <span>仮入庫</span>
                   <strong id="opProvisionalReservations">-</strong>
                   <small>希望日あり・店舗確認待ち</small>
+                  <em class="shortcut-hint">押すと仮入庫一覧へ</em>
                 </div>
                 <div class="icon bg-orange">🟡</div>
               </div>
 
-              <div class="card kpi">
+              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="入庫予定だけ確認" aria-label="入庫予定だけ確認" onclick="openDashboardShortcut('confirmedReservations')" onkeydown="handleShortcutCardKey(event, 'confirmedReservations')">
                 <div>
                   <span>入庫予定</span>
                   <strong id="opConfirmedReservations">-</strong>
                   <small>30日以内の来店予定</small>
+                  <em class="shortcut-hint">押すと入庫予定一覧へ</em>
                 </div>
                 <div class="icon bg-green">📅</div>
               </div>
 
-              <div class="card kpi">
+              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="再連絡予定だけ確認" aria-label="再連絡予定だけ確認" onclick="openDashboardShortcut('recontact')" onkeydown="handleShortcutCardKey(event, 'recontact')">
                 <div>
                   <span>再連絡予定</span>
                   <strong id="opRecontactScheduled">-</strong>
                   <small>後日もう一度連絡</small>
+                  <em class="shortcut-hint">押すと再連絡一覧へ</em>
                 </div>
                 <div class="icon bg-blue">🔁</div>
               </div>
@@ -2240,6 +2277,83 @@
       const ipadUrl = new URL("owner-ipad.html", currentUrl);
       ipadUrl.searchParams.set("return", currentUrl.href);
       window.location.href = ipadUrl.toString();
+    }
+
+    function handleShortcutCardKey(event, type) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openDashboardShortcut(type);
+    }
+
+    function setDashboardShortcutDateRange(days = 30) {
+      const fromEl = document.getElementById("reservationFrom");
+      const toEl = document.getElementById("reservationTo");
+      if (fromEl) fromEl.value = dateYmd(new Date());
+      if (toEl) toEl.value = dateYmd(addDays(new Date(), days));
+    }
+
+    function scrollDashboardTarget(id) {
+      setTimeout(() => {
+        const target = document.getElementById(id);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 450);
+    }
+
+    function openDashboardShortcut(type) {
+      clearAlert();
+
+      if (type === "todayTasks") {
+        switchTab("today");
+        scrollDashboardTarget("todayTaskList");
+        return;
+      }
+
+      if (type === "openInquiries") {
+        const filter = document.getElementById("inquiryStatusFilter");
+        if (filter) filter.value = "active";
+        switchTab("inquiries");
+        showOk("未対応・対応中の相談一覧を表示します。");
+        scrollDashboardTarget("inquiryFilterSummary");
+        return;
+      }
+
+      if (type === "recontact") {
+        const filter = document.getElementById("inquiryStatusFilter");
+        if (filter) filter.value = "recontact";
+        switchTab("inquiries");
+        showOk("再連絡予定の相談を表示します。今日やること内の再連絡もあわせて確認してください。");
+        scrollDashboardTarget("inquiryFilterSummary");
+        return;
+      }
+
+      if (type === "provisionalReservations") {
+        setDashboardShortcutDateRange(30);
+        const filter = document.getElementById("reservationListFilter");
+        if (filter) filter.value = "provisional";
+        switchTab("reservations");
+        showOk("仮入庫のみ表示します。確認できた案件は「入庫予定にする」を押してください。");
+        scrollDashboardTarget("reservationFilterSummary");
+        return;
+      }
+
+      if (type === "confirmedReservations") {
+        setDashboardShortcutDateRange(30);
+        const filter = document.getElementById("reservationListFilter");
+        if (filter) filter.value = "confirmed";
+        switchTab("reservations");
+        showOk("入庫予定・入庫済み・作業中の案件を表示します。");
+        scrollDashboardTarget("reservationFilterSummary");
+        return;
+      }
+
+      if (type === "todayReservations") {
+        setDashboardShortcutDateRange(7);
+        const filter = document.getElementById("reservationListFilter");
+        if (filter) filter.value = "today";
+        switchTab("reservations");
+        showOk("本日の入庫予定を表示します。");
+        scrollDashboardTarget("reservationFilterSummary");
+      }
     }
 
     function toggleTokenBox() {
