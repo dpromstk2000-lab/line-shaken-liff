@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>STREET HOUSE 杵築｜オーナーダッシュボード</title>
+  <title>STREET HOUSE 杵築｜オーナーダッシュボード STEP KSH-IPAD-1</title>
 
   <style>
     :root {
@@ -1081,7 +1081,7 @@
           <div class="logo">SH</div>
           <div>
             <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP KSH-9-3</p>
+            <p>LINE公式 DEMO / STEP KSH-IPAD-1</p>
           </div>
         </div>
       </div>
@@ -1100,7 +1100,7 @@
       <div class="side-footer">
         毎日見る場所：<br>
         ✅ 今日やること<br><br>
-        顧客検索 → 入庫予定作成<br>
+        現場作業はiPad用画面へ<br>
         売上情報はオーナー確認へ
       </div>
     </aside>
@@ -1113,6 +1113,7 @@
           <p id="pageDesc">今日対応すべき相談・車検営業・LINEチャット候補をまとめます。</p>
         </div>
         <div class="top-actions">
+          <button class="btn btn-orange" onclick="openIpadDashboard()">iPad用画面</button>
           <button class="btn btn-slate" onclick="toggleTokenBox()">認証設定</button>
           <button class="btn btn-primary" onclick="refreshCurrentTab()">更新</button>
         </div>
@@ -2232,6 +2233,13 @@
 
     function refreshCurrentTab() {
       switchTab(currentTab);
+    }
+
+    function openIpadDashboard() {
+      const currentUrl = new URL(window.location.href);
+      const ipadUrl = new URL("owner-ipad.html", currentUrl);
+      ipadUrl.searchParams.set("return", currentUrl.href);
+      window.location.href = ipadUrl.toString();
     }
 
     function toggleTokenBox() {
