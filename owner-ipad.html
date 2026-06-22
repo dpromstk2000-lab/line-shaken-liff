@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>STREET HOUSE 杵築｜現場用iPad画面</title>
+
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --dark: #111827;
+      --blue: #1e3a8a;
+      --green: #16a34a;
+      --red: #dc2626;
+      --orange: #ea580c;
+      --amber: #f59e0b;
+      --purple: #7c3aed;
+      --slate: #475569;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", Arial, sans-serif;
+      line-height: 1.55;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font-family: inherit;
+      font-size: 16px;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .app {
+      min-height: 100vh;
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 6px 18px rgba(15,23,42,0.05);
+    }
+
+    .header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 14px 18px 12px;
+    }
+
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #e67e22, #8e4409);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      letter-spacing: 1px;
+      flex: 0 0 auto;
+      box-shadow: 0 10px 24px rgba(230,126,34,0.24);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
+
+    .brand p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .tab-btn {
+      min-height: 56px;
+      border-radius: 16px;
+      background: #eef2f7;
+      color: #334155;
+      font-weight: 900;
+      box-shadow: inset 0 0 0 1px #dbe3ee;
+    }
+
+    .tab-btn.active {
+      background: var(--dark);
+      color: #ffffff;
+      box-shadow: none;
+    }
+
+    .main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px 18px 42px;
+    }
+
+    .section { display: none; }
+    .section.active {
+      display: block;
+      animation: fadeIn .16s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .btn {
+      min-height: 48px;
+      border-radius: 14px;
+      padding: 11px 15px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .btn-small {
+      min-height: 40px;
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-size: 14px;
+    }
+
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-purple { background: var(--purple); color: #fff; }
+    .btn-dark { background: var(--dark); color: #fff; }
+    .btn-slate { background: #e2e8f0; color: #334155; }
+    .btn-ghost { background: #fff; color: #334155; border: 1px solid #d1d5db; }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .toolbar h2,
+    .toolbar h3 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .toolbar p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .summary-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      min-height: 104px;
+    }
+
+    .summary-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      margin-bottom: 5px;
+    }
+
+    .summary-card strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .summary-card small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 18px 18px 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .panel-head p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .panel-body {
+      padding: 16px 18px 18px;
+    }
+
+    .card-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .work-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 7px solid var(--blue);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 6px 16px rgba(15,23,42,0.05);
+    }
+
+    .work-card.status-provisional { border-left-color: var(--orange); }
+    .work-card.status-confirmed { border-left-color: var(--green); }
+    .work-card.status-working { border-left-color: var(--purple); }
+    .work-card.status-alert { border-left-color: var(--red); }
+    .work-card.status-done { border-left-color: var(--slate); opacity: .78; }
+
+    .work-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .time-badge {
+      min-width: 86px;
+      text-align: center;
+      border-radius: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      font-size: 21px;
+      font-weight: 950;
+      line-height: 1.05;
+    }
+
+    .time-badge small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 4px;
+      font-weight: 900;
+    }
+
+    .work-title {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .customer-name {
+      font-size: 22px;
+      font-weight: 950;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .work-sub {
+      margin-top: 4px;
+      color: #334155;
+      font-size: 15px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .badge-blue { background:#dbeafe; color:#1d4ed8; }
+    .badge-green { background:#dcfce7; color:#15803d; }
+    .badge-red { background:#fee2e2; color:#b91c1c; }
+    .badge-orange { background:#ffedd5; color:#c2410c; }
+    .badge-purple { background:#ede9fe; color:#6d28d9; }
+    .badge-slate { background:#e2e8f0; color:#334155; }
+    .badge-amber { background:#fef3c7; color:#92400e; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .detail-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 10px 11px;
+      min-width: 0;
+    }
+
+    .detail-item dt {
+      margin: 0 0 4px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .detail-item dd {
+      margin: 0;
+      color: #0f172a;
+      font-size: 15px;
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-wide { grid-column: 1 / -1; }
+
+    .memo-box,
+    .message-box {
+      margin-top: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      color: #334155;
+      font-size: 14px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .memo-box strong,
+    .message-box strong {
+      display: block;
+      color: #111827;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .actions .btn {
+      width: 100%;
+      min-height: 52px;
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    .filter-btn {
+      min-height: 46px;
+      border-radius: 999px;
+      padding: 9px 14px;
+      background: #fff;
+      color: #334155;
+      border: 1px solid #d1d5db;
+      font-weight: 900;
+    }
+
+    .filter-btn.active {
+      background: var(--dark);
+      color: #fff;
+      border-color: var(--dark);
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 14px;
+      padding: 13px 13px;
+      background: #fff;
+      color: #111827;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 128px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(30,58,138,.12);
+    }
+
+    .search-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .search-row input { flex: 1; }
+    .search-row button { flex: 0 0 auto; }
+
+    .customer-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .customer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .vehicle-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .vehicle-mini {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 10px;
+      font-weight: 800;
+    }
+
+    .empty {
+      background: #fff;
+      border: 1px dashed #cbd5e1;
+      border-radius: 18px;
+      padding: 20px;
+      color: var(--muted);
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .alert {
+      display: none;
+      position: fixed;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      z-index: 100;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 14px 16px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1.5;
+      box-shadow: 0 18px 45px rgba(15,23,42,.22);
+      white-space: pre-wrap;
+    }
+
+    .alert.show { display: block; }
+    .alert-ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .loading-cover {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: rgba(255,255,255,.62);
+      align-items: center;
+      justify-content: center;
+      color: #111827;
+      font-weight: 950;
+      font-size: 18px;
+    }
+
+    .loading-cover.active { display: flex; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      background: rgba(15,23,42,.62);
+      padding: 22px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      width: min(720px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #fff;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 70px rgba(0,0,0,.28);
+    }
+
+    .modal-head {
+      padding: 20px 20px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .modal-body {
+      padding: 18px 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 14px 20px 20px;
+      border-top: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .form-field label {
+      display: block;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 950;
+      margin-bottom: 5px;
+    }
+
+    .form-full { grid-column: 1 / -1; }
+
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+    .strong { font-weight: 900; }
+
+    .token-box {
+      display: none;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .token-box.active { display: block; }
+
+    .token-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .token-row input { flex: 1; min-width: 260px; }
+
+    @media (max-width: 920px) {
+      .grid2 { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .header-inner,
+      .main { padding-left: 12px; padding-right: 12px; }
+      .top-row { display: block; }
+      .header-actions { justify-content: flex-start; margin-top: 12px; }
+      .tabs { gap: 7px; }
+      .tab-btn { min-height: 50px; font-size: 14px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .work-head { display: block; }
+      .time-badge { display: inline-block; margin-bottom: 10px; }
+      .detail-grid,
+      .form-grid { grid-template-columns: 1fr; }
+      .detail-wide,
+      .form-full { grid-column: auto; }
+      .actions { grid-template-columns: 1fr; }
+      .search-row { display: block; }
+      .search-row button { width: 100%; margin-top: 10px; }
+      .customer-head { display: block; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-inner">
+        <div class="top-row">
+          <div class="brand">
+            <div class="logo">SH</div>
+            <div>
+              <h1>STREET HOUSE 杵築</h1>
+              <p id="todayLabel">現場用iPad画面</p>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <button class="btn btn-slate" onclick="toggleTokenBox()">認証</button>
+            <button class="btn btn-primary" onclick="refreshCurrent()">更新</button>
+            <button class="btn btn-dark" onclick="goBackToPc()">PC管理画面へ戻る</button>
+          </div>
+        </div>
+
+        <nav class="tabs">
+          <button id="tab-today" class="tab-btn active" onclick="switchTab('today')">今日</button>
+          <button id="tab-reservations" class="tab-btn" onclick="switchTab('reservations')">入庫予定</button>
+          <button id="tab-customers" class="tab-btn" onclick="switchTab('customers')">顧客検索</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="main">
+      <div id="tokenBox" class="token-box">
+        <div class="strong">ダッシュボード認証トークン</div>
+        <div class="small muted">PC版と同じトークンを使います。通常は変更不要です。</div>
+        <div class="token-row">
+          <input id="tokenInput" type="text" placeholder="DASHBOARD_TOKEN" />
+          <button class="btn btn-primary" onclick="saveToken()">保存</button>
+          <button class="btn btn-slate" onclick="resetToken()">初期値</button>
+        </div>
+      </div>
+
+      <section id="section-today" class="section active">
+        <div class="toolbar">
+          <div>
+            <h2>今日の現場ボード</h2>
+            <p>本日の入庫・仮入庫確認・未対応相談だけを表示します。売上は表示しません。</p>
+          </div>
+          <button class="btn btn-primary" onclick="loadToday()">今日を更新</button>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span>本日の入庫</span>
+            <strong id="countTodayReservations">-</strong>
+            <small>今日の来店・作業予定</small>
+          </div>
+          <div class="summary-card">
+            <span>仮入庫確認</span>
+            <strong id="countProvisional">-</strong>
+            <small>日時確認が必要</small>
+          </div>
+          <div class="summary-card">
+            <span>未対応相談</span>
+            <strong id="countOpenTasks">-</strong>
+            <small>返信・電話が必要</small>
+          </div>
+          <div class="summary-card">
+            <span>作業中</span>
+            <strong id="countWorking">-</strong>
+            <small>現場で進行中</small>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>本日の入庫・作業</h3>
+                <p>状態変更とメモをここで行います。</p>
+              </div>
+            </div>
+            <div id="todayReservationList" class="panel-body card-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>今日やること</h3>
+                <p>新規相談・仮入庫・再連絡・LINE候補。</p>
+              </div>
+            </div>
+            <div id="todayTaskList" class="panel-body card-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-reservations" class="section">
+        <div class="toolbar">
+          <div>
+            <h2>入庫予定</h2>
+            <p>現場では対応中のみをカードで確認します。細かい登録・売上確認はPC版で行います。</p>
+          </div>
+          <button class="btn btn-primary" onclick="loadReservations()">入庫予定を更新</button>
+        </div>
+
+        <div class="filter-row">
+          <button id="filter-today" class="filter-btn active" onclick="setReservationFilter('today')">本日</button>
+          <button id="filter-next7" class="filter-btn" onclick="setReservationFilter('next7')">今後7日</button>
+          <button id="filter-provisional" class="filter-btn" onclick="setReservationFilter('provisional')">仮入庫</button>
+          <button id="filter-active" class="filter-btn" onclick="setReservationFilter('active')">対応中すべて</button>
+        </div>
+
+        <div id="reservationList" class="card-list"></div>
+      </section>
+
+      <section id="section-customers" class="section">
+        <div class="toolbar">
+          <div>
+            <h2>顧客検索</h2>
+            <p>名前・電話番号・車種・ナンバー下4桁で検索できます。</p>
+          </div>
+        </div>
+
+        <div class="search-box">
+          <div class="search-row">
+            <input id="customerKeyword" type="search" placeholder="例：山田、090、ジムニー、1234" onkeydown="if(event.key==='Enter'){ searchCustomers(); }" />
+            <button class="btn btn-primary" onclick="searchCustomers()">検索</button>
+          </div>
+        </div>
+
+        <div id="customerList" class="card-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="loadingCover" class="loading-cover">読み込み中...</div>
+  <div id="alertBox" class="alert"></div>
+
+  <div id="memoModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="memoModalTitle">メモ編集</h3>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label>現場メモ</label>
+          <textarea id="memoInput" placeholder="例：代車希望、部品待ち、タイヤ確認、お客様へ伝えることなど"></textarea>
+        </div>
+        <div style="height:12px"></div>
+        <div class="filter-row">
+          <button class="filter-btn" onclick="appendMemo('代車希望')">代車希望</button>
+          <button class="filter-btn" onclick="appendMemo('車検証確認')">車検証確認</button>
+          <button class="filter-btn" onclick="appendMemo('部品待ち')">部品待ち</button>
+          <button class="filter-btn" onclick="appendMemo('タイヤ交換提案')">タイヤ交換提案</button>
+          <button class="filter-btn" onclick="appendMemo('オイル交換案内')">オイル交換案内</button>
+          <button class="filter-btn" onclick="appendMemo('後日連絡')">後日連絡</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-slate" onclick="closeMemoModal()">閉じる</button>
+        <button class="btn btn-green" onclick="saveMemoModal()">メモ保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="completeModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>作業完了にする</h3>
+      </div>
+      <div class="modal-body">
+        <div class="small muted" style="margin-bottom:12px; font-weight:800;">
+          iPad版では売上金額は入力しません。金額確認はPC版の「オーナー確認」で行います。
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>作業完了日</label>
+            <input id="completeDateInput" type="date" />
+          </div>
+          <div class="form-field">
+            <label>次回オイル交換目安</label>
+            <input id="nextOilDateInput" type="date" />
+          </div>
+          <div class="form-field">
+            <label>次回車検年月</label>
+            <input id="nextShakenMonthInput" type="month" />
+          </div>
+          <div class="form-field form-full">
+            <label>作業完了メモ</label>
+            <textarea id="completionMemoInput" placeholder="例：車検完了。ブレーキ残量少なめ。次回点検時に確認。"></textarea>
+          </div>
+          <div class="form-field form-full">
+            <label>次回提案メモ</label>
+            <textarea id="nextProposalMemoInput" placeholder="例：半年後にオイル交換案内。次回車検時にタイヤ交換提案。"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-slate" onclick="closeCompleteModal()">閉じる</button>
+        <button class="btn btn-green" onclick="saveCompleteModal()">作業完了にする</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
+    const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
+    const LINE_MANAGER_URL = "https://manager.line.biz/";
+
+    let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
+    let currentTab = "today";
+    let reservationFilter = "today";
+    let returnUrl = "dashboard.html";
+
+    let dashboardCache = null;
+    let todayReservationsCache = [];
+    let reservationsCache = [];
+    let todayTasksCache = [];
+    let customersCache = [];
+    let followupActionsCache = [];
+
+    let editingMemoReservationId = "";
+    let completingReservationId = "";
+
+    window.addEventListener("load", async () => {
+      setupReturnUrl();
+      document.getElementById("tokenInput").value = dashboardToken;
+      document.getElementById("todayLabel").textContent = `${formatDate(dateYmd(new Date()))}｜現場用iPad画面`;
+      document.getElementById("completeDateInput").value = dateYmd(new Date());
+      await loadToday();
+    });
+
+    function setupReturnUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get("return") || "";
+      if (!raw) {
+        returnUrl = "dashboard.html";
+        return;
+      }
+
+      try {
+        const url = new URL(raw, window.location.href);
+        returnUrl = url.href;
+      } catch {
+        returnUrl = "dashboard.html";
+      }
+    }
+
+    function goBackToPc() {
+      window.location.href = returnUrl || "dashboard.html";
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll(".section").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+      document.getElementById(`section-${tab}`).classList.add("active");
+      document.getElementById(`tab-${tab}`).classList.add("active");
+
+      if (tab === "today") loadToday();
+      if (tab === "reservations") loadReservations();
+      if (tab === "customers") renderCustomers(customersCache);
+    }
+
+    function refreshCurrent() {
+      if (currentTab === "today") loadToday();
+      if (currentTab === "reservations") loadReservations();
+      if (currentTab === "customers") searchCustomers();
+    }
+
+    function toggleTokenBox() {
+      document.getElementById("tokenBox").classList.toggle("active");
+    }
+
+    function saveToken() {
+      dashboardToken = document.getElementById("tokenInput").value.trim() || DEFAULT_DASHBOARD_TOKEN;
+      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      showOk("認証トークンを保存しました。");
+    }
+
+    function resetToken() {
+      dashboardToken = DEFAULT_DASHBOARD_TOKEN;
+      document.getElementById("tokenInput").value = dashboardToken;
+      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      showOk("認証トークンを初期値に戻しました。");
+    }
+
+    async function api(path, options = {}) {
+      const url = `${WORKER_API_BASE}${path}`;
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Dashboard-Token": dashboardToken,
+        ...(options.headers || {})
+      };
+
+      let response;
+      try {
+        response = await fetch(url, { ...options, headers });
+      } catch (error) {
+        throw new Error(
+          "APIに接続できませんでした。\n\n" +
+          "Cloudflare WorkerがDeployされているか確認してください。\n" +
+          `確認URL：${WORKER_API_BASE}/health`
+        );
+      }
+
+      const text = await response.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { ok: false, message: text };
+      }
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.message || `API error: ${response.status}`);
+      }
+
+      return data;
+    }
+
+    async function loadToday() {
+      setLoading(true);
+      try {
+        const data = await api("/api/dashboard");
+        dashboardCache = data;
+        followupActionsCache = data.followupActions || [];
+
+        const today = dateYmd(new Date());
+        const upcoming = data.upcomingReservations || data.todayReservations || [];
+        todayReservationsCache = (data.todayReservations || upcoming.filter(row => normalizeDateInput(row.reservation_date) === today))
+          .filter(row => !isHiddenReservation(row));
+
+        reservationsCache = upcoming.filter(row => !isHiddenReservation(row));
+        todayTasksCache = buildTodayTasks(data);
+
+        renderTodaySummary();
+        renderTodayReservations();
+        renderTodayTasks();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderTodaySummary() {
+      const provisionalCount = todayTasksCache.filter(task => task.type === "provisional_reservation").length +
+        reservationsCache.filter(row => isProvisionalReservationStatus(row.status)).length;
+      const openTaskCount = todayTasksCache.filter(task => task.type !== "provisional_reservation").length;
+      const workingCount = reservationsCache.filter(row => String(row.status || "").includes("作業中") || String(row.status || "").includes("入庫済")).length;
+
+      setText("countTodayReservations", `${todayReservationsCache.length}件`);
+      setText("countProvisional", `${provisionalCount}件`);
+      setText("countOpenTasks", `${openTaskCount}件`);
+      setText("countWorking", `${workingCount}件`);
+    }
+
+    function renderTodayReservations() {
+      const box = document.getElementById("todayReservationList");
+      const rows = todayReservationsCache.slice().sort(sortReservations);
+
+      if (!rows.length) {
+        box.innerHTML = `<div class="empty">本日の入庫予定はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = rows.map(row => renderReservationCard(row, "today")).join("");
+    }
+
+    async function loadReservations() {
+      setLoading(true);
+      try {
+        const today = dateYmd(new Date());
+        const from = today;
+        const to = dateYmd(addDays(new Date(), reservationFilter === "active" ? 30 : 7));
+        const data = await api(`/api/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+        reservationsCache = (data.reservations || []).filter(row => !isHiddenReservation(row));
+        renderReservations();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function setReservationFilter(filter) {
+      reservationFilter = filter;
+      document.querySelectorAll(".filter-btn[id^='filter-']").forEach(el => el.classList.remove("active"));
+      const btn = document.getElementById(`filter-${filter}`);
+      if (btn) btn.classList.add("active");
+      loadReservations();
+    }
+
+    function renderReservations() {
+      const box = document.getElementById("reservationList");
+      const visible = reservationsCache.filter(row => reservationMatchesFilter(row, reservationFilter)).sort(sortReservations);
+
+      if (!visible.length) {
+        box.innerHTML = `<div class="empty">この条件の入庫予定はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = visible.map(row => renderReservationCard(row, "list")).join("");
+    }
+
+    function renderReservationCard(row, mode) {
+      const customer = row.customer || {};
+      const vehicle = row.vehicle || {};
+      const status = String(row.status || "入庫予定");
+      const cardClass = getReservationCardClass(status);
+      const time = row.reservation_time ? String(row.reservation_time).slice(0, 5) : "未定";
+      const date = normalizeDateInput(row.reservation_date || "");
+      const customerName = customer.name || row.customer_name || "お客様";
+      const phone = customer.phone || row.customer_phone || "";
+      const vehicleText = buildVehicleLabel(vehicle, row);
+      const work = row.work_type || "作業";
+      const memo = row.memo || row.completion_memo || "";
+
+      return `
+        <article class="work-card ${cardClass}">
+          <div class="work-head">
+            <div class="time-badge">${escapeHtml(time)}<small>${escapeHtml(mode === "today" ? "本日" : formatDateShort(date))}</small></div>
+            <div class="work-title">
+              <div class="customer-name">${escapeHtml(customerName)} 様</div>
+              <div class="work-sub">${escapeHtml(vehicleText)} / ${escapeHtml(work)}</div>
+            </div>
+            ${badgeStatus(status)}
+          </div>
+
+          <dl class="detail-grid">
+            <div class="detail-item"><dt>電話番号</dt><dd>${escapeHtml(phone || "未入力")}</dd></div>
+            <div class="detail-item"><dt>入庫日</dt><dd>${escapeHtml(formatDate(date))}</dd></div>
+            <div class="detail-item"><dt>作業内容</dt><dd>${escapeHtml(work)}</dd></div>
+            <div class="detail-item"><dt>状態</dt><dd>${escapeHtml(status)}</dd></div>
+            <div class="detail-item detail-wide"><dt>車両</dt><dd>${escapeHtml(vehicleText)}</dd></div>
+          </dl>
+
+          <div class="memo-box"><strong>メモ</strong>${escapeHtml(memo || "メモなし")}</div>
+
+          <div class="actions">
+            ${isProvisionalReservationStatus(status) ? `<button class="btn btn-green" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫予定')">この日時で確定</button>` : ""}
+            ${canShowStatusButton(status, "入庫済み") ? `<button class="btn btn-primary" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫済み')">入庫済み</button>` : ""}
+            ${canShowStatusButton(status, "作業中") ? `<button class="btn btn-purple" onclick="changeReservationStatus('${escapeAttr(row.id)}','作業中')">作業中</button>` : ""}
+            ${!isCompletedReservation(status) ? `<button class="btn btn-orange" onclick="openCompleteModal('${escapeAttr(row.id)}')">作業完了</button>` : ""}
+            <button class="btn btn-slate" onclick="openMemoModal('${escapeAttr(row.id)}')">メモ編集</button>
+            <button class="btn btn-slate" onclick="copyReservationName('${escapeAttr(row.id)}')">名前コピー</button>
+            <button class="btn btn-slate" onclick="copyReservationPhone('${escapeAttr(row.id)}')">電話コピー</button>
+            <button class="btn btn-primary" onclick="copyReservationMessage('${escapeAttr(row.id)}')">LINE文面コピー</button>
+            <button class="btn btn-dark" onclick="openLineManager()">LINE公式</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderTodayTasks() {
+      const box = document.getElementById("todayTaskList");
+      if (!todayTasksCache.length) {
+        box.innerHTML = `<div class="empty">現在、今日対応が必要な相談・再連絡はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = todayTasksCache.map((task, index) => renderTaskCard(task, index)).join("");
+    }
+
+    function renderTaskCard(task, index) {
+      const statusClass = task.color === "red" ? "status-alert" : task.color === "orange" ? "status-provisional" : task.color === "purple" ? "status-working" : "status-confirmed";
+      return `
+        <article class="work-card ${statusClass}">
+          <div class="work-head">
+            <div class="time-badge">${escapeHtml(task.badgeIcon || "!")}<small>${escapeHtml(task.badge || "対応")}</small></div>
+            <div class="work-title">
+              <div class="customer-name">${escapeHtml(task.name || "お客様")} 様</div>
+              <div class="work-sub">${escapeHtml(task.title || "対応タスク")}</div>
+            </div>
+            ${autoBadge(task.badge, task.color)}
+          </div>
+
+          <dl class="detail-grid">
+            <div class="detail-item"><dt>電話番号</dt><dd>${escapeHtml(task.phone || "未入力")}</dd></div>
+            <div class="detail-item"><dt>車両</dt><dd>${escapeHtml(buildTodayTaskVehicleText(task))}</dd></div>
+            <div class="detail-item"><dt>内容</dt><dd>${escapeHtml(task.consultType || task.type || "相談")}</dd></div>
+            <div class="detail-item"><dt>対象日</dt><dd>${escapeHtml(task.dueDate || task.preferredVisitDate ? formatDate(task.dueDate || task.preferredVisitDate) : "未入力")}</dd></div>
+          </dl>
+
+          ${task.taskSummary ? `<div class="message-box"><strong>今日やること</strong>${escapeHtml(task.taskSummary)}</div>` : ""}
+          ${task.inquiryMessage ? `<div class="message-box"><strong>相談内容・メモ</strong>${escapeHtml(task.inquiryMessage)}</div>` : ""}
+
+          <div class="actions">
+            <button class="btn btn-slate" onclick="copyTaskName(${index})">名前コピー</button>
+            <button class="btn btn-slate" onclick="copyTaskPhone(${index})">電話コピー</button>
+            <button class="btn btn-primary" onclick="copyTaskMessage(${index})">LINE文面コピー</button>
+            <button class="btn btn-green" onclick="markTaskHandled(${index}, 'line_sent')">チャット送信済み</button>
+            <button class="btn btn-slate" onclick="markTaskHandled(${index}, 'phone_called')">電話済み</button>
+            <button class="btn btn-dark" onclick="scheduleTaskRecontact(${index}, 7)">7日後</button>
+            <button class="btn btn-dark" onclick="openLineManager()">LINE公式</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function buildTodayTasks(data) {
+      const tasks = [];
+      const actionMap = buildFollowupActionMap(data.followupActions || []);
+      const today = dateYmd(new Date());
+      const tomorrow = dateYmd(addDays(new Date(), 1));
+      const inquiries = data.recentInquiries || [];
+      const opportunities = data.salesTriggers || [];
+      const reminders = data.reminderQueue || [];
+      const upcomingReservations = data.upcomingReservations || data.todayReservations || [];
+      const followupActions = data.followupActions || [];
+
+      inquiries.forEach(row => {
+        if (isVehicleRegistrationOnlyInquiry(row)) return;
+        const createdDate = row.created_at ? dateYmd(new Date(row.created_at)) : "";
+        const status = String(row.status || "");
+        const customerName = row.customer_name_snapshot || row.customer?.name || "お客様";
+        const phone = row.phone_snapshot || row.customer?.phone || "";
+        const carName = row.car_name_snapshot || row.vehicle?.car_name || "";
+        const plateLast4 = row.vehicle?.plate_last4 || row.plate_last4 || "";
+        const message = row.message || row.shop_memo || "";
+
+        if (createdDate === today && isOpenStatus(status)) {
+          tasks.push({
+            type: "inquiry",
+            inquiryId: row.id || "",
+            followupKey: buildTodayInquiryKey(row, "new"),
+            color: "red",
+            badge: "本日対応",
+            badgeIcon: "新",
+            title: row.consult_type || "新規相談",
+            taskSummary: "新しく届いた相談です。内容を確認して初回返信します。",
+            message: buildInquirySuggestedMessage(row),
+            inquiryMessage: message,
+            name: customerName,
+            phone,
+            customerId: row.customer_id || row.customer?.id || "",
+            vehicleId: row.vehicle_id || row.vehicle?.id || "",
+            vehicleName: carName,
+            carName,
+            plateLast4,
+            consultType: row.consult_type || "相談",
+            preferredVisitDate: row.preferred_visit_date || "",
+            status
+          });
+        }
+
+        if (status.includes("未返信") || status.includes("確認中") || status.includes("見積もり中")) {
+          tasks.push({
+            type: "followup",
+            inquiryId: row.id || "",
+            followupKey: buildTodayInquiryKey(row, "followup"),
+            color: "purple",
+            badge: "追客",
+            badgeIcon: "追",
+            title: row.consult_type || "相談の追客",
+            taskSummary: "見積もり後・案内後に未返信の相談です。状況確認をします。",
+            message: buildFollowupMessage(row),
+            inquiryMessage: message,
+            name: customerName,
+            phone,
+            customerId: row.customer_id || row.customer?.id || "",
+            vehicleId: row.vehicle_id || row.vehicle?.id || "",
+            vehicleName: carName,
+            carName,
+            plateLast4,
+            consultType: row.consult_type || "相談",
+            preferredVisitDate: row.preferred_visit_date || "",
+            status
+          });
+        }
+
+        if (row.preferred_visit_date === today || row.preferred_visit_date === tomorrow) {
+          tasks.push({
+            type: "visit",
+            inquiryId: row.id || "",
+            followupKey: buildTodayInquiryKey(row, "visit"),
+            color: row.preferred_visit_date === today ? "red" : "orange",
+            badge: row.preferred_visit_date === today ? "本日希望" : "明日希望",
+            badgeIcon: row.preferred_visit_date === today ? "今" : "明",
+            title: `${row.consult_type || "相談"}の入庫希望日が近いです`,
+            taskSummary: "希望入庫日が近い相談です。入庫時間・作業内容・代車の有無を確認します。",
+            message: buildVisitConfirmMessage(row),
+            inquiryMessage: message,
+            name: customerName,
+            phone,
+            customerId: row.customer_id || row.customer?.id || "",
+            vehicleId: row.vehicle_id || row.vehicle?.id || "",
+            vehicleName: carName,
+            carName,
+            plateLast4,
+            consultType: row.consult_type || "相談",
+            preferredVisitDate: row.preferred_visit_date || "",
+            status
+          });
+        }
+      });
+
+      upcomingReservations
+        .filter(row => isProvisionalReservationStatus(row.status))
+        .filter(row => {
+          const date = normalizeDateInput(row.reservation_date || "");
+          return date && date >= today && date <= dateYmd(addDays(new Date(), 14));
+        })
+        .slice(0, 8)
+        .forEach(row => {
+          const customer = row.customer || {};
+          const vehicle = row.vehicle || {};
+          tasks.push({
+            type: "provisional_reservation",
+            reservationId: row.id || "",
+            inquiryId: row.inquiry_id || "",
+            followupKey: ["today", "provisional_reservation", row.id || row.customer_id || "none"].join("_"),
+            color: "orange",
+            badge: "仮入庫",
+            badgeIcon: "仮",
+            title: `${formatDate(row.reservation_date)} ${row.reservation_time ? String(row.reservation_time).slice(0, 5) : "時間未定"}`,
+            taskSummary: "お客様が希望した入庫日です。店舗側で確認し、問題なければ入庫予定に変更します。",
+            message: buildReservationConfirmChatMessage(row),
+            inquiryMessage: row.memo || "",
+            name: customer.name || row.customer_name || "",
+            phone: customer.phone || row.customer_phone || "",
+            customerId: row.customer_id || customer.id || "",
+            vehicleId: row.vehicle_id || vehicle.id || "",
+            vehicleName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+            carName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+            plateLast4: vehicle.plate_last4 || row.plate_last4 || "",
+            consultType: row.work_type || "入庫確認",
+            preferredVisitDate: row.reservation_date || "",
+            dueDate: row.reservation_date || "",
+            status: row.status || "仮入庫"
+          });
+        });
+
+      reminders.slice(0, 5).forEach(row => {
+        const customer = row.customer || {};
+        const vehicle = row.vehicle || {};
+        tasks.push({
+          type: "reminder",
+          followupKey: buildTodayReminderKey(row),
+          color: "blue",
+          badge: "LINE候補",
+          badgeIcon: "L",
+          title: row.reminder_type || "LINEチャット候補",
+          taskSummary: "LINEチャット候補として作成された案内です。内容を確認して送信します。",
+          message: row.message_preview || row.message_text || "",
+          inquiryMessage: row.reason || "",
+          name: customer.name || row.customer_name || "",
+          phone: customer.phone || row.customer_phone || "",
+          customerId: row.customer_id || customer.id || "",
+          vehicleId: row.vehicle_id || vehicle.id || "",
+          vehicleName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+          carName: vehicle.car_name || row.vehicle_name || row.car_name || "",
+          plateLast4: vehicle.plate_last4 || row.plate_last4 || "",
+          consultType: row.reminder_type || "LINE候補",
+          dueDate: row.target_date || "",
+          status: row.has_future_reservation ? "今後の入庫予定あり" : "未対応"
+        });
+      });
+
+      opportunities.slice(0, 4).forEach(row => {
+        const triggerType = row.trigger_type || "";
+        if (!(triggerType.includes("車検") || triggerType.includes("オイル"))) return;
+        tasks.push({
+          type: "opportunity",
+          followupKey: buildTodayOpportunityKey(row),
+          color: triggerType.includes("車検") ? "orange" : "green",
+          badge: triggerType,
+          badgeIcon: triggerType.includes("車検") ? "車" : "油",
+          title: `${triggerType}の案内候補`,
+          taskSummary: "顧客・車両情報から自動抽出された営業チャンスです。必要に応じて連絡します。",
+          message: row.message_preview || "",
+          inquiryMessage: row.reason || row.next_proposal_memo || "",
+          name: row.customer_name || "",
+          phone: row.phone || "",
+          customerId: row.customer_id || "",
+          vehicleId: row.vehicle_id || "",
+          vehicleName: row.vehicle_name || row.car_name || "",
+          carName: row.vehicle_name || row.car_name || "",
+          plateLast4: row.plate_last4 || "",
+          consultType: triggerType,
+          dueDate: row.trigger_date || "",
+          status: row.has_future_reservation ? "今後の入庫予定あり" : "未対応"
+        });
+      });
+
+      followupActions
+        .filter(row => String(row.action_type || "") === "followup_scheduled")
+        .filter(row => normalizeDateInput(row.hide_until || "") <= today)
+        .slice(0, 8)
+        .forEach(row => {
+          tasks.push({
+            type: "recontact",
+            followupKey: ["today", "recontact", row.id || row.followup_key || "none"].join("_"),
+            color: "blue",
+            badge: "再連絡",
+            badgeIcon: "再",
+            title: "再連絡予定",
+            taskSummary: "以前、後日再連絡にしたお客様です。状況確認のチャットまたは電話をします。",
+            message: row.message_text || buildSimpleRecontactMessage(row.customer_name_snapshot || "お客様"),
+            inquiryMessage: row.memo || "",
+            name: row.customer_name_snapshot || "",
+            phone: row.phone_snapshot || "",
+            customerId: row.customer_id || "",
+            vehicleId: row.vehicle_id || "",
+            vehicleName: row.vehicle_name_snapshot || "",
+            dueDate: row.hide_until || "",
+            status: "再連絡予定"
+          });
+        });
+
+      return tasks
+        .filter(task => !task.followupKey || !actionMap.has(task.followupKey) || task.type === "recontact")
+        .slice(0, 14);
+    }
+
+    async function changeReservationStatus(reservationId, nextStatus) {
+      const row = findReservation(reservationId);
+      if (!row) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+
+      const name = row.customer?.name || "お客様";
+      if (!confirm(`${name}様の状態を「${nextStatus}」に変更しますか？`)) return;
+
+      await patchReservation(row, { status: nextStatus });
+    }
+
+    function openMemoModal(reservationId) {
+      const row = findReservation(reservationId);
+      if (!row) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+      editingMemoReservationId = reservationId;
+      document.getElementById("memoModalTitle").textContent = `${row.customer?.name || "お客様"}様のメモ編集`;
+      document.getElementById("memoInput").value = row.memo || "";
+      document.getElementById("memoModal").classList.add("active");
+      setTimeout(() => document.getElementById("memoInput").focus(), 80);
+    }
+
+    function closeMemoModal() {
+      editingMemoReservationId = "";
+      document.getElementById("memoModal").classList.remove("active");
+    }
+
+    function appendMemo(text) {
+      const input = document.getElementById("memoInput");
+      const current = input.value.trim();
+      input.value = current ? `${current}\n${text}` : text;
+      input.focus();
+    }
+
+    async function saveMemoModal() {
+      const row = findReservation(editingMemoReservationId);
+      if (!row) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+      await patchReservation(row, { memo: document.getElementById("memoInput").value.trim() });
+      closeMemoModal();
+    }
+
+    function openCompleteModal(reservationId) {
+      const row = findReservation(reservationId);
+      if (!row) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+      completingReservationId = reservationId;
+      document.getElementById("completeDateInput").value = dateYmd(new Date());
+      document.getElementById("nextOilDateInput").value = normalizeDateInput(row.next_oil_change_date || "");
+      document.getElementById("nextShakenMonthInput").value = buildMonthInputValue(row.next_shaken_year, row.next_shaken_month);
+      document.getElementById("completionMemoInput").value = row.completion_memo || row.memo || "";
+      document.getElementById("nextProposalMemoInput").value = row.next_proposal_memo || "";
+      document.getElementById("completeModal").classList.add("active");
+    }
+
+    function closeCompleteModal() {
+      completingReservationId = "";
+      document.getElementById("completeModal").classList.remove("active");
+    }
+
+    async function saveCompleteModal() {
+      const row = findReservation(completingReservationId);
+      if (!row) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+
+      if (!confirm("作業完了にしますか？\n\n売上金額はiPad版では入力せず、必要に応じてPC版で確認します。")) return;
+
+      await patchReservation(row, {
+        status: "作業完了",
+        completedDate: document.getElementById("completeDateInput").value || dateYmd(new Date()),
+        completionMemo: document.getElementById("completionMemoInput").value.trim(),
+        nextProposalMemo: document.getElementById("nextProposalMemoInput").value.trim(),
+        nextOilChangeDate: document.getElementById("nextOilDateInput").value,
+        nextShakenMonth: document.getElementById("nextShakenMonthInput").value
+      });
+      closeCompleteModal();
+    }
+
+    async function patchReservation(row, overrides = {}) {
+      setLoading(true);
+      try {
+        const payload = buildReservationPayload(row, overrides);
+        await api(`/api/reservations/${row.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+        showOk("保存しました。");
+        await reloadAfterReservationChange();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function buildReservationPayload(row, overrides = {}) {
+      return {
+        customerId: row.customer_id || row.customer?.id || null,
+        vehicleId: row.vehicle_id || row.vehicle?.id || null,
+        inquiryId: row.inquiry_id || null,
+        reservationDate: normalizeDateInput(row.reservation_date || ""),
+        reservationTime: normalizeTime(row.reservation_time || ""),
+        workType: row.work_type || "その他",
+        status: overrides.status || row.status || "入庫予定",
+        estimatedAmount: normalizeNullableNumber(row.estimated_amount),
+        memo: Object.prototype.hasOwnProperty.call(overrides, "memo") ? overrides.memo : (row.memo || ""),
+        actualSalesAmount: normalizeNullableNumber(row.actual_sales_amount),
+        completedDate: Object.prototype.hasOwnProperty.call(overrides, "completedDate") ? overrides.completedDate : (normalizeDateInput(row.completed_date || "") || null),
+        completionMemo: Object.prototype.hasOwnProperty.call(overrides, "completionMemo") ? overrides.completionMemo : (row.completion_memo || ""),
+        nextProposalMemo: Object.prototype.hasOwnProperty.call(overrides, "nextProposalMemo") ? overrides.nextProposalMemo : (row.next_proposal_memo || ""),
+        nextOilChangeDate: Object.prototype.hasOwnProperty.call(overrides, "nextOilChangeDate") ? overrides.nextOilChangeDate : (normalizeDateInput(row.next_oil_change_date || "") || ""),
+        nextShakenMonth: Object.prototype.hasOwnProperty.call(overrides, "nextShakenMonth") ? overrides.nextShakenMonth : buildMonthInputValue(row.next_shaken_year, row.next_shaken_month)
+      };
+    }
+
+    async function reloadAfterReservationChange() {
+      if (currentTab === "today") await loadToday();
+      if (currentTab === "reservations") await loadReservations();
+      if (currentTab === "customers") await searchCustomers();
+    }
+
+    async function markTaskHandled(index, actionType) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+      const label = followupActionLabel(actionType);
+      if (!confirm(`${task.name || "お客様"}様を「${label}」として記録しますか？\n\n記録後、今日やることから外れます。`)) return;
+
+      setLoading(true);
+      try {
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: task.followupKey,
+            candidateType: task.type,
+            actionType,
+            customerId: task.customerId,
+            vehicleId: task.vehicleId,
+            inquiryId: task.inquiryId,
+            reservationId: task.reservationId,
+            customerName: task.name,
+            vehicleName: buildTodayTaskVehicleText(task),
+            phone: task.phone,
+            dueDate: task.dueDate || task.preferredVisitDate || "",
+            messageText: task.message || "",
+            memo: task.taskSummary || task.inquiryMessage || ""
+          })
+        });
+        showOk(`${label}として記録しました。`);
+        await loadToday();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function scheduleTaskRecontact(index, days) {
+      const task = todayTasksCache[index];
+      if (!task) return;
+      const hideDays = Number(days || 7);
+      const hideUntil = dateYmd(addDays(new Date(), hideDays));
+      if (!confirm(`${task.name || "お客様"}様を${formatDate(hideUntil)}に再連絡予定として記録しますか？`)) return;
+
+      setLoading(true);
+      try {
+        await api("/api/followup-actions", {
+          method: "POST",
+          body: JSON.stringify({
+            followupKey: task.followupKey,
+            candidateType: task.type,
+            actionType: "followup_scheduled",
+            hideDays,
+            hideUntil,
+            customerId: task.customerId,
+            vehicleId: task.vehicleId,
+            inquiryId: task.inquiryId,
+            reservationId: task.reservationId,
+            customerName: task.name,
+            vehicleName: buildTodayTaskVehicleText(task),
+            phone: task.phone,
+            dueDate: task.dueDate || task.preferredVisitDate || "",
+            messageText: task.message || "",
+            memo: task.taskSummary || task.inquiryMessage || ""
+          })
+        });
+        showOk("再連絡予定として記録しました。");
+        await loadToday();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function searchCustomers() {
+      const keyword = document.getElementById("customerKeyword").value.trim();
+      setLoading(true);
+      try {
+        const query = keyword ? `/api/customers?keyword=${encodeURIComponent(keyword)}&limit=100` : "/api/customers?limit=100";
+        const data = await api(query);
+        customersCache = data.customers || [];
+        renderCustomers(customersCache);
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderCustomers(rows) {
+      const box = document.getElementById("customerList");
+      if (!rows || !rows.length) {
+        box.innerHTML = `<div class="empty">検索すると顧客情報が表示されます。</div>`;
+        return;
+      }
+
+      box.innerHTML = rows.map(row => {
+        const vehicles = Array.isArray(row.vehicles) ? row.vehicles : [];
+        return `
+          <article class="customer-card">
+            <div class="customer-head">
+              <div>
+                <div class="customer-name">${escapeHtml(row.name || "未入力")} 様</div>
+                <div class="work-sub">${escapeHtml(row.phone || "電話番号未入力")}</div>
+                ${row.line_display_name ? `<div class="small muted">LINE名：${escapeHtml(row.line_display_name)}</div>` : ""}
+              </div>
+              ${badgeStatus(row.status || "顧客")}
+            </div>
+
+            <div class="vehicle-list">
+              ${vehicles.length ? vehicles.map(vehicle => `
+                <div class="vehicle-mini">
+                  ${escapeHtml(buildVehicleLabel(vehicle))}
+                  ${vehicle.next_shaken_date ? `<div class="small muted">次回車検：${escapeHtml(formatYearMonth(vehicle.next_shaken_date))}</div>` : ""}
+                  ${vehicle.next_oil_change_date ? `<div class="small muted">次回オイル：${escapeHtml(formatDate(vehicle.next_oil_change_date))}</div>` : ""}
+                </div>
+              `).join("") : `<div class="vehicle-mini muted">登録車両なし</div>`}
+            </div>
+
+            ${row.memo ? `<div class="memo-box"><strong>顧客メモ</strong>${escapeHtml(row.memo)}</div>` : ""}
+
+            <div class="actions">
+              <button class="btn btn-slate" onclick="copyText('${escapeJs(row.name || "")}')">名前コピー</button>
+              <button class="btn btn-slate" onclick="copyText('${escapeJs(row.phone || "")}')">電話コピー</button>
+              <button class="btn btn-primary" onclick="copyCustomerMessage('${escapeAttr(row.id)}')">LINE文面コピー</button>
+              <button class="btn btn-dark" onclick="openLineManager()">LINE公式</button>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function copyReservationName(id) {
+      const row = findReservation(id);
+      if (row) copyText(row.customer?.name || row.customer_name || "");
+    }
+
+    function copyReservationPhone(id) {
+      const row = findReservation(id);
+      if (row) copyText(row.customer?.phone || row.customer_phone || "");
+    }
+
+    function copyReservationMessage(id) {
+      const row = findReservation(id);
+      if (!row) return;
+      copyText(buildReservationChatMessage(row));
+    }
+
+    function copyTaskName(index) {
+      const task = todayTasksCache[index];
+      if (task) copyText(task.name || "");
+    }
+
+    function copyTaskPhone(index) {
+      const task = todayTasksCache[index];
+      if (task) copyText(task.phone || "");
+    }
+
+    function copyTaskMessage(index) {
+      const task = todayTasksCache[index];
+      if (task) copyText(task.message || "");
+    }
+
+    function copyCustomerMessage(customerId) {
+      const row = customersCache.find(customer => String(customer.id) === String(customerId));
+      if (!row) return;
+      const name = row.name || "お客様";
+      copyText(`${name}様、STREET HOUSE 杵築です。お車の件でご連絡いたしました。ご都合のよい時にご確認ください。`);
+    }
+
+    function buildReservationChatMessage(row) {
+      const name = row.customer?.name || row.customer_name || "お客様";
+      const date = row.reservation_date ? formatDate(row.reservation_date) : "入庫日";
+      const time = row.reservation_time ? String(row.reservation_time).slice(0, 5) : "";
+      const work = row.work_type || "作業";
+      const status = String(row.status || "");
+
+      if (isProvisionalReservationStatus(status)) {
+        return `${name}様、STREET HOUSE 杵築です。\n${date}${time ? " " + time + "頃" : ""}の${work}について、仮入庫のご希望を確認しました。\n店舗側で確認後、正式な入庫日時をご連絡いたします。`;
+      }
+
+      if (status.includes("作業完了")) {
+        return `${name}様、STREET HOUSE 杵築です。\n${work}の作業が完了しました。お引き取り可能なタイミングなど、必要事項をご連絡いたします。`;
+      }
+
+      return `${name}様、STREET HOUSE 杵築です。\n${date}${time ? " " + time + "頃" : ""}の${work}入庫予定についてご連絡です。\nご都合が変わる場合は、お早めにお知らせください。`;
+    }
+
+    function buildInquirySuggestedMessage(row) {
+      const name = row.customer_name_snapshot || row.customer?.name || "お客様";
+      const type = row.consult_type || "ご相談";
+      return `${name}様、STREET HOUSE 杵築です。\n${type}のご相談ありがとうございます。内容を確認しましたので、順番にご連絡いたします。`;
+    }
+
+    function buildFollowupMessage(row) {
+      const name = row.customer_name_snapshot || row.customer?.name || "お客様";
+      return `${name}様、STREET HOUSE 杵築です。\n先日ご案内した件について、その後いかがでしょうか？\nご不明点や日程のご希望があれば、お気軽にご返信ください。`;
+    }
+
+    function buildVisitConfirmMessage(row) {
+      const name = row.customer_name_snapshot || row.customer?.name || "お客様";
+      const date = row.preferred_visit_date ? formatDate(row.preferred_visit_date) : "ご希望日";
+      return `${name}様、STREET HOUSE 杵築です。\n${date}の入庫希望について確認のご連絡です。\nお時間・作業内容・代車の有無など、確認でき次第ご案内いたします。`;
+    }
+
+    function buildReservationConfirmChatMessage(row) {
+      return buildReservationChatMessage(row);
+    }
+
+    function buildSimpleRecontactMessage(name) {
+      return `${name || "お客様"}様、STREET HOUSE 杵築です。\n以前ご相談いただいた件で、その後いかがでしょうか？\n必要であれば日程や内容を改めてご相談ください。`;
+    }
+
+    function findReservation(id) {
+      return [...todayReservationsCache, ...reservationsCache].find(row => String(row.id) === String(id)) || null;
+    }
+
+    function reservationMatchesFilter(row, filter) {
+      const status = String(row.status || "");
+      const date = normalizeDateInput(row.reservation_date || "");
+      const today = dateYmd(new Date());
+      const diff = daysUntil(date);
+      const active = !isHiddenReservation(row) && !isCompletedReservation(status);
+
+      if (filter === "today") return active && date === today;
+      if (filter === "next7") return active && diff !== null && diff >= 0 && diff <= 7;
+      if (filter === "provisional") return active && isProvisionalReservationStatus(status);
+      return active;
+    }
+
+    function isProvisionalReservationStatus(status) {
+      return String(status || "").includes("仮入庫");
+    }
+
+    function isCompletedReservation(status) {
+      return String(status || "").includes("作業完了");
+    }
+
+    function isHiddenReservation(row) {
+      const status = String(row.status || "");
+      return status.includes("キャンセル") || status.includes("削除");
+    }
+
+    function canShowStatusButton(currentStatus, nextStatus) {
+      const status = String(currentStatus || "");
+      if (status.includes("作業完了") || status.includes("キャンセル") || status.includes("削除")) return false;
+      if (nextStatus === "入庫済み") return !status.includes("入庫済") && !status.includes("作業中");
+      if (nextStatus === "作業中") return !status.includes("作業中");
+      return true;
+    }
+
+    function getReservationCardClass(status) {
+      const value = String(status || "");
+      if (value.includes("仮入庫")) return "status-provisional";
+      if (value.includes("作業中")) return "status-working";
+      if (value.includes("入庫済")) return "status-working";
+      if (value.includes("作業完了")) return "status-done";
+      return "status-confirmed";
+    }
+
+    function isOpenStatus(status) {
+      const value = String(status || "");
+      if (!value) return true;
+      if (["チャット対応済み", "電話対応済み", "今回は見送り", "車両登録のみ", "対応済み", "作業完了", "キャンセル", "失注"].some(x => value.includes(x))) return false;
+      return ["新規相談", "未対応", "確認中", "見積もり中", "未返信", "入庫希望", "保留"].some(x => value.includes(x)) || value === "新規";
+    }
+
+    function isVehicleRegistrationOnlyInquiry(row) {
+      const status = String(row.status || "");
+      if (status === "車両登録のみ") return true;
+      const text = [row.consult_type, row.other_consult_detail, row.message, row.shop_memo].map(v => String(v || "")).join(" ");
+      const looksVehicleRegistration = text.includes("2台目") || text.includes("二台目") || text.includes("別の車") || text.includes("別車両") || text.includes("車両登録") || text.includes("車を登録");
+      const hasWorkIntent = text.includes("車検") || text.includes("整備") || text.includes("修理") || text.includes("カスタム") || text.includes("見積") || text.includes("オイル") || text.includes("異音") || text.includes("点検");
+      return looksVehicleRegistration && !hasWorkIntent && !row.preferred_visit_date;
+    }
+
+    function buildFollowupActionMap(rows) {
+      const map = new Map();
+      (rows || []).forEach(row => {
+        const key = row.followup_key || row.followupKey || "";
+        if (key) map.set(key, row);
+      });
+      return map;
+    }
+
+    function buildTodayInquiryKey(row, suffix) {
+      return ["today", "inquiry", suffix || "new", row.id || row.customer_id || "none"].join("_");
+    }
+
+    function buildTodayReminderKey(row) {
+      return ["today", "reminder", row.id || row.customer_id || "none"].join("_");
+    }
+
+    function buildTodayOpportunityKey(row) {
+      return ["today", "opportunity", row.id || row.customer_id || row.vehicle_id || "none"].join("_");
+    }
+
+    function buildTodayTaskVehicleText(task) {
+      const parts = [];
+      const vehicleName = [task.maker, task.vehicleName || task.carName || task.model].filter(Boolean).join(" ").trim();
+      if (vehicleName) parts.push(vehicleName);
+      if (task.plateLast4) parts.push(`下4桁 ${task.plateLast4}`);
+      return parts.length ? parts.join(" / ") : "車両未入力";
+    }
+
+    function buildVehicleLabel(vehicle = {}, fallback = {}) {
+      const parts = [];
+      const name = [vehicle.maker, vehicle.car_name || vehicle.model || fallback.vehicle_name || fallback.car_name].filter(Boolean).join(" ").trim();
+      if (name) parts.push(name);
+      const plate = vehicle.plate_last4 || fallback.plate_last4;
+      if (plate) parts.push(`下4桁 ${plate}`);
+      return parts.length ? parts.join(" / ") : "車両未入力";
+    }
+
+    function badgeStatus(status) {
+      const value = String(status || "");
+      let cls = "badge-slate";
+      if (value.includes("仮")) cls = "badge-orange";
+      else if (value.includes("入庫予定") || value.includes("確定")) cls = "badge-green";
+      else if (value.includes("入庫済") || value.includes("作業中")) cls = "badge-purple";
+      else if (value.includes("完了")) cls = "badge-slate";
+      else if (value.includes("未") || value.includes("新規")) cls = "badge-red";
+      else if (value.includes("再")) cls = "badge-blue";
+      return `<span class="badge ${cls}">${escapeHtml(value || "未設定")}</span>`;
+    }
+
+    function autoBadge(text, color) {
+      const cls = color === "red" ? "badge-red" : color === "orange" ? "badge-orange" : color === "green" ? "badge-green" : color === "purple" ? "badge-purple" : "badge-blue";
+      return `<span class="badge ${cls}">${escapeHtml(text || "対応")}</span>`;
+    }
+
+    function followupActionLabel(actionType) {
+      if (actionType === "line_sent") return "チャット送信済み";
+      if (actionType === "phone_called") return "電話済み";
+      if (actionType === "followup_scheduled") return "再連絡予定";
+      if (actionType === "skipped") return "今回は見送り";
+      return "対応済み";
+    }
+
+    function openLineManager() {
+      window.open(LINE_MANAGER_URL, "_blank", "noopener,noreferrer");
+    }
+
+    async function copyText(text) {
+      const value = String(text || "");
+      if (!value) {
+        showError("コピーする内容がありません。");
+        return;
+      }
+
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = value;
+          textarea.style.position = "fixed";
+          textarea.style.left = "-9999px";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+        }
+        showOk("コピーしました。");
+      } catch (error) {
+        showError("コピーできませんでした。長押しで選択してコピーしてください。");
+      }
+    }
+
+    function setLoading(active) {
+      document.getElementById("loadingCover").classList.toggle("active", Boolean(active));
+    }
+
+    function showOk(message) {
+      showAlert(message, "ok");
+    }
+
+    function showError(message) {
+      showAlert(message, "error");
+    }
+
+    function showAlert(message, type) {
+      const box = document.getElementById("alertBox");
+      box.textContent = message || "";
+      box.className = `alert show ${type === "ok" ? "alert-ok" : "alert-error"}`;
+      clearTimeout(showAlert.timer);
+      showAlert.timer = setTimeout(() => {
+        box.className = "alert";
+      }, type === "ok" ? 2400 : 5200);
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function normalizeNullableNumber(value) {
+      if (value === null || value === undefined || value === "") return null;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function normalizeTime(value) {
+      const str = String(value || "").trim();
+      if (!str) return "";
+      const match = str.match(/^(\d{1,2}):(\d{2})/);
+      if (!match) return str;
+      return `${match[1].padStart(2, "0")}:${match[2]}`;
+    }
+
+    function normalizeDateInput(value) {
+      if (!value) return "";
+      const str = String(value);
+      const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match) return match[1];
+      const d = new Date(str);
+      if (Number.isNaN(d.getTime())) return "";
+      return dateYmd(d);
+    }
+
+    function dateYmd(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function addDays(date, days) {
+      const copy = new Date(date.getTime());
+      copy.setDate(copy.getDate() + Number(days || 0));
+      return copy;
+    }
+
+    function daysUntil(dateValue) {
+      const ymd = normalizeDateInput(dateValue);
+      if (!ymd) return null;
+      const today = new Date(dateYmd(new Date()) + "T00:00:00");
+      const target = new Date(ymd + "T00:00:00");
+      return Math.round((target - today) / 86400000);
+    }
+
+    function formatDate(value) {
+      const ymd = normalizeDateInput(value);
+      if (!ymd) return "未入力";
+      const d = new Date(ymd + "T00:00:00");
+      const weeks = ["日", "月", "火", "水", "木", "金", "土"];
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weeks[d.getDay()]}）`;
+    }
+
+    function formatDateShort(value) {
+      const ymd = normalizeDateInput(value);
+      if (!ymd) return "日付未定";
+      const d = new Date(ymd + "T00:00:00");
+      const weeks = ["日", "月", "火", "水", "木", "金", "土"];
+      return `${d.getMonth() + 1}/${d.getDate()}(${weeks[d.getDay()]})`;
+    }
+
+    function formatYearMonth(value) {
+      const ymd = normalizeDateInput(value);
+      if (!ymd) return "";
+      const d = new Date(ymd + "T00:00:00");
+      return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+    }
+
+    function buildMonthInputValue(year, month) {
+      if (!year || !month) return "";
+      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+    }
+
+    function sortReservations(a, b) {
+      const ad = `${normalizeDateInput(a.reservation_date || "9999-12-31")} ${normalizeTime(a.reservation_time || "99:99")}`;
+      const bd = `${normalizeDateInput(b.reservation_date || "9999-12-31")} ${normalizeTime(b.reservation_time || "99:99")}`;
+      return ad.localeCompare(bd);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function escapeJs(value) {
+      return String(value ?? "")
+        .replaceAll("\\", "\\\\")
+        .replaceAll("'", "\\'")
+        .replaceAll("\n", "\\n")
+        .replaceAll("\r", "");
+    }
+  </script>
+</body>
+</html>
