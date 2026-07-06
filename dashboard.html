@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-3</title>
+  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-7</title>
 
   <style>
     :root {
@@ -215,7 +215,7 @@
       padding: 18px;
     }
 
-    /* STEP KSH-BRUSH-3: PCトップ業務導線 */
+    /* STEP KSH-BRUSH-7: 車検フォロー・LINE文面テンプレート強化 */
     .daily-route {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1282,7 +1282,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-3</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-7</p>
           </div>
         </div>
       </div>
@@ -1984,6 +1984,18 @@
             </div>
           </div>
 
+          <div class="card card-pad" style="margin-bottom:16px">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">よく使うLINE文面テンプレート</h3>
+                <div class="small muted">車検90日/60日/30日/7日前、見積もり後再連絡、入庫前日、作業完了、納車後お礼をすぐ確認できます。</div>
+              </div>
+              <button class="btn btn-slate" onclick="loadMessageTemplates(true)">テンプレート更新</button>
+            </div>
+            <div id="messageTemplateList" class="grid4"></div>
+            <div id="messageTemplateHelp" class="small muted" style="margin-top:10px">候補の文面は、下のLINEチャット候補ごとにも個別に切り替えできます。</div>
+          </div>
+
           <div class="grid4">
             <div class="card kpi">
               <div>
@@ -2020,6 +2032,15 @@
               </div>
               <div class="icon bg-purple">提</div>
             </div>
+
+            <div class="card kpi">
+              <div>
+                <span>見積もり後再連絡</span>
+                <strong id="followupEstimateCount">-</strong>
+                <small>見積もり後・未返信の相談</small>
+              </div>
+              <div class="icon bg-red">見</div>
+            </div>
           </div>
 
           <div style="height:16px"></div>
@@ -2038,6 +2059,7 @@
               <button id="ff-shaken" class="followup-filter-btn" onclick="setFollowupFilter('shaken')">車検案内</button>
               <button id="ff-oil" class="followup-filter-btn" onclick="setFollowupFilter('oil')">オイル交換</button>
               <button id="ff-proposal" class="followup-filter-btn" onclick="setFollowupFilter('proposal')">次回提案</button>
+              <button id="ff-estimate" class="followup-filter-btn" onclick="setFollowupFilter('estimate')">見積再連絡</button>
               <button id="ff-line_unlinked" class="followup-filter-btn" onclick="setFollowupFilter('line_unlinked')">LINE未連携</button>
             </div>
 
@@ -2523,7 +2545,7 @@
     function applyShopSettingsToDashboard() {
       const shopName = getShopName();
       const serviceName = getServiceName();
-      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-2`;
+      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-7`;
       setText("dashboardLogoText", getShopInitials(shopName));
       setText("dashboardShopName", shopName);
       setText("dashboardServiceName", serviceName);
@@ -2647,6 +2669,7 @@
     let completedSalesCache = [];
     let followupCandidatesCache = [];
     let followupVisibleCache = [];
+    let messageTemplatesCache = [];
     let followupActionsCache = [];
     let currentFollowupFilter = "all";
     let monthlySalesCache = [];
@@ -4901,6 +4924,7 @@
       clearAlert();
 
       try {
+        await loadMessageTemplates(false);
         const days = Number(document.getElementById("followupDays")?.value || 120);
         const includeLineUnlinked = document.getElementById("followupIncludeLineUnlinked")?.checked !== false;
         const includeHandled = document.getElementById("followupIncludeHandled")?.checked === true;
@@ -4934,6 +4958,69 @@
       if (active) active.classList.add("active");
     }
 
+    async function loadMessageTemplates(showToast) {
+      try {
+        const data = await api("/api/message-templates");
+        messageTemplatesCache = data.templates || [];
+        renderMessageTemplates();
+        if (showToast) showOk("LINE文面テンプレートを更新しました。");
+      } catch (error) {
+        console.warn("message templates fallback", error);
+        if (showToast) showError(error.message);
+      }
+    }
+
+    function renderMessageTemplates() {
+      const box = document.getElementById("messageTemplateList");
+      if (!box) return;
+
+      const rows = messageTemplatesCache || [];
+      if (!rows.length) {
+        box.innerHTML = `<div class="muted">テンプレートを読み込み中です。</div>`;
+        return;
+      }
+
+      box.innerHTML = rows.map((row, index) => `
+        <div class="mini-card" style="padding:14px;border:1px solid var(--border);border-radius:18px;background:#fff">
+          <div class="small muted">${escapeHtml(row.category || "テンプレート")}</div>
+          <strong style="display:block;margin-top:4px">${escapeHtml(row.label || "文面")}</strong>
+          <div class="small muted" style="margin-top:4px">${escapeHtml(row.timing || "")}</div>
+          <div class="task-actions" style="margin-top:10px">
+            <button class="btn btn-slate" onclick="copyMessageTemplate(${index})">文面コピー</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function copyMessageTemplate(index) {
+      const row = messageTemplatesCache[index];
+      if (!row) return;
+      copyText(row.text || "");
+    }
+
+    function renderCandidateTemplateButtons(row, index) {
+      const options = Array.isArray(row.template_options) ? row.template_options : [];
+      if (!options.length) return "";
+
+      return `
+        <div class="task-actions" style="margin-top:8px">
+          ${options.map((option, optionIndex) => `
+            <button class="btn btn-slate" onclick="applyFollowupTemplateOption(${index}, ${optionIndex})">${escapeHtml(option.label || "文面切替")}</button>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function applyFollowupTemplateOption(index, optionIndex) {
+      const row = followupVisibleCache[index];
+      const option = row && Array.isArray(row.template_options) ? row.template_options[optionIndex] : null;
+      const textarea = document.getElementById(`followupMessage-${index}`);
+      if (!row || !option || !textarea) return;
+      row.edited_message_text = option.text || "";
+      textarea.value = option.text || "";
+      showOk(`${option.label || "文面"}に切り替えました。`);
+    }
+
     function renderFollowupSummary(summary, generatedAt) {
       const rows = followupCandidatesCache || [];
       const calc = {
@@ -4941,6 +5028,7 @@
         shaken: rows.filter(row => row.type === "shaken").length,
         oil: rows.filter(row => row.type === "oil").length,
         proposal: rows.filter(row => row.type === "proposal").length,
+        estimate: rows.filter(row => row.type === "estimate").length,
         line_unlinked: rows.filter(row => row.type === "line_unlinked").length
       };
 
@@ -4948,14 +5036,16 @@
       const shaken = Number(calc.shaken || 0);
       const oil = Number(calc.oil || 0);
       const proposal = Number(calc.proposal || 0);
+      const estimate = Number(calc.estimate || 0);
       const lineUnlinked = Number(calc.line_unlinked || 0);
 
       setText("followupTotalCount", `${total}件`);
       setText("followupShakenCount", `${shaken}件`);
       setText("followupOilCount", `${oil}件`);
       setText("followupProposalCount", `${proposal}件`);
+      setText("followupEstimateCount", `${estimate}件`);
 
-      const generatedText = generatedAt ? `更新：${formatDateTime(generatedAt)} / LINE未連携 ${lineUnlinked}件` : `LINE未連携 ${lineUnlinked}件`;
+      const generatedText = generatedAt ? `更新：${formatDateTime(generatedAt)} / 見積再連絡 ${estimate}件 / LINE未連携 ${lineUnlinked}件` : `見積再連絡 ${estimate}件 / LINE未連携 ${lineUnlinked}件`;
       setText("followupGeneratedAt", generatedText);
     }
 
@@ -4981,6 +5071,7 @@
         <tr>
           <td>
             ${badgeFollowupType(row.type_label || row.type)}
+            ${row.stage_label ? `<div style="margin-top:6px"><span class="badge badge-blue">${escapeHtml(row.stage_label)}</span></div>` : ""}
             ${row.is_handled ? `<div style="margin-top:6px"><span class="badge badge-green">${escapeHtml(row.handled_label || "対応済み")}</span></div>` : ""}
           </td>
           <td>${badgeFollowupPriority(row.priority)}</td>
@@ -4996,6 +5087,7 @@
           </td>
           <td>
             <div>${escapeHtml(row.reason || "")}</div>
+            ${row.recommended_action ? `<div class="small" style="margin-top:6px;font-weight:900;color:var(--ink)">おすすめ：${escapeHtml(row.recommended_action)}</div>` : ""}
             ${row.proposal_memo ? `<div class="message-box" style="margin-top:8px">${escapeHtml(row.proposal_memo)}</div>` : ""}
             ${row.has_future_reservation ? `<div class="small" style="margin-top:6px;color:var(--green);font-weight:900">今後の入庫予定あり</div>` : ""}
           </td>
@@ -5006,6 +5098,7 @@
               oninput="updateFollowupMessage(${index})"
             >${escapeHtml(row.edited_message_text || row.message_text || "")}</textarea>
             <div class="editable-message-help">個別チャットへ貼り付ける前に、この場で文面を編集できます。</div>
+            ${renderCandidateTemplateButtons(row, index)}
             <div class="task-actions">
               <button class="btn btn-slate" onclick="copyFollowupName(${index})">名前コピー</button>
               <button class="btn btn-slate" onclick="copyFollowupPhone(${index})">電話コピー</button>
@@ -5014,6 +5107,7 @@
               <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">チャット送信済み</button>
               <button class="btn btn-slate" onclick="markFollowupHandled(${index}, 'phone_called')">電話済み</button>
               <button class="btn btn-dark" onclick="markFollowupHandled(${index}, 'skipped')">今回は見送り</button>
+              <button class="btn btn-slate" onclick="scheduleFollowupRecontact(${index}, 3)">3日後に再連絡</button>
               <button class="btn btn-slate" onclick="scheduleFollowupRecontact(${index}, 7)">1週間後に再連絡</button>
               <button class="btn btn-dark" onclick="scheduleFollowupRecontact(${index}, 30)">1か月後に再連絡</button>
               ${row.customer_id ? `<button class="btn btn-green" onclick="openReservationFromFollowup(${index})">入庫予定へ</button>` : ""}
@@ -6628,6 +6722,7 @@
       if (s.includes("車検") || s === "shaken") cls = "badge-blue";
       if (s.includes("オイル") || s === "oil") cls = "badge-green";
       if (s.includes("提案") || s === "proposal") cls = "badge-orange";
+      if (s.includes("見積") || s === "estimate") cls = "badge-purple";
       if (s.includes("未連携") || s === "line_unlinked") cls = "badge-slate";
 
       return `<span class="badge ${cls}">${escapeHtml(s || "未設定")}</span>`;
@@ -6857,6 +6952,7 @@
             actionType,
             customerId: row.customer_id,
             vehicleId: row.vehicle_id,
+            inquiryId: row.inquiry_id,
             customerName: row.customer_name,
             vehicleName: buildFollowupVehicleText(row),
             phone: row.customer_phone,
@@ -6917,7 +7013,7 @@
 
       const hideDays = Number(days || 7);
       const hideUntil = dateYmd(addDays(new Date(), hideDays));
-      const label = hideDays >= 30 ? "1か月後に再連絡" : "1週間後に再連絡";
+      const label = hideDays >= 30 ? "1か月後に再連絡" : hideDays <= 3 ? "3日後に再連絡" : "1週間後に再連絡";
 
       if (!confirm(`${task.title || "この対応"}を「${label}」として記録しますか？\n\n${formatDate(hideUntil)}に今日やることへ再表示されます。`)) {
         return;
@@ -6960,7 +7056,7 @@
 
       const hideDays = Number(days || 7);
       const hideUntil = dateYmd(addDays(new Date(), hideDays));
-      const label = hideDays >= 30 ? "1か月後に再連絡" : "1週間後に再連絡";
+      const label = hideDays >= 30 ? "1か月後に再連絡" : hideDays <= 3 ? "3日後に再連絡" : "1週間後に再連絡";
 
       if (!confirm(`${row.customer_name || "対象顧客"}様を「${label}」として記録しますか？\n\n${formatDate(hideUntil)}に今日やることへ再表示されます。`)) {
         return;
@@ -6978,6 +7074,7 @@
             hideUntil,
             customerId: row.customer_id,
             vehicleId: row.vehicle_id,
+            inquiryId: row.inquiry_id,
             customerName: row.customer_name,
             vehicleName: buildFollowupVehicleText(row),
             phone: row.customer_phone,
