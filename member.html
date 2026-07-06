@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DPRO CAR LINE｜マイカー会員ページ STEP KSH-BRUSH-6</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    :root {
+      --bg: #101010;
+      --card: #1f1f1f;
+      --card2: #171717;
+      --text: #f6f6f6;
+      --muted: #a8a8a8;
+      --line: #363636;
+      --accent: #e67e22;
+      --accent2: #ff9f43;
+      --ok: #2ecc71;
+      --warn: #f1c40f;
+      --danger: #ff6b6b;
+      --info: #38bdf8;
+      --input: #151515;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top, rgba(230, 126, 34, 0.16), transparent 38%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", Arial, sans-serif;
+      line-height: 1.62;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 20px 15px 36px; }
+    .header { text-align: center; margin-bottom: 16px; }
+    .logo {
+      width: 58px; height: 58px; margin: 0 auto 10px; border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent), #854008);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; letter-spacing: 1px;
+      box-shadow: 0 12px 34px rgba(230, 126, 34, 0.24);
+    }
+    .header h1 { margin: 0; font-size: 19px; letter-spacing: 1px; font-weight: 900; }
+    .header p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
+    .version { margin-top: 8px; font-size: 11px; color: #777; }
+
+    .card {
+      background: rgba(31, 31, 31, 0.97);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
+    }
+    .card.soft { background: rgba(23, 23, 23, 0.96); box-shadow: none; }
+    .title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    h2 { margin: 0; font-size: 16px; letter-spacing: 0.5px; }
+    h3 { margin: 0 0 8px; font-size: 14px; }
+    p { margin: 0; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .small { font-size: 12px; }
+    .tiny { font-size: 11px; color: #858585; }
+    .notice {
+      background: rgba(230, 126, 34, 0.12);
+      border: 1px solid rgba(230, 126, 34, 0.35);
+      color: #ffe1c1;
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .ok-box {
+      background: rgba(46, 204, 113, 0.12);
+      border: 1px solid rgba(46, 204, 113, 0.38);
+      color: #d8ffe8;
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .danger-box {
+      background: rgba(255, 107, 107, 0.12);
+      border: 1px solid rgba(255, 107, 107, 0.38);
+      color: #ffd6d6;
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 420px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+    .stat {
+      border: 1px solid var(--line);
+      background: #151515;
+      border-radius: 14px;
+      padding: 12px;
+      min-height: 76px;
+    }
+    .stat .label { color: var(--muted); font-size: 11px; }
+    .stat .value { margin-top: 4px; font-weight: 900; font-size: 17px; }
+    .stat .sub { margin-top: 2px; color: #8d8d8d; font-size: 11px; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: #151515;
+      border: 1px solid var(--line);
+      color: #dedede;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .badge.ok { border-color: rgba(46, 204, 113, 0.48); color: #a7ffd0; background: rgba(46, 204, 113, 0.1); }
+    .badge.warn { border-color: rgba(241, 196, 15, 0.48); color: #fff2ae; background: rgba(241, 196, 15, 0.1); }
+    .badge.danger { border-color: rgba(255, 107, 107, 0.48); color: #ffd6d6; background: rgba(255, 107, 107, 0.1); }
+    .badge.info { border-color: rgba(56, 189, 248, 0.48); color: #d7f2ff; background: rgba(56, 189, 248, 0.1); }
+
+    .vehicle-card, .reservation-card, .history-card {
+      border: 1px solid var(--line);
+      background: #151515;
+      border-radius: 16px;
+      padding: 14px;
+      margin-top: 10px;
+    }
+    .vehicle-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .vehicle-name { font-size: 16px; font-weight: 900; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+    .info-list { margin: 12px 0 0; padding: 0; list-style: none; }
+    .info-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #2b2b2b; font-size: 12px; }
+    .info-list span:first-child { color: var(--muted); }
+    .info-list strong { text-align: right; }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+    button, .link-btn {
+      appearance: none;
+      border: none;
+      border-radius: 13px;
+      padding: 12px 14px;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      color: #111;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 9px 24px rgba(230, 126, 34, 0.18);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 44px;
+    }
+    button.secondary, .link-btn.secondary { background: #2b2b2b; color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+    button.ghost, .link-btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+    button.warn { background: linear-gradient(135deg, #f1c40f, #ffda65); color: #111; }
+    button.danger { background: linear-gradient(135deg, #ff6b6b, #ff9f9f); color: #111; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .full { width: 100%; }
+
+    .message-box {
+      background: #101010;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      white-space: pre-wrap;
+      font-size: 12px;
+      color: #e7e7e7;
+      margin-top: 9px;
+    }
+    .empty {
+      border: 1px dashed #484848;
+      border-radius: 15px;
+      padding: 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .loading { text-align: center; padding: 30px 12px; color: var(--muted); }
+    .hidden { display: none !important; }
+    .footer { text-align: center; color: #777; font-size: 11px; margin-top: 20px; }
+    .toast {
+      position: fixed;
+      left: 50%; bottom: 18px;
+      transform: translateX(-50%);
+      background: #f5f5f5;
+      color: #111;
+      border-radius: 999px;
+      padding: 10px 15px;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+      max-width: calc(100% - 30px);
+      text-align: center;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="logo">CAR</div>
+      <h1 id="pageTitle">マイカー会員ページ</h1>
+      <p id="pageLead">登録済みのお車・入庫予定・相談履歴を確認できます。</p>
+      <div class="version">STEP KSH-BRUSH-6 / member.html</div>
+    </header>
+
+    <div id="alertArea"></div>
+
+    <section class="card">
+      <div class="title-row">
+        <h2>会員ページでできること</h2>
+        <span class="badge info">LINE連携</span>
+      </div>
+      <div class="grid2">
+        <div class="stat">
+          <div class="label">登録車両</div>
+          <div class="value">マイカー管理</div>
+          <div class="sub">車検日・オイル交換日を確認</div>
+        </div>
+        <div class="stat">
+          <div class="label">入庫予定</div>
+          <div class="value">予約確認</div>
+          <div class="sub">変更・キャンセル相談文面もコピー</div>
+        </div>
+        <div class="stat">
+          <div class="label">相談履歴</div>
+          <div class="value">前回内容</div>
+          <div class="sub">車検・整備・修理相談を確認</div>
+        </div>
+        <div class="stat">
+          <div class="label">次回相談</div>
+          <div class="value">すぐ連絡</div>
+          <div class="sub">LINE送信用文面を自動作成</div>
+        </div>
+      </div>
+    </section>
+
+    <main id="app">
+      <section class="card loading">会員情報を読み込み中です...</section>
+    </main>
+
+    <div class="footer" id="footerText">DPRO CAR LINE / 車検・整備LINE管理システム</div>
+  </div>
+
+  <div class="toast" id="toast">コピーしました</div>
+
+  <script>
+    const LIFF_ID = "2010239091-K5EeUmBh";
+    const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
+    const SHOP_CODE = "street_house_kitsuki";
+    const VERSION = "STEP KSH-BRUSH-6";
+
+    const state = {
+      shop: {
+        shop_name: "STREET HOUSE 杵築",
+        service_name: "DPRO 車検・整備LINE管理システム",
+        member_title: "STREET HOUSE 杵築 マイカー会員ページ",
+        phone: "",
+        address: "",
+        business_hours_text: "",
+        regular_holiday_text: "",
+        line_message_footer: ""
+      },
+      lineProfile: null,
+      profile: null,
+      loading: true,
+      error: "",
+      demo: false
+    };
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    async function init() {
+      await loadShopSettings();
+      applyShopSettings();
+      await initLiffAndLoadProfile();
+    }
+
+    async function loadShopSettings() {
+      try {
+        const response = await fetch(`${WORKER_API_BASE}/api/public/shop-settings?shopCode=${encodeURIComponent(SHOP_CODE)}`);
+        const data = await response.json();
+        if (data && data.ok && data.shop_settings) {
+          state.shop = { ...state.shop, ...data.shop_settings };
+        }
+      } catch (error) {
+        console.warn("shop-settings failed", error);
+      }
+    }
+
+    function applyShopSettings() {
+      const title = state.shop.member_title || `${state.shop.shop_name} マイカー会員ページ`;
+      document.title = `${title}｜${VERSION}`;
+      document.getElementById("pageTitle").textContent = title;
+      document.getElementById("pageLead").textContent = `${state.shop.shop_name}に登録したお車・入庫予定・相談履歴を確認できます。`;
+      document.getElementById("footerText").textContent = `${state.shop.shop_name} / ${state.shop.service_name || "DPRO CAR LINE"}`;
+      if (state.shop.main_color && /^#[0-9a-fA-F]{6}$/.test(state.shop.main_color)) {
+        document.documentElement.style.setProperty("--accent", state.shop.main_color);
+      }
+    }
+
+    async function initLiffAndLoadProfile() {
+      const params = new URLSearchParams(location.search);
+      const queryLineUserId = params.get("lineUserId") || params.get("line_user_id") || "";
+      const showDemo = params.get("demo") === "1";
+
+      if (showDemo) {
+        state.demo = true;
+        state.profile = buildDemoProfile();
+        state.loading = false;
+        render();
+        return;
+      }
+
+      try {
+        if (typeof liff !== "undefined" && LIFF_ID && LIFF_ID !== "YOUR_LIFF_ID") {
+          await liff.init({ liffId: LIFF_ID });
+          if (liff.isLoggedIn()) {
+            state.lineProfile = await liff.getProfile();
+          }
+        }
+      } catch (error) {
+        console.warn("LIFF init failed", error);
+      }
+
+      const lineUserId = state.lineProfile?.userId || queryLineUserId;
+      if (!lineUserId) {
+        state.loading = false;
+        state.profile = null;
+        render();
+        return;
+      }
+
+      try {
+        const response = await fetch(`${WORKER_API_BASE}/api/public/customer-profile?lineUserId=${encodeURIComponent(lineUserId)}`);
+        const data = await response.json();
+        state.loading = false;
+        state.profile = data || null;
+        render();
+      } catch (error) {
+        console.error("customer-profile failed", error);
+        state.loading = false;
+        state.error = "会員情報の取得に失敗しました。時間をおいて再度お試しください。";
+        render();
+      }
+    }
+
+    function render() {
+      const app = document.getElementById("app");
+      const alertArea = document.getElementById("alertArea");
+      alertArea.innerHTML = "";
+
+      if (state.demo) {
+        alertArea.innerHTML = `<div class="notice">これは会員ページの表示例です。実データは保存していません。</div>`;
+      }
+
+      if (state.loading) {
+        app.innerHTML = `<section class="card loading">会員情報を読み込み中です...</section>`;
+        return;
+      }
+
+      if (state.error) {
+        app.innerHTML = `
+          <section class="card">
+            <div class="danger-box">${escapeHtml(state.error)}</div>
+            ${renderPrimaryActions()}
+          </section>`;
+        return;
+      }
+
+      if (!state.profile || !state.profile.found) {
+        app.innerHTML = renderNoProfile();
+        return;
+      }
+
+      app.innerHTML = `
+        ${renderCustomerSummary(state.profile)}
+        ${renderVehicles(state.profile.vehicles || [])}
+        ${renderReservations(state.profile.recentReservations || [], state.profile.vehicles || [])}
+        ${renderQuickMessages(state.profile)}
+        ${renderHistory(state.profile.recentInquiries || [], state.profile.recentReservations || [])}
+        ${renderPrimaryActions()}
+      `;
+    }
+
+    function renderNoProfile() {
+      return `
+        <section class="card">
+          <div class="title-row">
+            <h2>登録済み情報がまだありません</h2>
+            <span class="badge warn">初回登録前</span>
+          </div>
+          <p class="muted">LINEアカウントに紐づくお客様情報・車両情報がまだ登録されていません。まずは車検・整備相談フォームからお車を登録してください。</p>
+          <div class="btn-row">
+            <a class="link-btn full" href="index.html?v=step-ksh-brush-6">車検・整備相談フォームを開く</a>
+            <button class="secondary full" type="button" onclick="showDemoProfile()">会員ページの表示例を見る</button>
+          </div>
+        </section>
+        <section class="card soft">
+          <h2>このページの使い方</h2>
+          <ul class="info-list">
+            <li><span>初回</span><strong>相談フォームでお客様・車両を登録</strong></li>
+            <li><span>2回目以降</span><strong>登録済み車両を選んで相談</strong></li>
+            <li><span>入庫予定</span><strong>変更・キャンセル相談文面をコピー</strong></li>
+            <li><span>次回案内</span><strong>車検日・オイル交換日を確認</strong></li>
+          </ul>
+        </section>
+        ${renderPrimaryActions()}
+      `;
+    }
+
+    function renderCustomerSummary(profile) {
+      const customer = profile.customer || {};
+      const vehicles = profile.vehicles || [];
+      const reservations = profile.recentReservations || [];
+      const upcoming = reservations.filter(isUpcomingReservation);
+      const nearestShaken = findNearestShaken(vehicles);
+      return `
+        <section class="card">
+          <div class="title-row">
+            <h2>${escapeHtml(customer.name || "お客様")} 様</h2>
+            <span class="badge ok">登録済み</span>
+          </div>
+          <p class="muted">${escapeHtml(customer.line_display_name || state.lineProfile?.displayName || "LINE会員")} / ${escapeHtml(customer.phone || "電話番号未登録")}</p>
+          <div class="grid3" style="margin-top: 12px;">
+            <div class="stat">
+              <div class="label">登録車両</div>
+              <div class="value">${vehicles.length} 台</div>
+              <div class="sub">複数台管理できます</div>
+            </div>
+            <div class="stat">
+              <div class="label">入庫予定</div>
+              <div class="value">${upcoming.length} 件</div>
+              <div class="sub">今日以降の予定</div>
+            </div>
+            <div class="stat">
+              <div class="label">近い車検</div>
+              <div class="value">${nearestShaken ? escapeHtml(formatDateShort(nearestShaken.next_shaken_date)) : "未登録"}</div>
+              <div class="sub">${nearestShaken ? escapeHtml(nearestShaken.label || vehicleTitle(nearestShaken)) : "車検日登録で案内可"}</div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderVehicles(vehicles) {
+      if (!vehicles.length) {
+        return `
+          <section class="card">
+            <div class="title-row"><h2>登録車両</h2><span class="badge warn">未登録</span></div>
+            <div class="empty">登録車両はまだありません。相談フォームからお車を登録してください。</div>
+          </section>`;
+      }
+
+      return `
+        <section class="card">
+          <div class="title-row"><h2>登録車両</h2><span class="badge info">${vehicles.length}台</span></div>
+          <p class="muted">車検日・オイル交換日・次回提案メモを確認できます。</p>
+          ${vehicles.map(vehicle => renderVehicleCard(vehicle)).join("")}
+        </section>`;
+    }
+
+    function renderVehicleCard(vehicle) {
+      const shaken = dateStatus(vehicle.next_shaken_date, "車検");
+      const oil = dateStatus(vehicle.next_oil_change_date || vehicle.last_oil_change_date, "オイル");
+      return `
+        <div class="vehicle-card">
+          <div class="vehicle-head">
+            <div>
+              <div class="vehicle-name">${escapeHtml(vehicleTitle(vehicle))}</div>
+              <div class="muted">ナンバー下4桁：${escapeHtml(vehicle.plate_last4 || "未登録")}</div>
+            </div>
+            <span class="badge ${shaken.className}">${escapeHtml(shaken.label)}</span>
+          </div>
+          <div class="meta-row">
+            <span class="badge">メーカー：${escapeHtml(vehicle.maker || "未登録")}</span>
+            <span class="badge">型式：${escapeHtml(vehicle.model || "未登録")}</span>
+          </div>
+          <ul class="info-list">
+            <li><span>次回車検日</span><strong>${escapeHtml(vehicle.next_shaken_date ? `${formatDate(vehicle.next_shaken_date)}（${daysText(vehicle.next_shaken_date)}）` : "未登録")}</strong></li>
+            <li><span>オイル交換目安</span><strong>${escapeHtml((vehicle.next_oil_change_date || vehicle.last_oil_change_date) ? `${formatDate(vehicle.next_oil_change_date || vehicle.last_oil_change_date)}（${oil.label}）` : "未登録")}</strong></li>
+            <li><span>最終入庫・作業</span><strong>${escapeHtml(vehicle.last_work_completed_date || vehicle.last_visit_date || "未登録")}</strong></li>
+            <li><span>次回提案メモ</span><strong>${escapeHtml(vehicle.next_proposal_memo || vehicle.memo || "未登録")}</strong></li>
+          </ul>
+          <div class="btn-row">
+            <button type="button" onclick="copyVehicleConsult('${safeAttr(vehicle.id)}')">この車で相談文面コピー</button>
+            <a class="link-btn secondary" href="index.html?v=step-ksh-brush-6&vehicleId=${encodeURIComponent(vehicle.id || "")}">この車で相談する</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderReservations(reservations, vehicles) {
+      const upcoming = reservations.filter(isUpcomingReservation).slice(0, 8);
+      if (!upcoming.length) {
+        return `
+          <section class="card">
+            <div class="title-row"><h2>現在の入庫予定</h2><span class="badge">予定なし</span></div>
+            <div class="empty">現在、今日以降の入庫予定はありません。車検・整備・オイル交換の相談はフォームから送れます。</div>
+          </section>`;
+      }
+
+      return `
+        <section class="card">
+          <div class="title-row"><h2>現在の入庫予定</h2><span class="badge ok">${upcoming.length}件</span></div>
+          ${upcoming.map(reservation => renderReservationCard(reservation, vehicles)).join("")}
+        </section>`;
+    }
+
+    function renderReservationCard(reservation, vehicles) {
+      const vehicle = vehicles.find(v => String(v.id) === String(reservation.vehicle_id));
+      const title = vehicle ? vehicleTitle(vehicle) : "登録車両";
+      const dateText = [formatDate(reservation.reservation_date), reservation.reservation_time].filter(Boolean).join(" ");
+      return `
+        <div class="reservation-card">
+          <div class="title-row">
+            <h3>${escapeHtml(dateText || "日程未登録")}</h3>
+            <span class="badge info">${escapeHtml(reservation.status || "入庫予定")}</span>
+          </div>
+          <p><strong>${escapeHtml(title)}</strong> / ${escapeHtml(reservation.work_type || "作業内容未登録")}</p>
+          <p class="muted">${escapeHtml(reservation.memo || "")}</p>
+          <div class="btn-row">
+            <button type="button" onclick="copyReservationMessage('${safeAttr(reservation.id)}','change')">日程変更相談</button>
+            <button class="warn" type="button" onclick="copyReservationMessage('${safeAttr(reservation.id)}','remind')">入庫前確認</button>
+            <button class="danger" type="button" onclick="copyReservationMessage('${safeAttr(reservation.id)}','cancel')">キャンセル相談</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderQuickMessages(profile) {
+      return `
+        <section class="card">
+          <div class="title-row"><h2>すぐ送れるLINE文面</h2><span class="badge info">コピー用</span></div>
+          <p class="muted">LINEで店舗へ送る文面を作れます。内容は送信前に自由に編集できます。</p>
+          <div class="btn-row">
+            <button type="button" onclick="copyGeneralMessage('shaken')">車検相談</button>
+            <button type="button" onclick="copyGeneralMessage('oil')">オイル交換相談</button>
+            <button type="button" onclick="copyGeneralMessage('estimate')">見積もり相談</button>
+            <button class="secondary" type="button" onclick="copyGeneralMessage('other')">その他相談</button>
+          </div>
+          <div class="message-box" id="lastCopiedBox">コピーした文面がここに表示されます。</div>
+        </section>
+      `;
+    }
+
+    function renderHistory(inquiries, reservations) {
+      const inquiryItems = inquiries.slice(0, 5);
+      const pastReservations = reservations.filter(r => !isUpcomingReservation(r)).slice(0, 5);
+      return `
+        <section class="card soft">
+          <div class="title-row"><h2>最近の相談・入庫履歴</h2><span class="badge">直近</span></div>
+          ${inquiryItems.length ? inquiryItems.map(renderInquiryHistory).join("") : `<div class="empty">最近の相談履歴はまだありません。</div>`}
+          ${pastReservations.length ? `<h3 style="margin-top:14px;">過去の入庫予定</h3>${pastReservations.map(renderReservationHistory).join("")}` : ""}
+        </section>
+      `;
+    }
+
+    function renderInquiryHistory(inquiry) {
+      return `
+        <div class="history-card">
+          <div class="title-row">
+            <h3>${escapeHtml(inquiry.consult_type || "相談")}</h3>
+            <span class="badge">${escapeHtml(inquiry.status || "受付")}</span>
+          </div>
+          <p class="muted">${escapeHtml(inquiry.preferred_visit_date ? `希望入庫日：${formatDate(inquiry.preferred_visit_date)}` : "希望入庫日未指定")}</p>
+          <p class="small">${escapeHtml(truncate(inquiry.message || "", 90))}</p>
+        </div>
+      `;
+    }
+
+    function renderReservationHistory(reservation) {
+      return `
+        <div class="history-card">
+          <div class="title-row">
+            <h3>${escapeHtml(formatDate(reservation.reservation_date) || "日程未登録")}</h3>
+            <span class="badge">${escapeHtml(reservation.status || "入庫")}</span>
+          </div>
+          <p class="muted">${escapeHtml(reservation.work_type || "作業内容未登録")}</p>
+        </div>
+      `;
+    }
+
+    function renderPrimaryActions() {
+      const tel = cleanPhone(state.shop.phone);
+      return `
+        <section class="card">
+          <div class="title-row"><h2>次の操作</h2><span class="badge info">お客様用</span></div>
+          <div class="btn-row">
+            <a class="link-btn full" href="index.html?v=step-ksh-brush-6">車検・整備相談フォームを開く</a>
+            <a class="link-btn secondary full" href="index.html?v=step-ksh-brush-6&mode=add_vehicle">2台目・家族車・社用車を追加する</a>
+            ${tel ? `<a class="link-btn ghost full" href="tel:${escapeHtml(tel)}">店舗へ電話する：${escapeHtml(state.shop.phone)}</a>` : ""}
+          </div>
+          <p class="tiny" style="margin-top:10px;">本番導入時は、店舗専用のLINE公式・LIFF・管理URLに差し替えます。</p>
+        </section>
+      `;
+    }
+
+    function showDemoProfile() {
+      state.demo = true;
+      state.profile = buildDemoProfile();
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function buildDemoProfile() {
+      const today = new Date();
+      const future = addDays(today, 22);
+      const future2 = addDays(today, 64);
+      const past = addDays(today, -36);
+      const ymd = d => d.toISOString().slice(0, 10);
+      return {
+        ok: true,
+        found: true,
+        customer: {
+          id: "demo_customer",
+          name: "佐藤 健一",
+          phone: "090-1234-5678",
+          status: "LINE連携済み",
+          line_display_name: "佐藤さん"
+        },
+        vehicles: [
+          {
+            id: "demo_vehicle_1",
+            car_name: "タント",
+            maker: "ダイハツ",
+            model: "LA650S",
+            plate_last4: "1234",
+            next_shaken_date: ymd(future2),
+            next_oil_change_date: ymd(future),
+            last_work_completed_date: ymd(past),
+            next_proposal_memo: "次回車検前に見積もり案内"
+          },
+          {
+            id: "demo_vehicle_2",
+            car_name: "ハイエース",
+            maker: "トヨタ",
+            model: "GDH201V",
+            plate_last4: "5678",
+            next_shaken_date: ymd(addDays(today, 34)),
+            next_oil_change_date: "",
+            last_work_completed_date: ymd(addDays(today, -72)),
+            next_proposal_memo: "社用車・点検案内"
+          }
+        ],
+        recentReservations: [
+          {
+            id: "demo_reservation_1",
+            vehicle_id: "demo_vehicle_1",
+            reservation_date: ymd(addDays(today, 7)),
+            reservation_time: "10:00",
+            work_type: "車検見積もり",
+            status: "確定入庫",
+            memo: "代車希望あり"
+          },
+          {
+            id: "demo_reservation_2",
+            vehicle_id: "demo_vehicle_2",
+            reservation_date: ymd(addDays(today, -22)),
+            reservation_time: "14:00",
+            work_type: "オイル交換",
+            status: "納車済み",
+            memo: "次回点検案内"
+          }
+        ],
+        recentInquiries: [
+          {
+            id: "demo_inquiry_1",
+            consult_type: "車検相談",
+            preferred_visit_date: ymd(addDays(today, 7)),
+            status: "入庫予約済み",
+            message: "車検満了が近いため、見積もりと入庫日を相談したいです。"
+          },
+          {
+            id: "demo_inquiry_2",
+            consult_type: "オイル交換",
+            preferred_visit_date: ymd(addDays(today, -22)),
+            status: "納車済み",
+            message: "エンジンオイル交換をお願いしました。"
+          }
+        ]
+      };
+    }
+
+    function copyVehicleConsult(vehicleId) {
+      const vehicle = (state.profile?.vehicles || []).find(v => String(v.id) === String(vehicleId));
+      const customer = state.profile?.customer || {};
+      const text = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n${vehicle ? `${vehicleTitle(vehicle)}（ナンバー下4桁：${vehicle.plate_last4 || "未登録"}）` : "登録している車"}について相談したいです。\n\n相談内容：\n希望入庫日：\n希望時間：\n\nよろしくお願いします。`;
+      copyText(text);
+    }
+
+    function copyReservationMessage(reservationId, type) {
+      const reservation = (state.profile?.recentReservations || []).find(r => String(r.id) === String(reservationId));
+      const vehicle = (state.profile?.vehicles || []).find(v => String(v.id) === String(reservation?.vehicle_id));
+      const customer = state.profile?.customer || {};
+      const dateText = reservation ? [formatDate(reservation.reservation_date), reservation.reservation_time].filter(Boolean).join(" ") : "";
+      const car = vehicle ? `${vehicleTitle(vehicle)}（${vehicle.plate_last4 || "ナンバー未登録"}）` : "登録車両";
+      let body = "";
+      if (type === "change") {
+        body = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n以下の入庫予定について、日程変更を相談したいです。\n\n車両：${car}\n現在の予定：${dateText}\n希望日：\n希望時間：\n\nよろしくお願いします。`;
+      } else if (type === "cancel") {
+        body = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n以下の入庫予定について、キャンセルまたは再調整を相談したいです。\n\n車両：${car}\n現在の予定：${dateText}\n理由：\n\nよろしくお願いします。`;
+      } else {
+        body = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n以下の入庫予定について確認です。\n\n車両：${car}\n予定：${dateText}\n当日必要なものや注意点があれば教えてください。\n\nよろしくお願いします。`;
+      }
+      copyText(body);
+    }
+
+    function copyGeneralMessage(type) {
+      const customer = state.profile?.customer || {};
+      const firstVehicle = (state.profile?.vehicles || [])[0];
+      const carLine = firstVehicle ? `\n車両：${vehicleTitle(firstVehicle)}（ナンバー下4桁：${firstVehicle.plate_last4 || "未登録"}）` : "";
+      const nameLine = customer.name ? `${customer.name}です。` : "相談です。";
+      let subject = "";
+      let detail = "";
+      if (type === "shaken") {
+        subject = "車検について相談したいです。";
+        detail = "車検見積もり・入庫可能日を教えてください。";
+      } else if (type === "oil") {
+        subject = "オイル交換について相談したいです。";
+        detail = "作業可能日と目安費用を教えてください。";
+      } else if (type === "estimate") {
+        subject = "見積もりについて相談したいです。";
+        detail = "内容を確認して、次の進め方を相談したいです。";
+      } else {
+        subject = "車のことで相談したいです。";
+        detail = "相談内容：\n希望入庫日：\n希望時間：";
+      }
+      const text = `${state.shop.shop_name} 様\n\n${nameLine}${carLine}\n\n${subject}\n${detail}\n\nよろしくお願いします。`;
+      copyText(text);
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        const box = document.getElementById("lastCopiedBox");
+        if (box) box.textContent = text;
+        showToast("LINE文面をコピーしました");
+      } catch (error) {
+        console.error(error);
+        showToast("コピーできませんでした。長押しで選択してください。", true);
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    function isUpcomingReservation(row) {
+      const ymd = row?.reservation_date;
+      if (!ymd) return false;
+      return ymd >= todayYmd() && !["削除済み", "キャンセル", "キャンセル済み", "取消"].includes(row.status || "");
+    }
+
+    function findNearestShaken(vehicles) {
+      return vehicles
+        .filter(v => v.next_shaken_date && v.next_shaken_date >= todayYmd())
+        .sort((a, b) => String(a.next_shaken_date).localeCompare(String(b.next_shaken_date)))[0] || null;
+    }
+
+    function dateStatus(ymd, type) {
+      if (!ymd) return { label: `${type}未登録`, className: "" };
+      const diff = daysUntil(ymd);
+      if (diff < 0) return { label: `${type}期限超過`, className: "danger" };
+      if (diff <= 14) return { label: `${type}${diff}日以内`, className: "danger" };
+      if (diff <= 60) return { label: `${type}${diff}日以内`, className: "warn" };
+      return { label: `${type}${diff}日後`, className: "ok" };
+    }
+
+    function daysText(ymd) {
+      if (!ymd) return "";
+      const diff = daysUntil(ymd);
+      if (diff < 0) return `${Math.abs(diff)}日前`;
+      if (diff === 0) return "今日";
+      return `${diff}日後`;
+    }
+
+    function daysUntil(ymd) {
+      const target = new Date(`${ymd}T00:00:00+09:00`);
+      const today = new Date(`${todayYmd()}T00:00:00+09:00`);
+      return Math.round((target - today) / 86400000);
+    }
+
+    function todayYmd() {
+      const d = new Date();
+      const jst = new Date(d.getTime() + (9 * 60 + d.getTimezoneOffset()) * 60000);
+      return jst.toISOString().slice(0, 10);
+    }
+
+    function addDays(date, days) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + days);
+      return d;
+    }
+
+    function vehicleTitle(vehicle) {
+      return vehicle?.label || [vehicle?.maker, vehicle?.car_name].filter(Boolean).join(" ") || vehicle?.car_name || "登録車両";
+    }
+
+    function formatDate(ymd) {
+      if (!ymd) return "";
+      const parts = String(ymd).split("-");
+      if (parts.length !== 3) return ymd;
+      return `${Number(parts[0])}年${Number(parts[1])}月${Number(parts[2])}日`;
+    }
+
+    function formatDateShort(ymd) {
+      if (!ymd) return "";
+      const parts = String(ymd).split("-");
+      if (parts.length !== 3) return ymd;
+      return `${Number(parts[1])}/${Number(parts[2])}`;
+    }
+
+    function cleanPhone(value) {
+      return String(value || "").replace(/[^0-9+]/g, "");
+    }
+
+    function truncate(text, max) {
+      const value = String(text || "");
+      return value.length > max ? `${value.slice(0, max)}...` : value;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function safeAttr(value) {
+      return String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    }
+  </script>
+</body>
+</html>
