@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-2</title>
+  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-3</title>
 
   <style>
     :root {
@@ -214,6 +214,176 @@
     .card-pad {
       padding: 18px;
     }
+
+    /* STEP KSH-BRUSH-3: PCトップ業務導線 */
+    .daily-route {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .route-step {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: #ffffff;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      min-height: 112px;
+    }
+
+    .route-step-number {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: #111827;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      flex: 0 0 auto;
+      font-size: 13px;
+    }
+
+    .route-step strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .route-step span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .ops-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .ops-card {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--blue);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+      cursor: pointer;
+      transition: transform 0.08s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .ops-card:hover,
+    .ops-card:focus {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+      outline: none;
+    }
+
+    .ops-card.red { border-left-color: var(--red); }
+    .ops-card.orange { border-left-color: var(--orange); }
+    .ops-card.green { border-left-color: var(--green); }
+    .ops-card.blue { border-left-color: var(--blue); }
+    .ops-card.purple { border-left-color: var(--purple); }
+    .ops-card.slate { border-left-color: var(--slate); }
+
+    .ops-card-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .ops-card strong {
+      display: block;
+      font-size: 28px;
+      margin-bottom: 2px;
+    }
+
+    .ops-card small {
+      display: block;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .template-chip {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+
+    .template-chip strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .template-chip span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .reservation-status-group {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      background: #ffffff;
+    }
+
+    .reservation-status-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .reservation-status-title span {
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .reservation-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 1120px) {
+      .daily-route { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ops-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      .daily-route,
+      .ops-grid,
+      .template-grid { grid-template-columns: 1fr; }
+    }
+
 
     .kpi {
       padding: 18px;
@@ -1112,7 +1282,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-2</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-3</p>
           </div>
         </div>
       </div>
@@ -1141,7 +1311,7 @@
         <div>
           <button class="btn btn-slate mobile-menu" onclick="toggleSidebar()">☰</button>
           <h2 id="pageTitle">今日やること</h2>
-          <p id="pageDesc">今日対応すべき相談・車検営業・LINEチャット候補をまとめます。</p>
+          <p id="pageDesc">今日対応する順番・入庫予定・未対応相談・車検フォローを一画面で確認します。</p>
         </div>
         <div class="top-actions">
           <button class="btn btn-orange" onclick="openIpadDashboard()">iPad用画面</button>
@@ -1166,6 +1336,38 @@
         <div id="alertBox" class="alert"></div>
 
         <section id="section-today" class="section active">
+          <div class="card card-pad" style="margin-bottom:16px; border:2px solid #bfdbfe; background:#eff6ff;">
+            <div class="panel-title">
+              <div>
+                <h3>今日見る順番</h3>
+                <p>車屋オーナーが朝一番に確認する流れです。売上ではなく、対応・入庫・連絡を先に見ます。</p>
+              </div>
+              <button class="btn btn-primary" onclick="loadToday()">最新状態に更新</button>
+            </div>
+            <div class="daily-route">
+              <div class="route-step">
+                <div class="route-step-number">1</div>
+                <div><strong>未対応相談を見る</strong><span>新規相談・見積もり後未返信・入庫希望を確認します。</span></div>
+              </div>
+              <div class="route-step">
+                <div class="route-step-number">2</div>
+                <div><strong>仮入庫を確定する</strong><span>お客様の希望日を確認し、正式な入庫予定へ変更します。</span></div>
+              </div>
+              <div class="route-step">
+                <div class="route-step-number">3</div>
+                <div><strong>本日の入庫を処理する</strong><span>入庫済み・作業中・完了連絡待ちに進めます。</span></div>
+              </div>
+              <div class="route-step">
+                <div class="route-step-number">4</div>
+                <div><strong>LINE文面を送る</strong><span>車検案内・見積もり後再連絡・完了連絡をコピーします。</span></div>
+              </div>
+              <div class="route-step">
+                <div class="route-step-number">5</div>
+                <div><strong>次回フォローを残す</strong><span>3日後・7日後の再連絡や次回車検案内につなげます。</span></div>
+              </div>
+            </div>
+          </div>
+
           <div class="grid4">
             <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="今日やること一覧へ移動" aria-label="今日やること一覧へ移動" onclick="openDashboardShortcut('todayTasks')" onkeydown="handleShortcutCardKey(event, 'todayTasks')">
               <div>
@@ -1177,20 +1379,21 @@
               <div class="icon bg-red">✅</div>
             </div>
 
-            <div class="card kpi">
+            <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="本日の入庫予定へ移動" aria-label="本日の入庫予定へ移動" onclick="openDashboardShortcut('todayReservations')" onkeydown="handleShortcutCardKey(event, 'todayReservations')">
               <div>
-                <span>LINE顧客数</span>
-                <strong id="kpiLineMembers">-</strong>
-                <small>DEMO上のLINE連携・顧客数</small>
+                <span>本日の入庫</span>
+                <strong id="kpiTodayReservations">-</strong>
+                <small>仮入庫・入庫予定・作業中</small>
+                <em class="shortcut-hint">押すと入庫予定へ</em>
               </div>
-              <div class="icon bg-green">💬</div>
+              <div class="icon bg-green">📅</div>
             </div>
 
             <div class="card kpi">
               <div>
                 <span>車検時期登録</span>
                 <strong id="kpiShakenKnown">-</strong>
-                <small>車両情報が売上資産になる</small>
+                <small>車両情報が次回提案の資産</small>
               </div>
               <div class="icon bg-blue">🚗</div>
             </div>
@@ -1211,49 +1414,51 @@
           <div class="card card-pad">
             <div class="panel-title">
               <div>
-                <h3>対応状況ボード</h3>
-                <p>未対応相談・仮入庫・入庫予定・再連絡予定をまとめて確認します。売上金額はこの画面には表示しません。</p>
+                <h3>今日の業務ボード</h3>
+                <p>件数カードを押すと、該当する一覧へ移動します。営業・現場スタッフが見るトップなので、売上金額は出しません。</p>
               </div>
+              <button class="btn btn-slate" onclick="switchTab('ownerSales')">売上・完了履歴は別画面</button>
             </div>
-            <div class="grid4">
-              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="未対応相談だけ確認" aria-label="未対応相談だけ確認" onclick="openDashboardShortcut('openInquiries')" onkeydown="handleShortcutCardKey(event, 'openInquiries')">
-                <div>
-                  <span>未対応相談</span>
-                  <strong id="opOpenInquiries">-</strong>
-                  <small>新規・確認中・未返信</small>
-                  <em class="shortcut-hint">押すと相談一覧へ</em>
-                </div>
-                <div class="icon bg-red">📝</div>
+            <div class="ops-grid">
+              <div class="ops-card red" role="button" tabindex="0" onclick="openDashboardShortcut('openInquiries')" onkeydown="handleShortcutCardKey(event, 'openInquiries')">
+                <div class="ops-card-label"><span>相談対応</span><span>未処理</span></div>
+                <strong id="opOpenInquiries">-</strong>
+                <small>新規相談・確認中・見積もり後未返信</small>
               </div>
-
-              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="仮入庫のみ確認" aria-label="仮入庫のみ確認" onclick="openDashboardShortcut('provisionalReservations')" onkeydown="handleShortcutCardKey(event, 'provisionalReservations')">
-                <div>
-                  <span>仮入庫</span>
-                  <strong id="opProvisionalReservations">-</strong>
-                  <small>希望日あり・店舗確認待ち</small>
-                  <em class="shortcut-hint">押すと仮入庫一覧へ</em>
-                </div>
-                <div class="icon bg-orange">🟡</div>
+              <div class="ops-card orange" role="button" tabindex="0" onclick="openDashboardShortcut('provisionalReservations')" onkeydown="handleShortcutCardKey(event, 'provisionalReservations')">
+                <div class="ops-card-label"><span>入庫調整</span><span>確認待ち</span></div>
+                <strong id="opProvisionalReservations">-</strong>
+                <small>お客様希望日あり。店舗側で確定が必要</small>
               </div>
-
-              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="入庫予定だけ確認" aria-label="入庫予定だけ確認" onclick="openDashboardShortcut('confirmedReservations')" onkeydown="handleShortcutCardKey(event, 'confirmedReservations')">
-                <div>
-                  <span>入庫予定</span>
-                  <strong id="opConfirmedReservations">-</strong>
-                  <small>30日以内の来店予定</small>
-                  <em class="shortcut-hint">押すと入庫予定一覧へ</em>
-                </div>
-                <div class="icon bg-green">📅</div>
+              <div class="ops-card green" role="button" tabindex="0" onclick="openDashboardShortcut('confirmedReservations')" onkeydown="handleShortcutCardKey(event, 'confirmedReservations')">
+                <div class="ops-card-label"><span>入庫予定</span><span>30日以内</span></div>
+                <strong id="opConfirmedReservations">-</strong>
+                <small>確定入庫・入庫済み・作業中</small>
               </div>
-
-              <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="再連絡予定だけ確認" aria-label="再連絡予定だけ確認" onclick="openDashboardShortcut('recontact')" onkeydown="handleShortcutCardKey(event, 'recontact')">
-                <div>
-                  <span>再連絡予定</span>
-                  <strong id="opRecontactScheduled">-</strong>
-                  <small>後日もう一度連絡</small>
-                  <em class="shortcut-hint">押すと再連絡一覧へ</em>
-                </div>
-                <div class="icon bg-blue">🔁</div>
+              <div class="ops-card blue" role="button" tabindex="0" onclick="openDashboardShortcut('todayReservations')" onkeydown="handleShortcutCardKey(event, 'todayReservations')">
+                <div class="ops-card-label"><span>本日処理</span><span>今日</span></div>
+                <strong id="opTodayReservations">-</strong>
+                <small>今日の入庫・作業・完了連絡</small>
+              </div>
+              <div class="ops-card red" role="button" tabindex="0" onclick="openDashboardShortcut('shakenFollowups')" onkeydown="handleShortcutCardKey(event, 'shakenFollowups')">
+                <div class="ops-card-label"><span>車検フォロー</span><span>60日以内</span></div>
+                <strong id="kpiShaken60">-</strong>
+                <small>すぐ連絡したい車検案内候補</small>
+              </div>
+              <div class="ops-card orange" role="button" tabindex="0" onclick="openDashboardShortcut('oilFollowups')" onkeydown="handleShortcutCardKey(event, 'oilFollowups')">
+                <div class="ops-card-label"><span>オイル交換</span><span>候補</span></div>
+                <strong id="opOilCandidates">-</strong>
+                <small>前回作業・目安日からの案内候補</small>
+              </div>
+              <div class="ops-card purple" role="button" tabindex="0" onclick="openDashboardShortcut('estimateFollowups')" onkeydown="handleShortcutCardKey(event, 'estimateFollowups')">
+                <div class="ops-card-label"><span>見積もり後</span><span>未返信</span></div>
+                <strong id="opEstimateFollowups">-</strong>
+                <small>見積もり後・案内後に再連絡したい案件</small>
+              </div>
+              <div class="ops-card slate" role="button" tabindex="0" onclick="openDashboardShortcut('recontact')" onkeydown="handleShortcutCardKey(event, 'recontact')">
+                <div class="ops-card-label"><span>再連絡予定</span><span>3日後/7日後</span></div>
+                <strong id="opRecontactScheduled">-</strong>
+                <small>後日もう一度連絡する案件</small>
               </div>
             </div>
           </div>
@@ -1265,7 +1470,7 @@
               <div class="toolbar">
                 <div>
                   <h3 style="margin:0">今日やること</h3>
-                  <div class="small muted">オーナーはまずここだけ見ればOKです。</div>
+                  <div class="small muted">お客様名・車両・相談内容・送る文面までここに集約します。</div>
                 </div>
                 <button class="btn btn-slate" onclick="loadToday()">更新</button>
               </div>
@@ -1276,9 +1481,9 @@
               <div class="panel-title">
                 <div>
                   <h3>本日の入庫・来店予定</h3>
-                  <p>仮入庫・入庫予定・入庫済みを確認します。</p>
+                  <p>仮入庫・入庫予定・入庫済み・作業中をステータス別に確認します。</p>
                 </div>
-                <button class="btn btn-slate" onclick="switchTab('reservations')">詳細</button>
+                <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">詳細</button>
               </div>
               <div id="dashboardTodayReservations" class="list"></div>
             </div>
@@ -1286,32 +1491,67 @@
 
           <div style="height:16px"></div>
 
-          <div class="grid3">
-            <div class="card kpi">
-              <div>
-                <span>車検2か月以内</span>
-                <strong id="kpiShaken60">-</strong>
-                <small>すぐ連絡したい顧客</small>
+          <div class="grid2">
+            <div class="card card-pad">
+              <div class="panel-title">
+                <div>
+                  <h3>すぐ送れるLINE文面</h3>
+                  <p>実際の個別文面は「今日やること」内で編集してコピーできます。ここでは使う場面を整理します。</p>
+                </div>
+                <button class="btn btn-slate" onclick="switchTab('followups')">チャット候補へ</button>
               </div>
-              <div class="icon bg-red">⚠️</div>
+              <div class="template-grid">
+                <div class="template-chip"><strong>車検案内</strong><span>車検満了90日・60日・30日前の案内</span></div>
+                <div class="template-chip"><strong>見積もり後再連絡</strong><span>未返信のお客様へ確認連絡</span></div>
+                <div class="template-chip"><strong>入庫日前日確認</strong><span>日時・持ち物・代車確認</span></div>
+                <div class="template-chip"><strong>作業完了連絡</strong><span>完了報告と引き取り案内</span></div>
+                <div class="template-chip"><strong>オイル交換案内</strong><span>前回作業からの次回提案</span></div>
+                <div class="template-chip"><strong>LINE未連携案内</strong><span>電話・店頭顧客へLINE登録案内</span></div>
+              </div>
             </div>
 
-            <div class="card kpi">
-              <div>
-                <span>車検3か月以内</span>
-                <strong id="kpiShaken90">-</strong>
-                <small>早めに案内したい顧客</small>
+            <div class="card card-pad">
+              <div class="panel-title">
+                <div>
+                  <h3>車検・整備フォロー</h3>
+                  <p>車両情報が残ることで、次の車検・整備・オイル交換の案内につなげます。</p>
+                </div>
+                <button class="btn btn-slate" onclick="switchTab('opportunities')">営業候補へ</button>
               </div>
-              <div class="icon bg-orange">🔔</div>
-            </div>
-
-            <div class="card kpi">
-              <div>
-                <span>LINEチャット候補</span>
-                <strong id="kpiReminderQueue">-</strong>
-                <small>文面編集・チャット送信用</small>
+              <div class="grid2">
+                <div class="card kpi">
+                  <div>
+                    <span>車検3か月以内</span>
+                    <strong id="kpiShaken90">-</strong>
+                    <small>早めに案内したい顧客</small>
+                  </div>
+                  <div class="icon bg-orange">🔔</div>
+                </div>
+                <div class="card kpi">
+                  <div>
+                    <span>LINE未連携</span>
+                    <strong id="opLineUnlinked">-</strong>
+                    <small>店頭でLINE登録案内</small>
+                  </div>
+                  <div class="icon bg-slate">👤</div>
+                </div>
+                <div class="card kpi">
+                  <div>
+                    <span>LINEチャット候補</span>
+                    <strong id="kpiReminderQueue">-</strong>
+                    <small>文面編集・コピー用</small>
+                  </div>
+                  <div class="icon bg-purple">📨</div>
+                </div>
+                <div class="card kpi">
+                  <div>
+                    <span>LINE顧客数</span>
+                    <strong id="kpiLineMembers">-</strong>
+                    <small>DEMO上のLINE連携・顧客数</small>
+                  </div>
+                  <div class="icon bg-green">💬</div>
+                </div>
               </div>
-              <div class="icon bg-purple">📨</div>
             </div>
           </div>
         </section>
@@ -2425,7 +2665,7 @@
     const pageMeta = {
       today: {
         title: "今日やること",
-        desc: "今日対応すべき相談・仮入庫・再連絡・LINEチャット候補をまとめます。件数は表示中の一覧と連動します。"
+        desc: "今日対応する順番・入庫予定・未対応相談・車検フォローを一画面で確認します。"
       },
       inquiries: {
         title: "相談一覧",
@@ -2581,6 +2821,30 @@
         switchTab("reservations");
         showOk("本日の入庫予定を表示します。");
         scrollDashboardTarget("reservationFilterSummary");
+        return;
+      }
+
+      if (type === "shakenFollowups") {
+        switchTab("followups");
+        if (typeof setFollowupFilter === "function") setFollowupFilter("shaken");
+        showOk("車検案内候補を表示します。");
+        return;
+      }
+
+      if (type === "oilFollowups") {
+        switchTab("followups");
+        if (typeof setFollowupFilter === "function") setFollowupFilter("oil");
+        showOk("オイル交換案内候補を表示します。");
+        return;
+      }
+
+      if (type === "estimateFollowups") {
+        const filter = document.getElementById("inquiryStatusFilter");
+        if (filter) filter.value = "active";
+        switchTab("inquiries");
+        showOk("見積もり後・未返信を含む対応中相談を表示します。");
+        scrollDashboardTarget("inquiryFilterSummary");
+        return;
       }
     }
 
@@ -2771,6 +3035,10 @@
       setText("opProvisionalReservations", `${visible.provisionalReservations || 0}件`);
       setText("opConfirmedReservations", `${visible.confirmedReservations || 0}件`);
       setText("opRecontactScheduled", `${visible.recontactScheduled || 0}件`);
+      setText("opTodayReservations", `${visible.todayReservations || 0}件`);
+      setText("opOilCandidates", `${visible.oilCandidates || 0}件`);
+      setText("opEstimateFollowups", `${visible.estimateFollowups || 0}件`);
+      setText("opLineUnlinked", `${visible.lineUnlinked || 0}名`);
     }
 
     function syncTodayAndOperationCounts(data, rawStats = {}) {
@@ -2783,6 +3051,11 @@
       setText("kpiShaken60", `${visible.shaken60 || 0}件`);
       setText("kpiShaken90", `${visible.shaken90 || 0}件`);
       setText("kpiReminderQueue", `${visible.chatCandidates || 0}件`);
+      setText("kpiTodayReservations", `${visible.todayReservations || 0}件`);
+      setText("opTodayReservations", `${visible.todayReservations || 0}件`);
+      setText("opOilCandidates", `${visible.oilCandidates || 0}件`);
+      setText("opEstimateFollowups", `${visible.estimateFollowups || 0}件`);
+      setText("opLineUnlinked", `${visible.lineUnlinked || 0}名`);
       renderOperationBoard(data, visible);
     }
 
@@ -2794,6 +3067,8 @@
       const reminders = source.reminderQueue || remindersCache || [];
       const upcomingReservations = source.upcomingReservations || source.todayReservations || reservationsCache || [];
       const followupActions = source.followupActions || followupActionsCache || [];
+      const customers = source.latestCustomers || customersCache || [];
+      const todayReservations = source.todayReservations || reservationsCache || [];
       const summary = source.summary || {};
       const today = dateYmd(new Date());
 
@@ -2821,6 +3096,23 @@
         return !hideUntil || hideUntil >= today;
       });
 
+      const oilCandidates = visibleOpportunityRows.filter(row => {
+        const trigger = String(row.trigger_type || row.followup_type || row.title || "");
+        return trigger.includes("オイル") || trigger.toLowerCase().includes("oil");
+      }).length;
+
+      const estimateFollowups = visibleOpenInquiries.filter(row => {
+        const status = String(row.status || "");
+        const consult = String(row.consult_type || "");
+        const message = String(row.message || "");
+        return status.includes("見積") || status.includes("未返信") || consult.includes("見積") || message.includes("見積");
+      }).length;
+
+      const todayReservationCount = todayReservations.filter(row => !isClosedReservationStatus(row.status)).length;
+      const lineUnlinked = Array.isArray(customers)
+        ? customers.filter(row => row && row.status !== "削除済み" && !row.line_user_id).length
+        : 0;
+
       return {
         lineMembers: Number(summary.line_members ?? 0),
         shakenKnown: Number(rawStats.shakenKnown ?? 0),
@@ -2831,7 +3123,11 @@
         chatCandidates: visibleReminderRows.length,
         provisionalReservations: provisionalReservations.length,
         confirmedReservations: confirmedReservations.length,
-        recontactScheduled: recontactScheduled.length
+        recontactScheduled: recontactScheduled.length,
+        todayReservations: todayReservationCount,
+        oilCandidates,
+        estimateFollowups,
+        lineUnlinked
       };
     }
 
@@ -3401,24 +3697,66 @@
 
     function renderTodayReservations(rows) {
       const box = document.getElementById("dashboardTodayReservations");
+      const visibleRows = (rows || []).filter(row => !isClosedReservationStatus(row.status));
 
-      if (!rows.length) {
+      if (!visibleRows.length) {
         box.innerHTML = `<div class="list-item muted">本日の入庫予定はありません。</div>`;
         return;
       }
 
-      box.innerHTML = rows.map(row => `
-        <div class="list-item">
-          <div class="list-item-head">
-            <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "時間未定")} / ${escapeHtml(row.work_type || "")}</strong>
-            ${badgeStatus(row.status)}
+      const groups = [
+        { key: "provisional", label: "仮入庫・確認待ち", hint: "正式な日時確認が必要", match: row => isProvisionalReservationStatus(row.status) },
+        { key: "confirmed", label: "確定入庫・入庫予定", hint: "本日来店予定", match: row => isConfirmedReservationStatus(row.status) && !String(row.status || "").includes("作業完了") },
+        { key: "completed", label: "完了連絡待ち・作業完了", hint: "文面コピー・次回提案へ", match: row => String(row.status || "").includes("完了") },
+        { key: "other", label: "その他", hint: "状況確認", match: row => true }
+      ];
+
+      const used = new Set();
+      const htmlGroups = groups.map(group => {
+        const items = visibleRows.filter(row => {
+          const id = row.id || `${row.reservation_date}_${row.reservation_time}_${row.customer_id}`;
+          if (used.has(id)) return false;
+          const ok = group.match(row);
+          if (ok) used.add(id);
+          return ok;
+        });
+
+        if (!items.length) return "";
+
+        return `
+          <div class="reservation-status-group">
+            <div class="reservation-status-title">
+              <div>${escapeHtml(group.label)}</div>
+              <span>${items.length}件 / ${escapeHtml(group.hint)}</span>
+            </div>
+            ${items.map(row => {
+              const customerName = row.customer?.name || row.customer_name || "未入力";
+              const vehicleName = row.vehicle?.car_name || row.car_name_snapshot || "車両未入力";
+              const plate = row.vehicle?.plate_last4 || row.plate_last4 || "";
+              const reservationId = escapeHtml(row.id || "");
+              return `
+                <div class="list-item">
+                  <div class="list-item-head">
+                    <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "時間未定")} / ${escapeHtml(row.work_type || "入庫予定")}</strong>
+                    ${badgeStatus(row.status)}
+                  </div>
+                  <div class="small">
+                    ${escapeHtml(customerName)} / ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""}
+                  </div>
+                  <div class="muted small">${escapeHtml(row.memo || "")}</div>
+                  <div class="reservation-actions">
+                    ${row.id ? `<button class="btn btn-slate" onclick="copyReservationMessage('${reservationId}')">文面コピー</button>` : ""}
+                    ${isProvisionalReservationStatus(row.status) && row.id ? `<button class="btn btn-green" onclick="confirmReservationQuick('${reservationId}')">入庫予定にする</button>` : ""}
+                    <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">一覧で確認</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
           </div>
-          <div class="small">
-            ${escapeHtml(row.customer?.name || "未入力")} / ${escapeHtml(row.vehicle?.car_name || "車両未入力")}
-          </div>
-          <div class="muted small">${escapeHtml(row.memo || "")}</div>
-        </div>
-      `).join("");
+        `;
+      }).join("");
+
+      box.innerHTML = htmlGroups || `<div class="list-item muted">本日の入庫予定はありません。</div>`;
     }
 
     async function loadInquiries() {
