@@ -2062,6 +2062,9 @@
                 <div class="form-field">
                   <label>日付</label>
                   <input id="specialDate" type="date" />
+                  <div class="small muted" style="margin-top:6px; line-height:1.6;">
+                    今日以降の日付だけ登録できます。過去日の臨時休み・特別営業日は登録できません。
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>区分</label>
@@ -2460,6 +2463,7 @@
       initCustomerFormLimits();
       initReservationFormLimits();
       initSalesDateRange();
+      initSpecialDayDateLimit();
       await loadShopSettingsOnly();
       await loadToday();
     });
@@ -5122,6 +5126,18 @@
       }, 80);
     }
 
+    function initSpecialDayDateLimit() {
+      const input = document.getElementById("specialDate");
+      if (!input) return;
+
+      const today = dateYmd(new Date());
+      input.min = today;
+
+      if (input.value && input.value < today) {
+        input.value = today;
+      }
+    }
+
     function initCustomerFormLimits() {
       const today = new Date();
       const todayDate = dateYmd(today);
@@ -5905,6 +5921,7 @@
 
         renderBusinessDays(businessDaysCache);
         renderSpecialDays(specialDaysCache);
+        initSpecialDayDateLimit();
 
       } catch (error) {
         showError(error.message);
@@ -6016,6 +6033,13 @@
 
       if (!targetDate) {
         showError("日付を選択してください。");
+        return;
+      }
+
+      const today = dateYmd(new Date());
+      if (targetDate < today) {
+        showError("過去の日付は登録できません。今日以降の日付を選択してください。");
+        initSpecialDayDateLimit();
         return;
       }
 
