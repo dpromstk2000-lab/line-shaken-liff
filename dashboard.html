@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>STREET HOUSE 杵築｜オーナーダッシュボード STEP KSH-IPAD-1</title>
+  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-2</title>
 
   <style>
     :root {
@@ -1109,10 +1109,10 @@
     <aside id="sidebar" class="sidebar">
       <div class="brand">
         <div class="brand-row">
-          <div class="logo">SH</div>
+          <div id="dashboardLogoText" class="logo">SH</div>
           <div>
-            <h1>STREET HOUSE 杵築<br>オーナー画面</h1>
-            <p>LINE公式 DEMO / STEP KSH-IPAD-1</p>
+            <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-2</p>
           </div>
         </div>
       </div>
@@ -1145,19 +1145,19 @@
         </div>
         <div class="top-actions">
           <button class="btn btn-orange" onclick="openIpadDashboard()">iPad用画面</button>
-          <button class="btn btn-slate" onclick="toggleTokenBox()">認証設定</button>
+          <button class="btn btn-slate" onclick="toggleTokenBox()">管理コード設定</button>
           <button class="btn btn-primary" onclick="refreshCurrentTab()">更新</button>
         </div>
       </header>
 
       <div class="content">
         <div id="tokenBox" class="token-box">
-          <strong>ダッシュボード認証トークン</strong>
+          <strong>デモ管理コード</strong>
           <div class="small muted">
-            DEMO用です。本番ではCloudflare Accessなどのログイン制限を追加してください。
+            デモ用の管理コードは 1234 です。本番では店舗ごとのコードやCloudflare Accessなどのログイン制限を追加してください。
           </div>
           <div class="token-row">
-            <input id="tokenInput" type="text" placeholder="DASHBOARD_TOKEN" />
+            <input id="tokenInput" type="text" placeholder="例：1234" />
             <button class="btn btn-primary" onclick="saveToken()">保存</button>
             <button class="btn btn-slate" onclick="resetToken()">初期値に戻す</button>
           </div>
@@ -1954,13 +1954,83 @@
         </section>
 
         <section id="section-settings" class="section">
+
+          <div class="card card-pad" style="margin-bottom:16px; border:2px solid #bfdbfe; background:#eff6ff;">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">店舗基本設定</h3>
+                <div class="small muted" style="line-height:1.7; margin-top:6px;">
+                  店舗名・サービス名・予約フォームの見出しを変更すると、予約フォーム・PC管理画面・iPad画面の表示に反映されます。<br>
+                  今回のデモ初期値は STREET HOUSE 杵築 のままです。本番では各オーナーの店舗名に変更します。
+                </div>
+              </div>
+              <button id="shopSettingsSaveButton" class="btn btn-primary" onclick="saveShopSettings()">店舗基本設定を保存</button>
+            </div>
+
+            <div class="form-grid" style="margin-top:14px">
+              <div class="form-field">
+                <label>店舗名</label>
+                <input id="settingShopName" type="text" placeholder="例：田中モータース" />
+              </div>
+              <div class="form-field">
+                <label>サービス名</label>
+                <input id="settingServiceName" type="text" placeholder="例：DPRO車検・整備LINE管理システム" />
+              </div>
+              <div class="form-field">
+                <label>電話番号</label>
+                <input id="settingPhone" type="tel" placeholder="例：0978-00-0000" />
+              </div>
+              <div class="form-field">
+                <label>メインカラー</label>
+                <input id="settingMainColor" type="text" placeholder="例：#0f766e" />
+              </div>
+              <div class="form-field form-wide">
+                <label>住所</label>
+                <input id="settingAddress" type="text" placeholder="例：大分県杵築市〇〇" />
+              </div>
+              <div class="form-field">
+                <label>営業時間表示</label>
+                <input id="settingBusinessHoursText" type="text" placeholder="例：10:00〜19:00" />
+              </div>
+              <div class="form-field">
+                <label>定休日表示</label>
+                <input id="settingRegularHolidayText" type="text" placeholder="例：月曜定休" />
+              </div>
+              <div class="form-field form-wide">
+                <label>予約フォーム見出し</label>
+                <input id="settingFormTitle" type="text" placeholder="例：車検・整備のLINE受付" />
+              </div>
+              <div class="form-field form-full">
+                <label>予約フォーム説明文</label>
+                <textarea id="settingFormDescription" placeholder="例：車検・整備・オイル交換・修理相談をLINEから受付できます。"></textarea>
+              </div>
+              <div class="form-field form-wide">
+                <label>PC管理画面タイトル</label>
+                <input id="settingOwnerTitle" type="text" placeholder="例：オーナー管理画面" />
+              </div>
+              <div class="form-field form-wide">
+                <label>iPad画面タイトル</label>
+                <input id="settingIpadTitle" type="text" placeholder="例：店頭受付iPad" />
+              </div>
+              <div class="form-field form-full">
+                <label>受付時の注意事項</label>
+                <textarea id="settingReceptionNotice" placeholder="例：仮希望受付後、スタッフ確認後に正式な入庫日時をご連絡します。"></textarea>
+              </div>
+              <div class="form-field form-full">
+                <label>LINE文面フッター</label>
+                <textarea id="settingLineMessageFooter" placeholder="例：ご不明点があればLINEでお気軽にご返信ください。"></textarea>
+              </div>
+            </div>
+            <div id="shopSettingsMessage" class="small muted" style="line-height:1.7; margin-top:8px;"></div>
+          </div>
+
           <div class="card card-pad" style="margin-bottom:16px; border:2px solid #fed7aa; background:#fff7ed;">
             <div class="toolbar">
               <div>
                 <h3 style="margin:0">営業前DEMO準備</h3>
                 <div class="small muted" style="line-height:1.7; margin-top:6px;">
                   営業前に押すと、顧客・車両・相談・入庫予定を今日基準で作り直します。<br>
-                  STREET HOUSE 杵築のDEMOデータだけをリセットします。
+                  <span id="demoResetShopName">STREET HOUSE 杵築</span> のDEMOデータだけをリセットします。
                 </div>
               </div>
               <button id="kshDemoResetButton" class="btn btn-orange" onclick="resetKshDemoData()">営業前DEMOを準備する</button>
@@ -2165,8 +2235,161 @@
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const KSH_DEMO_RESET_WORKER_URL = "https://ksh-demo-reset.dpromstk2000.workers.dev";
-    const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
+    const DEFAULT_DASHBOARD_TOKEN = "1234";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
+
+
+    let shopSettings = {
+      shop_name: "STREET HOUSE 杵築",
+      service_name: "DPRO車検・整備LINE管理システム",
+      form_title: "STREET HOUSE 杵築 車検・整備のLINE受付",
+      form_description: "車検・整備・オイル交換・修理相談をLINEから受付できます。",
+      owner_title: "STREET HOUSE 杵築 オーナー管理画面",
+      ipad_title: "STREET HOUSE 杵築 店頭受付iPad",
+      business_hours_text: "10:00〜19:00",
+      regular_holiday_text: "月曜定休",
+      main_color: "#0f766e"
+    };
+
+    function getShopName() {
+      return String(shopSettings.shop_name || "STREET HOUSE 杵築").trim();
+    }
+
+    function getServiceName() {
+      return String(shopSettings.service_name || "DPRO車検・整備LINE管理システム").trim();
+    }
+
+    function getShopInitials(name) {
+      const text = String(name || "").trim();
+      if (!text) return "店";
+      const ascii = text.match(/[A-Za-z0-9]/g);
+      if (ascii && ascii.length >= 2) return (ascii[0] + ascii[1]).toUpperCase();
+      return text.slice(0, 2);
+    }
+
+    function mergeShopSettings(settings = {}) {
+      shopSettings = {
+        ...shopSettings,
+        ...settings,
+        shop_name: settings.shop_name || settings.shop || shopSettings.shop_name,
+        service_name: settings.service_name || shopSettings.service_name
+      };
+      applyShopSettingsToDashboard();
+    }
+
+    function applyShopSettingsToDashboard() {
+      const shopName = getShopName();
+      const serviceName = getServiceName();
+      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-2`;
+      setText("dashboardLogoText", getShopInitials(shopName));
+      setText("dashboardShopName", shopName);
+      setText("dashboardServiceName", serviceName);
+      setText("demoResetShopName", shopName);
+    }
+
+    async function loadShopSettingsOnly() {
+      try {
+        const result = await api("/api/shop-settings");
+        const settings = result.shop_settings || {};
+        mergeShopSettings({
+          ...settings,
+          shop_name: result.shop_name || settings.shop_name,
+          service_name: result.service_name || settings.service_name
+        });
+        renderShopSettingsForm(shopSettings);
+        return shopSettings;
+      } catch (error) {
+        console.warn("shop settings fallback", error);
+        applyShopSettingsToDashboard();
+        renderShopSettingsForm(shopSettings);
+        return shopSettings;
+      }
+    }
+
+    function renderShopSettingsForm(settings) {
+      const s = settings || shopSettings || {};
+      setInputValue("settingShopName", s.shop_name || "");
+      setInputValue("settingServiceName", s.service_name || "");
+      setInputValue("settingPhone", s.phone || "");
+      setInputValue("settingAddress", s.address || "");
+      setInputValue("settingBusinessHoursText", s.business_hours_text || "");
+      setInputValue("settingRegularHolidayText", s.regular_holiday_text || "");
+      setInputValue("settingFormTitle", s.form_title || "");
+      setInputValue("settingFormDescription", s.form_description || "");
+      setInputValue("settingOwnerTitle", s.owner_title || "");
+      setInputValue("settingIpadTitle", s.ipad_title || "");
+      setInputValue("settingReceptionNotice", s.reception_notice || "");
+      setInputValue("settingLineMessageFooter", s.line_message_footer || "");
+      setInputValue("settingMainColor", s.main_color || "#0f766e");
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value == null ? "" : String(value);
+    }
+
+    function getInputValue(id) {
+      const el = document.getElementById(id);
+      return el ? String(el.value || "").trim() : "";
+    }
+
+    async function saveShopSettings() {
+      clearAlert();
+      const button = document.getElementById("shopSettingsSaveButton");
+      const message = document.getElementById("shopSettingsMessage");
+
+      const payload = {
+        shop_name: getInputValue("settingShopName"),
+        service_name: getInputValue("settingServiceName"),
+        phone: getInputValue("settingPhone"),
+        address: getInputValue("settingAddress"),
+        business_hours_text: getInputValue("settingBusinessHoursText"),
+        regular_holiday_text: getInputValue("settingRegularHolidayText"),
+        form_title: getInputValue("settingFormTitle"),
+        form_description: getInputValue("settingFormDescription"),
+        owner_title: getInputValue("settingOwnerTitle"),
+        ipad_title: getInputValue("settingIpadTitle"),
+        reception_notice: getInputValue("settingReceptionNotice"),
+        line_message_footer: getInputValue("settingLineMessageFooter"),
+        main_color: getInputValue("settingMainColor")
+      };
+
+      if (!payload.shop_name) {
+        showError("店舗名を入力してください。");
+        return;
+      }
+
+      if (payload.main_color && !/^#[0-9a-fA-F]{6}$/.test(payload.main_color)) {
+        showError("メインカラーは #0f766e のような6桁カラーコードで入力してください。");
+        return;
+      }
+
+      try {
+        if (button) {
+          button.disabled = true;
+          button.textContent = "保存中...";
+        }
+        if (message) message.textContent = "保存中です...";
+
+        const result = await api("/api/shop-settings", {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+
+        mergeShopSettings(result.shop_settings || payload);
+        renderShopSettingsForm(shopSettings);
+        showOk("店舗基本設定を保存しました。予約フォーム・iPad画面・LINE文面の店舗名にも反映されます。");
+        if (message) message.textContent = `保存しました：${getShopName()}`;
+      } catch (error) {
+        showError(error.message);
+        if (message) message.textContent = "保存できませんでした。管理コードとWorker反映状況を確認してください。";
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = "店舗基本設定を保存";
+        }
+      }
+    }
 
     let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
     let currentTab = "today";
@@ -2227,7 +2450,7 @@
       },
       settings: {
         title: "店舗設定",
-        desc: "定休日・臨時休み・営業時間、営業前DEMO準備を管理します。"
+        desc: "店舗名・表示文言・定休日・営業時間、営業前DEMO準備を管理します。"
       }
     };
 
@@ -2237,6 +2460,7 @@
       initCustomerFormLimits();
       initReservationFormLimits();
       initSalesDateRange();
+      await loadShopSettingsOnly();
       await loadToday();
     });
 
@@ -2434,7 +2658,7 @@
       }
 
       const ok = confirm(
-        "STREET HOUSE 杵築の営業前DEMOデータを作り直しますか？\n\n" +
+        `${getShopName()}の営業前DEMOデータを作り直しますか？\n\n` +
         "・顧客、車両、相談、入庫予定を今日基準で作り直します\n" +
         "・ksh_demo_ 系テーブルだけを対象にします\n" +
         "・現在のDEMO用テストデータはリセットされます"
@@ -2442,7 +2666,7 @@
 
       if (!ok) return;
 
-      const password = prompt("DEMO準備パスワードを入力してください");
+      const password = prompt("DEMO準備パスワードを入力してください（デモコード：1234）");
       if (password === null) return;
 
       const button = document.getElementById("kshDemoResetButton");
@@ -2482,7 +2706,7 @@
         ].filter(Boolean).join(" / ");
 
         setKshDemoResetMessage(summary, "success");
-        showOk("STREET HOUSE 杵築の営業前DEMOデータを準備しました。");
+        showOk(`${getShopName()}の営業前DEMOデータを準備しました。`);
 
         await loadSettings();
         await loadToday();
@@ -2513,6 +2737,7 @@
       try {
         const data = await api("/api/dashboard");
         dashboardCache = data;
+        if (data.shop_settings) mergeShopSettings(data.shop_settings);
 
         const s = data.summary || {};
         inquiriesCache = data.recentInquiries || [];
@@ -5667,11 +5892,14 @@
       clearAlert();
 
       try {
-        const [business, special] = await Promise.all([
+        const [shop, business, special] = await Promise.all([
+          api("/api/shop-settings"),
           api("/api/business-days"),
           api("/api/special-days")
         ]);
 
+        mergeShopSettings(shop.shop_settings || {});
+        renderShopSettingsForm(shopSettings);
         businessDaysCache = business.businessDays || [];
         specialDaysCache = special.specialDays || [];
 
@@ -6430,12 +6658,12 @@
       const date = row.reservation_date ? formatDate(row.reservation_date) : "ご希望日";
       const time = row.reservation_time ? `${String(row.reservation_time).slice(0, 5)}頃` : "";
       const work = row.work_type || "ご相談内容";
-      return `${customerName}様\nいつもありがとうございます。STREET HOUSE 杵築です。\n${date}${time ? " " + time : ""}の${work}について確認のご連絡です。\nこちらの日時で入庫可能か確認いたしますので、少々お待ちください。`;
+      return `${customerName}様\nいつもありがとうございます。${getShopName()}です。\n${date}${time ? " " + time : ""}の${work}について確認のご連絡です。\nこちらの日時で入庫可能か確認いたしますので、少々お待ちください。`;
     }
 
     function buildSimpleRecontactMessage(customerName) {
       const name = customerName || "お客様";
-      return `${name}様\nいつもありがとうございます。STREET HOUSE 杵築です。\n以前ご相談いただいた件で、その後の状況はいかがでしょうか。\n必要でしたらお気軽にご相談ください。`;
+      return `${name}様\nいつもありがとうございます。${getShopName()}です。\n以前ご相談いただいた件で、その後の状況はいかがでしょうか。\n必要でしたらお気軽にご相談ください。`;
     }
 
     function buildFollowupActionMap(actions) {
