@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DPRO CAR LINE｜現場用iPad画面 STEP KSH-BRUSH-2</title>
+  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4</title>
 
   <style>
     :root {
@@ -124,7 +124,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -691,6 +691,66 @@
       gap: 12px;
     }
 
+    .workflow-guide {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .guide-card {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 15px;
+      box-shadow: var(--shadow);
+    }
+
+    .guide-card b {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--dark);
+      color: #ffffff;
+      margin-right: 8px;
+      font-size: 14px;
+    }
+
+    .guide-card strong {
+      font-size: 15px;
+      font-weight: 950;
+    }
+
+    .guide-card p {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .intake-note {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 850;
+      margin-bottom: 14px;
+      white-space: pre-wrap;
+    }
+
+    .time-help {
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+
     .form-field label {
       display: block;
       color: #64748b;
@@ -735,13 +795,14 @@
       .main { padding-left: 12px; padding-right: 12px; }
       .top-row { display: block; }
       .header-actions { justify-content: flex-start; margin-top: 12px; }
-      .tabs { gap: 7px; }
+      .tabs { gap: 7px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .tab-btn { min-height: 50px; font-size: 14px; }
       .summary-grid { grid-template-columns: 1fr; }
       .work-head { display: block; }
       .time-badge { display: inline-block; margin-bottom: 10px; }
       .detail-grid,
-      .form-grid { grid-template-columns: 1fr; }
+      .form-grid,
+      .workflow-guide { grid-template-columns: 1fr; }
       .detail-wide,
       .form-full { grid-column: auto; }
       .actions { grid-template-columns: 1fr; }
@@ -761,7 +822,7 @@
             <div id="ipadLogoText" class="logo">SH</div>
             <div>
               <h1 id="ipadShopName">STREET HOUSE 杵築</h1>
-              <p id="todayLabel">現場用iPad画面</p>
+              <p id="todayLabel">現場受付専用iPad</p>
             </div>
           </div>
 
@@ -773,7 +834,8 @@
         </div>
 
         <nav class="tabs">
-          <button id="tab-today" class="tab-btn active" onclick="switchTab('today')">今日</button>
+          <button id="tab-intake" class="tab-btn active" onclick="switchTab('intake')">受付</button>
+          <button id="tab-today" class="tab-btn" onclick="switchTab('today')">今日</button>
           <button id="tab-reservations" class="tab-btn" onclick="switchTab('reservations')">入庫予定</button>
           <button id="tab-customers" class="tab-btn" onclick="switchTab('customers')">顧客検索</button>
         </nav>
@@ -791,7 +853,100 @@
         </div>
       </div>
 
-      <section id="section-today" class="section active">
+
+      <section id="section-intake" class="section active">
+        <div class="toolbar">
+          <div>
+            <h2>電話・店頭受付</h2>
+            <p>電話予約、店頭での次回車検予約、Instagram DM予約をその場で登録します。売上や細かい設定はPC版で確認します。</p>
+          </div>
+          <button class="btn btn-primary" onclick="resetIntakeForm()">入力をリセット</button>
+        </div>
+
+        <div class="workflow-guide">
+          <div class="guide-card"><strong><b>1</b>顧客・車両を入力</strong><p>電話番号が同じ場合は既存顧客として更新し、重複登録を減らします。</p></div>
+          <div class="guide-card"><strong><b>2</b>入庫日時を選択</strong><p>今日以降の日付、営業時間内の30分単位だけを選びます。</p></div>
+          <div class="guide-card"><strong><b>3</b>保存してLINE連絡</strong><p>保存後、確認文面をコピーしてLINE公式・電話対応に使います。</p></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>現場受付フォーム</h3>
+              <p>iPadでは現場で必要な項目だけに絞っています。詳細編集・売上確認はPC管理画面で行います。</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="intake-note">現場用のかんたん登録です。お客様名・電話番号・車両・入庫日時を入力すると、顧客・車両・入庫予定をまとめて保存します。</div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label>お客様名 <span class="muted">必須</span></label>
+                <input id="intakeName" type="text" placeholder="例：佐藤健一" autocomplete="name" />
+              </div>
+              <div class="form-field">
+                <label>電話番号</label>
+                <input id="intakePhone" type="tel" placeholder="例：09012345678" autocomplete="tel" />
+              </div>
+              <div class="form-field">
+                <label>メーカー</label>
+                <input id="intakeMaker" type="text" placeholder="例：ダイハツ" />
+              </div>
+              <div class="form-field">
+                <label>車名</label>
+                <input id="intakeCarName" type="text" placeholder="例：タント" />
+              </div>
+              <div class="form-field">
+                <label>ナンバー下4桁</label>
+                <input id="intakePlateLast4" type="text" inputmode="numeric" maxlength="4" placeholder="例：1234" />
+              </div>
+              <div class="form-field">
+                <label>次回車検日</label>
+                <input id="intakeNextShakenDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label>作業内容</label>
+                <select id="intakeWorkType">
+                  <option value="車検">車検</option>
+                  <option value="車検見積もり">車検見積もり</option>
+                  <option value="オイル交換">オイル交換</option>
+                  <option value="点検">点検</option>
+                  <option value="修理">修理</option>
+                  <option value="キズ・へこみ">キズ・へこみ</option>
+                  <option value="タイヤ交換">タイヤ交換</option>
+                  <option value="カスタム相談">カスタム相談</option>
+                  <option value="その他">その他</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label>入庫状態</label>
+                <select id="intakeStatus">
+                  <option value="入庫予定">入庫予定</option>
+                  <option value="仮入庫">仮入庫</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label>入庫日 <span class="muted">必須</span></label>
+                <input id="intakeReservationDate" type="date" onchange="loadIntakeTimeOptions()" />
+              </div>
+              <div class="form-field">
+                <label>入庫時間 <span class="muted">必須</span></label>
+                <select id="intakeReservationTime"></select>
+                <div id="intakeTimeHelp" class="time-help">日付を選ぶと受付可能時間を読み込みます。</div>
+              </div>
+              <div class="form-field form-full">
+                <label>受付メモ</label>
+                <textarea id="intakeMemo" placeholder="例：代車希望。車検証を持参。見積もり後に電話希望。"></textarea>
+              </div>
+            </div>
+            <div class="modal-actions" style="padding:16px 0 0; border-top:0;">
+              <button class="btn btn-slate" onclick="resetIntakeForm()">クリア</button>
+              <button class="btn btn-green" onclick="createIpadIntakeReservation()">顧客・車両・入庫予定を保存</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-today" class="section">
         <div class="toolbar">
           <div>
             <h2>今日の現場ボード</h2>
@@ -1009,11 +1164,11 @@
 
     function applyShopSettingsToIpad() {
       const shopName = getShopName();
-      document.title = `${shopName}｜現場用iPad画面 STEP KSH-BRUSH-2`;
+      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4`;
       setText("ipadLogoText", getShopInitials(shopName));
       setText("ipadShopName", shopName);
       const today = dateYmd(new Date());
-      setText("todayLabel", `${formatDate(today)}｜現場用iPad画面`);
+      setText("todayLabel", `${formatDate(today)}｜現場受付専用iPad`);
     }
 
     async function loadShopSettingsOnly() {
@@ -1031,7 +1186,7 @@
     }
 
     let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
-    let currentTab = "today";
+    let currentTab = "intake";
     let reservationFilter = "today";
     let returnUrl = "dashboard.html";
 
@@ -1049,8 +1204,9 @@
     window.addEventListener("load", async () => {
       setupReturnUrl();
       document.getElementById("tokenInput").value = dashboardToken;
-      document.getElementById("todayLabel").textContent = `${formatDate(dateYmd(new Date()))}｜現場用iPad画面`;
+      document.getElementById("todayLabel").textContent = `${formatDate(dateYmd(new Date()))}｜現場受付専用iPad`;
       document.getElementById("completeDateInput").value = dateYmd(new Date());
+      setupIntakeForm();
       await loadShopSettingsOnly();
       await loadToday();
     });
@@ -1088,6 +1244,7 @@
     }
 
     function refreshCurrent() {
+      if (currentTab === "intake") loadIntakeTimeOptions();
       if (currentTab === "today") loadToday();
       if (currentTab === "reservations") loadReservations();
       if (currentTab === "customers") searchCustomers();
@@ -1161,6 +1318,259 @@
       }
 
       return data;
+    }
+
+    function setupIntakeForm() {
+      const today = dateYmd(new Date());
+      const reservationDate = document.getElementById("intakeReservationDate");
+      const nextShakenDate = document.getElementById("intakeNextShakenDate");
+
+      if (reservationDate) {
+        reservationDate.min = today;
+        reservationDate.value = today;
+      }
+
+      if (nextShakenDate) {
+        nextShakenDate.min = today;
+      }
+
+      loadIntakeTimeOptions();
+    }
+
+    function getIntakeValue(id) {
+      const el = document.getElementById(id);
+      return el ? String(el.value || "").trim() : "";
+    }
+
+    function resetIntakeForm() {
+      [
+        "intakeName",
+        "intakePhone",
+        "intakeMaker",
+        "intakeCarName",
+        "intakePlateLast4",
+        "intakeNextShakenDate",
+        "intakeMemo"
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+
+      const today = dateYmd(new Date());
+      const dateInput = document.getElementById("intakeReservationDate");
+      if (dateInput) {
+        dateInput.min = today;
+        dateInput.value = today;
+      }
+
+      const workType = document.getElementById("intakeWorkType");
+      if (workType) workType.value = "車検";
+
+      const status = document.getElementById("intakeStatus");
+      if (status) status.value = "入庫予定";
+
+      loadIntakeTimeOptions();
+      showOk("受付フォームをリセットしました。");
+    }
+
+    async function loadIntakeTimeOptions() {
+      const select = document.getElementById("intakeReservationTime");
+      const help = document.getElementById("intakeTimeHelp");
+      if (!select) return;
+
+      const date = getIntakeValue("intakeReservationDate");
+      const today = dateYmd(new Date());
+
+      select.innerHTML = `<option value="">読み込み中...</option>`;
+      if (help) help.textContent = "受付可能時間を確認しています。";
+
+      if (!date) {
+        select.innerHTML = `<option value="">先に入庫日を選択</option>`;
+        if (help) help.textContent = "入庫日を選ぶと受付可能時間を読み込みます。";
+        return;
+      }
+
+      if (date < today) {
+        select.innerHTML = `<option value="">過去日は選択できません</option>`;
+        if (help) help.textContent = "入庫日は今日以降を選択してください。";
+        showError("過去の日付は登録できません。今日以降の日付を選択してください。");
+        return;
+      }
+
+      try {
+        const data = await api(`/api/reservation-time-options?date=${encodeURIComponent(date)}`);
+        if (!data.available) {
+          select.innerHTML = `<option value="">受付不可</option>`;
+          if (help) help.textContent = data.reason || "この日は受付できません。";
+          return;
+        }
+
+        const slots = Array.isArray(data.slots) ? data.slots : [];
+        const availableSlots = slots.filter(slot => !slot.isFull && Number(slot.remaining || 0) > 0);
+        if (!availableSlots.length) {
+          select.innerHTML = `<option value="">満枠です</option>`;
+          if (help) help.textContent = "この日の受付可能枠は埋まっています。別の日付を選択してください。";
+          return;
+        }
+
+        select.innerHTML = [`<option value="">時間を選択</option>`]
+          .concat(availableSlots.map(slot => `<option value="${escapeAttr(slot.time)}">${escapeHtml(slot.time)}（残り${Number(slot.remaining || 0)}枠）</option>`))
+          .join("");
+        if (help) help.textContent = `受付可能時間：${data.openTime || ""}〜${data.closeTime || ""} / ${data.stepMinutes || 30}分単位`;
+      } catch (error) {
+        select.innerHTML = `<option value="">時間を取得できません</option>`;
+        if (help) help.textContent = error.message;
+      }
+    }
+
+    async function createIpadIntakeReservation() {
+      const name = getIntakeValue("intakeName");
+      const phone = getIntakeValue("intakePhone");
+      const maker = getIntakeValue("intakeMaker");
+      const carName = getIntakeValue("intakeCarName");
+      const plateLast4 = getIntakeValue("intakePlateLast4");
+      const nextShakenDate = getIntakeValue("intakeNextShakenDate");
+      const workType = getIntakeValue("intakeWorkType") || "車検";
+      const status = getIntakeValue("intakeStatus") || "入庫予定";
+      const reservationDate = getIntakeValue("intakeReservationDate");
+      const reservationTime = getIntakeValue("intakeReservationTime");
+      const memo = getIntakeValue("intakeMemo");
+      const today = dateYmd(new Date());
+
+      if (!name) {
+        showError("お客様名を入力してください。");
+        return;
+      }
+      if (!reservationDate) {
+        showError("入庫日を選択してください。");
+        return;
+      }
+      if (reservationDate < today) {
+        showError("過去の日付は登録できません。今日以降の日付を選択してください。");
+        return;
+      }
+      if (!reservationTime) {
+        showError("入庫時間を選択してください。");
+        return;
+      }
+
+      const vehicleLabel = [maker, carName].filter(Boolean).join(" ") || "お車";
+      const confirmText = [
+        `${name}様の入庫予定を登録します。`,
+        "",
+        `内容：${workType}`,
+        `日時：${formatDate(reservationDate)} ${reservationTime}`,
+        `車両：${vehicleLabel}${plateLast4 ? ` / ナンバー下4桁 ${plateLast4}` : ""}`,
+        "",
+        "よろしいですか？"
+      ].join("\n");
+
+      if (!confirm(confirmText)) return;
+
+      setLoading(true);
+      try {
+        const customerResult = await api("/api/customers", {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            phone,
+            status: "店舗登録",
+            memo: memo ? `iPad受付メモ：${memo}` : "iPad受付から登録",
+            vehicle: {
+              maker,
+              carName,
+              plateLast4,
+              nextShakenDate,
+              memo: "iPad受付から登録"
+            }
+          })
+        });
+
+        const customer = customerResult.customer || {};
+        const vehicle = customerResult.vehicle || null;
+
+        const reservationResult = await api("/api/reservations", {
+          method: "POST",
+          body: JSON.stringify({
+            customerId: customer.id,
+            vehicleId: vehicle ? vehicle.id : null,
+            reservationDate,
+            reservationTime,
+            workType,
+            status,
+            memo: [
+              "iPad電話・店頭受付から登録",
+              memo
+            ].filter(Boolean).join("\n")
+          })
+        });
+
+        const message = buildIntakeConfirmMessage({
+          name,
+          phone,
+          maker,
+          carName,
+          plateLast4,
+          workType,
+          reservationDate,
+          reservationTime,
+          status,
+          reservation: reservationResult.reservation || null
+        });
+
+        await copyText(message, { silent: true });
+        showOk("入庫予定を保存しました。確認LINE文面もコピーしました。");
+        resetIntakeFormWithoutToast();
+        await loadToday();
+        switchTab("today");
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function resetIntakeFormWithoutToast() {
+      [
+        "intakeName",
+        "intakePhone",
+        "intakeMaker",
+        "intakeCarName",
+        "intakePlateLast4",
+        "intakeNextShakenDate",
+        "intakeMemo"
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+      const today = dateYmd(new Date());
+      const dateInput = document.getElementById("intakeReservationDate");
+      if (dateInput) {
+        dateInput.min = today;
+        dateInput.value = today;
+      }
+      const workType = document.getElementById("intakeWorkType");
+      if (workType) workType.value = "車検";
+      const status = document.getElementById("intakeStatus");
+      if (status) status.value = "入庫予定";
+      loadIntakeTimeOptions();
+    }
+
+    function buildIntakeConfirmMessage(input) {
+      const shopName = getShopName();
+      const vehicleText = [input.maker, input.carName].filter(Boolean).join(" ") || "お車";
+      const numberText = input.plateLast4 ? `（ナンバー下4桁：${input.plateLast4}）` : "";
+      return [
+        `${input.name}様`,
+        `いつも${shopName}をご利用いただきありがとうございます。`,
+        "",
+        "下記の内容で入庫予定を承りました。",
+        `内容：${input.workType}`,
+        `日時：${formatDate(input.reservationDate)} ${input.reservationTime}`,
+        `車両：${vehicleText}${numberText}`,
+        "",
+        "変更やご不明点がございましたら、このLINEにご返信ください。"
+      ].join("\n");
     }
 
     async function loadToday() {
@@ -2064,10 +2474,10 @@
       window.open(LINE_MANAGER_URL, "_blank", "noopener,noreferrer");
     }
 
-    async function copyText(text) {
+    async function copyText(text, options = {}) {
       const value = String(text || "");
       if (!value) {
-        showError("コピーする内容がありません。");
+        if (!options.silent) showError("コピーする内容がありません。");
         return;
       }
 
@@ -2085,9 +2495,9 @@
           document.execCommand("copy");
           textarea.remove();
         }
-        showOk("コピーしました。");
+        if (!options.silent) showOk("コピーしました。");
       } catch (error) {
-        showError("コピーできませんでした。長押しで選択してコピーしてください。");
+        if (!options.silent) showError("コピーできませんでした。長押しで選択してコピーしてください。");
       }
     }
 
