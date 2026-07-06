@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>STREET HOUSE 杵築｜現場用iPad画面</title>
+  <title>DPRO CAR LINE｜現場用iPad画面 STEP KSH-BRUSH-2</title>
 
   <style>
     :root {
@@ -758,9 +758,9 @@
       <div class="header-inner">
         <div class="top-row">
           <div class="brand">
-            <div class="logo">SH</div>
+            <div id="ipadLogoText" class="logo">SH</div>
             <div>
-              <h1>STREET HOUSE 杵築</h1>
+              <h1 id="ipadShopName">STREET HOUSE 杵築</h1>
               <p id="todayLabel">現場用iPad画面</p>
             </div>
           </div>
@@ -782,10 +782,10 @@
 
     <main class="main">
       <div id="tokenBox" class="token-box">
-        <div class="strong">ダッシュボード認証トークン</div>
-        <div class="small muted">PC版と同じトークンを使います。通常は変更不要です。</div>
+        <div class="strong">デモ管理コード</div>
+        <div class="small muted">PC版と同じデモ管理コード 1234 を使います。通常は変更不要です。</div>
         <div class="token-row">
-          <input id="tokenInput" type="text" placeholder="DASHBOARD_TOKEN" />
+          <input id="tokenInput" type="text" placeholder="例：1234" />
           <button class="btn btn-primary" onclick="saveToken()">保存</button>
           <button class="btn btn-slate" onclick="resetToken()">初期値</button>
         </div>
@@ -971,8 +971,64 @@
 
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
-    const DEFAULT_DASHBOARD_TOKEN = "ksh-demo-dashboard-2026";
+    const DEFAULT_DASHBOARD_TOKEN = "1234";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
+
+
+    let shopSettings = {
+      shop_name: "STREET HOUSE 杵築",
+      service_name: "DPRO車検・整備LINE管理システム",
+      ipad_title: "STREET HOUSE 杵築 店頭受付iPad"
+    };
+
+    function getShopName() {
+      return String(shopSettings.shop_name || "STREET HOUSE 杵築").trim();
+    }
+
+    function getServiceName() {
+      return String(shopSettings.service_name || "DPRO車検・整備LINE管理システム").trim();
+    }
+
+    function getShopInitials(name) {
+      const text = String(name || "").trim();
+      if (!text) return "店";
+      const ascii = text.match(/[A-Za-z0-9]/g);
+      if (ascii && ascii.length >= 2) return (ascii[0] + ascii[1]).toUpperCase();
+      return text.slice(0, 2);
+    }
+
+    function mergeShopSettings(settings = {}) {
+      shopSettings = {
+        ...shopSettings,
+        ...settings,
+        shop_name: settings.shop_name || settings.shop || shopSettings.shop_name,
+        service_name: settings.service_name || shopSettings.service_name
+      };
+      applyShopSettingsToIpad();
+    }
+
+    function applyShopSettingsToIpad() {
+      const shopName = getShopName();
+      document.title = `${shopName}｜現場用iPad画面 STEP KSH-BRUSH-2`;
+      setText("ipadLogoText", getShopInitials(shopName));
+      setText("ipadShopName", shopName);
+      const today = dateYmd(new Date());
+      setText("todayLabel", `${formatDate(today)}｜現場用iPad画面`);
+    }
+
+    async function loadShopSettingsOnly() {
+      try {
+        const result = await api("/api/shop-settings");
+        mergeShopSettings({
+          ...(result.shop_settings || {}),
+          shop_name: result.shop_name || result.shop_settings?.shop_name,
+          service_name: result.service_name || result.shop_settings?.service_name
+        });
+      } catch (error) {
+        console.warn("shop settings fallback", error);
+        applyShopSettingsToIpad();
+      }
+    }
 
     let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
     let currentTab = "today";
@@ -995,6 +1051,7 @@
       document.getElementById("tokenInput").value = dashboardToken;
       document.getElementById("todayLabel").textContent = `${formatDate(dateYmd(new Date()))}｜現場用iPad画面`;
       document.getElementById("completeDateInput").value = dateYmd(new Date());
+      await loadShopSettingsOnly();
       await loadToday();
     });
 
@@ -1111,6 +1168,7 @@
       try {
         const data = await api("/api/dashboard");
         dashboardCache = data;
+        if (data.shop_settings) mergeShopSettings(data.shop_settings);
         followupActionsCache = data.followupActions || [];
 
         const today = dateYmd(new Date());
@@ -1821,7 +1879,7 @@
       const row = customersCache.find(customer => String(customer.id) === String(customerId));
       if (!row) return;
       const name = row.name || "お客様";
-      copyText(`${name}様、STREET HOUSE 杵築です。お車の件でご連絡いたしました。ご都合のよい時にご確認ください。`);
+      copyText(`${name}様、${getShopName()}です。お車の件でご連絡いたしました。ご都合のよい時にご確認ください。`);
     }
 
     function buildReservationChatMessage(row) {
@@ -1832,31 +1890,31 @@
       const status = String(row.status || "");
 
       if (isProvisionalReservationStatus(status)) {
-        return `${name}様、STREET HOUSE 杵築です。\n${date}${time ? " " + time + "頃" : ""}の${work}について、仮入庫のご希望を確認しました。\n店舗側で確認後、正式な入庫日時をご連絡いたします。`;
+        return `${name}様、${getShopName()}です。\n${date}${time ? " " + time + "頃" : ""}の${work}について、仮入庫のご希望を確認しました。\n店舗側で確認後、正式な入庫日時をご連絡いたします。`;
       }
 
       if (status.includes("作業完了")) {
-        return `${name}様、STREET HOUSE 杵築です。\n${work}の作業が完了しました。お引き取り可能なタイミングなど、必要事項をご連絡いたします。`;
+        return `${name}様、${getShopName()}です。\n${work}の作業が完了しました。お引き取り可能なタイミングなど、必要事項をご連絡いたします。`;
       }
 
-      return `${name}様、STREET HOUSE 杵築です。\n${date}${time ? " " + time + "頃" : ""}の${work}入庫予定についてご連絡です。\nご都合が変わる場合は、お早めにお知らせください。`;
+      return `${name}様、${getShopName()}です。\n${date}${time ? " " + time + "頃" : ""}の${work}入庫予定についてご連絡です。\nご都合が変わる場合は、お早めにお知らせください。`;
     }
 
     function buildInquirySuggestedMessage(row) {
       const name = row.customer_name_snapshot || row.customer?.name || "お客様";
       const type = row.consult_type || "ご相談";
-      return `${name}様、STREET HOUSE 杵築です。\n${type}のご相談ありがとうございます。内容を確認しましたので、順番にご連絡いたします。`;
+      return `${name}様、${getShopName()}です。\n${type}のご相談ありがとうございます。内容を確認しましたので、順番にご連絡いたします。`;
     }
 
     function buildFollowupMessage(row) {
       const name = row.customer_name_snapshot || row.customer?.name || "お客様";
-      return `${name}様、STREET HOUSE 杵築です。\n先日ご案内した件について、その後いかがでしょうか？\nご不明点や日程のご希望があれば、お気軽にご返信ください。`;
+      return `${name}様、${getShopName()}です。\n先日ご案内した件について、その後いかがでしょうか？\nご不明点や日程のご希望があれば、お気軽にご返信ください。`;
     }
 
     function buildVisitConfirmMessage(row) {
       const name = row.customer_name_snapshot || row.customer?.name || "お客様";
       const date = row.preferred_visit_date ? formatDate(row.preferred_visit_date) : "ご希望日";
-      return `${name}様、STREET HOUSE 杵築です。\n${date}の入庫希望について確認のご連絡です。\nお時間・作業内容・代車の有無など、確認でき次第ご案内いたします。`;
+      return `${name}様、${getShopName()}です。\n${date}の入庫希望について確認のご連絡です。\nお時間・作業内容・代車の有無など、確認でき次第ご案内いたします。`;
     }
 
     function buildReservationConfirmChatMessage(row) {
@@ -1864,7 +1922,7 @@
     }
 
     function buildSimpleRecontactMessage(name) {
-      return `${name || "お客様"}様、STREET HOUSE 杵築です。\n以前ご相談いただいた件で、その後いかがでしょうか？\n必要であれば日程や内容を改めてご相談ください。`;
+      return `${name || "お客様"}様、${getShopName()}です。\n以前ご相談いただいた件で、その後いかがでしょうか？\n必要であれば日程や内容を改めてご相談ください。`;
     }
 
     function findReservation(id) {
