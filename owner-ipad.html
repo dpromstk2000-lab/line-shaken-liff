@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4B</title>
+  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4C</title>
 
   <style>
     :root {
@@ -1164,7 +1164,7 @@
 
     function applyShopSettingsToIpad() {
       const shopName = getShopName();
-      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4B`;
+      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4C`;
       setText("ipadLogoText", getShopInitials(shopName));
       setText("ipadShopName", shopName);
       const today = dateYmd(new Date());
@@ -1312,7 +1312,7 @@
         throw new Error(
           "APIに接続できませんでした。\n\n" +
           "PC管理画面は動いているため、iPad画面の認証/CORS方式を確認してください。\n" +
-          "このSTEP KSH-BRUSH-4BBでは、管理コードをURL側にも付けて接続します。\n" +
+          "このSTEP KSH-BRUSH-4CBでは、管理コードをURL側にも付けて接続します。\n" +
           `確認URL：${WORKER_API_BASE}/health`
         );
       }
@@ -2640,5 +2640,338 @@
         .replaceAll("\r", "");
     }
   </script>
+
+  <style>
+    /* STEP KSH-BRUSH-4C：iPad現場画面コンパクト化 */
+    .ipad-compact {
+      padding: 12px 13px;
+      border-radius: 16px;
+      box-shadow: 0 3px 10px rgba(15,23,42,.045);
+    }
+
+    .ipad-compact .work-head {
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .ipad-compact .time-badge {
+      min-width: 72px;
+      padding: 7px 8px;
+      border-radius: 14px;
+      font-size: 18px;
+    }
+
+    .ipad-compact .time-badge small {
+      font-size: 10px;
+    }
+
+    .ipad-compact .customer-name {
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .ipad-compact .work-sub {
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .compact-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 8px;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .compact-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 999px;
+      padding: 5px 8px;
+      min-height: 26px;
+    }
+
+    .compact-details {
+      margin-top: 8px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 13px;
+      overflow: hidden;
+    }
+
+    .compact-details summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 9px 11px;
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .compact-details summary::-webkit-details-marker { display: none; }
+    .compact-details summary::before { content: "▶ "; color: #1d4ed8; }
+    .compact-details[open] summary::before { content: "▼ "; }
+
+    .compact-details-body {
+      padding: 0 11px 11px;
+      color: #334155;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .ipad-compact .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .ipad-compact .actions .btn {
+      width: auto;
+      min-height: 39px;
+      min-width: 104px;
+      flex: 1 1 112px;
+      padding: 8px 9px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+
+    .compact-more-box {
+      border: 1px dashed #cbd5e1;
+      border-radius: 16px;
+      background: #f8fafc;
+      padding: 14px;
+      text-align: center;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .compact-more-box .btn {
+      margin-top: 9px;
+      min-height: 42px;
+    }
+
+    .compact-mini-help {
+      margin: 0 0 10px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    @media (min-width: 1000px) {
+      #section-today .grid2 {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+      }
+    }
+  </style>
+
+  <script>
+    /* STEP KSH-BRUSH-4C：縦長対策。現場iPadでは最重要件数だけ先に見せる。 */
+    let ipadShowAllProvisional = false;
+    let ipadShowAllTodayTasks = false;
+    let ipadShowAllReservations = false;
+
+    function toggleIpadProvisionalAll() {
+      ipadShowAllProvisional = !ipadShowAllProvisional;
+      renderProvisionalReservations();
+    }
+
+    function toggleIpadTodayTasksAll() {
+      ipadShowAllTodayTasks = !ipadShowAllTodayTasks;
+      renderTodayTasks();
+    }
+
+    function toggleIpadReservationsAll() {
+      ipadShowAllReservations = !ipadShowAllReservations;
+      renderReservations();
+    }
+
+    function renderProvisionalReservations() {
+      const box = document.getElementById("provisionalReservationList");
+      if (!box) return;
+
+      const rows = provisionalReservationsCache.slice().sort(sortReservations);
+      if (!rows.length) {
+        box.innerHTML = `<div class="empty">現在、確認が必要な仮入庫はありません。</div>`;
+        return;
+      }
+
+      const limit = ipadShowAllProvisional ? rows.length : 2;
+      const visible = rows.slice(0, limit);
+      const rest = rows.length - visible.length;
+
+      box.innerHTML = `
+        <div class="compact-mini-help">仮入庫は確認が必要なものだけを先に表示します。</div>
+        ${visible.map(row => renderReservationCard(row, "provisional")).join("")}
+        ${rest > 0 ? `<div class="compact-more-box">残り ${rest}件あります。営業中は必要な時だけ開きます。<br><button class="btn btn-primary" onclick="toggleIpadProvisionalAll()">仮入庫を全件表示</button></div>` : (ipadShowAllProvisional && rows.length > 2 ? `<div class="compact-more-box"><button class="btn btn-slate" onclick="toggleIpadProvisionalAll()">仮入庫を2件表示に戻す</button></div>` : "")}
+      `;
+    }
+
+    function renderTodayReservations() {
+      const box = document.getElementById("todayReservationList");
+      if (!box) return;
+      const rows = todayReservationsCache.slice().sort(sortReservations);
+
+      if (!rows.length) {
+        box.innerHTML = `<div class="empty">本日の入庫予定はありません。</div>`;
+        return;
+      }
+
+      box.innerHTML = `
+        <div class="compact-mini-help">本日の入庫は、時刻順にコンパクト表示します。</div>
+        ${rows.map(row => renderReservationCard(row, "today")).join("")}
+      `;
+    }
+
+    function renderReservations() {
+      const box = document.getElementById("reservationList");
+      if (!box) return;
+      const visibleAll = reservationsCache.filter(row => reservationMatchesFilter(row, reservationFilter)).sort(sortReservations);
+
+      if (!visibleAll.length) {
+        box.innerHTML = `<div class="empty">この条件の入庫予定はありません。</div>`;
+        return;
+      }
+
+      const limit = ipadShowAllReservations ? visibleAll.length : 6;
+      const visible = visibleAll.slice(0, limit);
+      const rest = visibleAll.length - visible.length;
+
+      box.innerHTML = `
+        <div class="compact-mini-help">iPadでは直近の予定を優先表示します。全件確認は必要な時だけ開きます。</div>
+        ${visible.map(row => renderReservationCard(row, "list")).join("")}
+        ${rest > 0 ? `<div class="compact-more-box">残り ${rest}件あります。<br><button class="btn btn-primary" onclick="toggleIpadReservationsAll()">入庫予定を全件表示</button></div>` : (ipadShowAllReservations && visibleAll.length > 6 ? `<div class="compact-more-box"><button class="btn btn-slate" onclick="toggleIpadReservationsAll()">6件表示に戻す</button></div>` : "")}
+      `;
+    }
+
+    function renderTodayTasks() {
+      const box = document.getElementById("todayTaskList");
+      if (!box) return;
+      if (!todayTasksCache.length) {
+        box.innerHTML = `<div class="empty">現在、今日対応が必要な相談・再連絡はありません。</div>`;
+        return;
+      }
+
+      const indexed = todayTasksCache.map((task, index) => ({ task, index }));
+      const limit = ipadShowAllTodayTasks ? indexed.length : 5;
+      const visible = indexed.slice(0, limit);
+      const rest = indexed.length - visible.length;
+
+      box.innerHTML = `
+        <div class="compact-mini-help">今日やることは重要な5件だけ先に表示します。</div>
+        ${visible.map(item => renderTaskCard(item.task, item.index)).join("")}
+        ${rest > 0 ? `<div class="compact-more-box">残り ${rest}件あります。<br><button class="btn btn-primary" onclick="toggleIpadTodayTasksAll()">今日やることを全件表示</button></div>` : (ipadShowAllTodayTasks && indexed.length > 5 ? `<div class="compact-more-box"><button class="btn btn-slate" onclick="toggleIpadTodayTasksAll()">5件表示に戻す</button></div>` : "")}
+      `;
+    }
+
+    function renderReservationCard(row, mode) {
+      const customer = row.customer || {};
+      const vehicle = row.vehicle || {};
+      const status = String(row.status || "入庫予定");
+      const cardClass = getReservationCardClass(status);
+      const time = row.reservation_time ? String(row.reservation_time).slice(0, 5) : "未定";
+      const date = normalizeDateInput(row.reservation_date || "");
+      const customerName = customer.name || row.customer_name || "お客様";
+      const phone = customer.phone || row.customer_phone || "";
+      const vehicleText = buildVehicleLabel(vehicle, row);
+      const work = row.work_type || "作業";
+      const memo = row.memo || row.completion_memo || "";
+      const compactDate = mode === "today" ? "本日" : (mode === "provisional" ? formatDateShort(date) : formatDateShort(date));
+
+      return `
+        <article class="work-card ipad-compact ${cardClass}">
+          <div class="work-head">
+            <div class="time-badge">${escapeHtml(time)}<small>${escapeHtml(compactDate)}</small></div>
+            <div class="work-title">
+              <div class="customer-name">${escapeHtml(customerName)} 様</div>
+              <div class="work-sub">${escapeHtml(vehicleText)} / ${escapeHtml(work)}</div>
+            </div>
+            ${badgeStatus(status)}
+          </div>
+
+          <div class="compact-line">
+            <span class="compact-chip">📞 ${escapeHtml(phone || "電話未入力")}</span>
+            <span class="compact-chip">📅 ${escapeHtml(formatDate(date))}</span>
+            <span class="compact-chip">🚗 ${escapeHtml(work)}</span>
+          </div>
+
+          <details class="compact-details">
+            <summary>詳細・メモを開く</summary>
+            <div class="compact-details-body">
+電話番号：${escapeHtml(phone || "未入力")}
+入庫日：${escapeHtml(formatDate(date))}
+作業内容：${escapeHtml(work)}
+状態：${escapeHtml(status)}
+車両：${escapeHtml(vehicleText)}
+メモ：${escapeHtml(memo || "メモなし")}
+            </div>
+          </details>
+
+          <div class="actions">
+            ${isProvisionalReservationStatus(status) ? `<button class="btn btn-green" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫予定')">入庫予定にする</button>` : ""}
+            ${canShowStatusButton(status, "入庫済み") ? `<button class="btn btn-primary" onclick="changeReservationStatus('${escapeAttr(row.id)}','入庫済み')">入庫済み</button>` : ""}
+            ${canShowStatusButton(status, "作業中") ? `<button class="btn btn-purple" onclick="changeReservationStatus('${escapeAttr(row.id)}','作業中')">作業中</button>` : ""}
+            ${!isCompletedReservation(status) ? `<button class="btn btn-orange" onclick="openCompleteModal('${escapeAttr(row.id)}')">作業完了</button>` : ""}
+            <button class="btn btn-slate" onclick="openMemoModal('${escapeAttr(row.id)}')">メモ</button>
+            <button class="btn btn-primary" onclick="copyReservationMessage('${escapeAttr(row.id)}')">LINE文面</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderTaskCard(task, index) {
+      const statusClass = task.color === "red" ? "status-alert" : task.color === "orange" ? "status-provisional" : task.color === "purple" ? "status-working" : "status-confirmed";
+      const targetDate = task.dueDate || task.preferredVisitDate || "";
+      const vehicleText = buildTodayTaskVehicleText(task);
+      return `
+        <article class="work-card ipad-compact ${statusClass}">
+          <div class="work-head">
+            <div class="time-badge">${escapeHtml(task.badgeIcon || "!")}<small>${escapeHtml(task.badge || "対応")}</small></div>
+            <div class="work-title">
+              <div class="customer-name">${escapeHtml(task.name || "お客様")} 様</div>
+              <div class="work-sub">${escapeHtml(task.title || "対応タスク")}</div>
+            </div>
+            ${autoBadge(task.badge, task.color)}
+          </div>
+
+          <div class="compact-line">
+            <span class="compact-chip">📞 ${escapeHtml(task.phone || "電話未入力")}</span>
+            <span class="compact-chip">🚗 ${escapeHtml(vehicleText)}</span>
+            <span class="compact-chip">📅 ${escapeHtml(targetDate ? formatDate(targetDate) : "対象日なし")}</span>
+          </div>
+
+          <details class="compact-details">
+            <summary>相談内容・LINE文面を開く</summary>
+            <div class="compact-details-body">
+今日やること：${escapeHtml(task.taskSummary || "対応内容を確認してください。")}
+相談内容・メモ：${escapeHtml(task.inquiryMessage || "なし")}
+
+送信候補文：
+${escapeHtml(task.message || "")}
+            </div>
+          </details>
+
+          <div class="actions">
+            <button class="btn btn-slate" onclick="copyTaskName(${index})">名前</button>
+            <button class="btn btn-slate" onclick="copyTaskPhone(${index})">電話</button>
+            <button class="btn btn-primary" onclick="copyTaskMessage(${index})">LINE文面</button>
+            <button class="btn btn-green" onclick="markTaskHandled(${index}, 'line_sent')">送信済み</button>
+            <button class="btn btn-slate" onclick="markTaskHandled(${index}, 'phone_called')">電話済み</button>
+            <button class="btn btn-dark" onclick="scheduleTaskRecontact(${index}, 7)">7日後</button>
+          </div>
+        </article>
+      `;
+    }
+  </script>
+
 </body>
 </html>
