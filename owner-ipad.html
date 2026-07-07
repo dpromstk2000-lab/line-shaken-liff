@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4</title>
+  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4B</title>
 
   <style>
     :root {
@@ -1164,7 +1164,7 @@
 
     function applyShopSettingsToIpad() {
       const shopName = getShopName();
-      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4`;
+      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4B`;
       setText("ipadLogoText", getShopInitials(shopName));
       setText("ipadShopName", shopName);
       const today = dateYmd(new Date());
@@ -1286,13 +1286,24 @@
       showOk("認証トークンを初期値に戻しました。");
     }
 
+    function buildApiUrl(path) {
+      const url = new URL(`${WORKER_API_BASE}${path}`);
+      const isPublicApi = url.pathname.startsWith("/api/public/") || url.pathname === "/health";
+      if (!isPublicApi && dashboardToken) {
+        url.searchParams.set("token", dashboardToken);
+      }
+      return url.toString();
+    }
+
     async function api(path, options = {}) {
-      const url = `${WORKER_API_BASE}${path}`;
-      const headers = {
-        "Content-Type": "application/json",
-        "X-Dashboard-Token": dashboardToken,
-        ...(options.headers || {})
-      };
+      const url = buildApiUrl(path);
+      const headers = { ...(options.headers || {}) };
+
+      // iPad画面は現場で使うため、CORSの事前確認で止まりにくい形にする。
+      // Worker側は request.text() からJSONを読むため、text/plain でも正常に処理できます。
+      if (options.body && !headers["Content-Type"]) {
+        headers["Content-Type"] = "text/plain;charset=utf-8";
+      }
 
       let response;
       try {
@@ -1300,7 +1311,8 @@
       } catch (error) {
         throw new Error(
           "APIに接続できませんでした。\n\n" +
-          "Cloudflare WorkerがDeployされているか確認してください。\n" +
+          "PC管理画面は動いているため、iPad画面の認証/CORS方式を確認してください。\n" +
+          "このSTEP KSH-BRUSH-4BBでは、管理コードをURL側にも付けて接続します。\n" +
           `確認URL：${WORKER_API_BASE}/health`
         );
       }
