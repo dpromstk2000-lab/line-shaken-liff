@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-7</title>
+  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-7B</title>
 
   <style>
     :root {
@@ -215,7 +215,7 @@
       padding: 18px;
     }
 
-    /* STEP KSH-BRUSH-7: 車検フォロー・LINE文面テンプレート強化 */
+    /* STEP KSH-BRUSH-7B: 車検フォロー・LINE文面テンプレート強化 */
     .daily-route {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1271,6 +1271,165 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* STEP KSH-BRUSH-7B: 営業デモ用コンパクト化 */
+    .compact-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 10px;
+    }
+
+    .task-card.compact-task {
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      border-left-width: 5px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+    }
+
+    .task-card.compact-task .task-title {
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .task-card.compact-task .task-meta {
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .compact-task-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin: 10px 0;
+    }
+
+    .compact-task-summary div {
+      border: 1px solid #e5e7eb;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 7px 9px;
+      min-width: 0;
+    }
+
+    .compact-task-summary span {
+      display: block;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    .compact-task-summary strong {
+      display: block;
+      color: #0f172a;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    details.compact-details {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    details.compact-details summary {
+      cursor: pointer;
+      padding: 9px 11px;
+      font-size: 12px;
+      font-weight: 900;
+      color: #1e293b;
+      background: #f8fafc;
+      user-select: none;
+    }
+
+    details.compact-details .task-context-box {
+      border: 0;
+      border-top: 1px solid #e5e7eb;
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .compact-actions {
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .compact-actions .btn {
+      padding: 7px 9px;
+      font-size: 12px;
+      border-radius: 9px;
+    }
+
+    .compact-more-box {
+      border: 1px dashed #cbd5e1;
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+      color: #475569;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .compact-more-box strong {
+      color: #0f172a;
+    }
+
+    .compact-reservation-item {
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+
+    .compact-reservation-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .compact-reservation-line strong {
+      font-size: 14px;
+    }
+
+    .compact-reservation-meta {
+      color: #475569;
+      font-size: 12px;
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .reservation-actions.compact-actions {
+      margin-top: 8px;
+    }
+
+    .template-grid .template-chip {
+      padding: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .compact-task-summary {
+        grid-template-columns: 1fr;
+      }
+      .compact-reservation-line {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
   </style>
 </head>
 
@@ -1282,7 +1441,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-7</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-7B</p>
           </div>
         </div>
       </div>
@@ -1311,7 +1470,7 @@
         <div>
           <button class="btn btn-slate mobile-menu" onclick="toggleSidebar()">☰</button>
           <h2 id="pageTitle">今日やること</h2>
-          <p id="pageDesc">今日対応する順番・入庫予定・未対応相談・車検フォローを一画面で確認します。</p>
+          <p id="pageDesc">営業デモで見やすいよう、今日の入庫・未対応相談・フォロー候補をコンパクトに確認します。</p>
         </div>
         <div class="top-actions">
           <button class="btn btn-orange" onclick="openIpadDashboard()">iPad用画面</button>
@@ -1470,9 +1629,9 @@
               <div class="toolbar">
                 <div>
                   <h3 style="margin:0">今日やること</h3>
-                  <div class="small muted">お客様名・車両・相談内容・送る文面までここに集約します。</div>
+                  <div class="small muted">最初は重要な5件だけ表示します。詳細は開いて確認します。</div>
                 </div>
-                <button class="btn btn-slate" onclick="loadToday()">更新</button>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap"><span class="compact-note">営業デモ用：5件表示</span><button class="btn btn-slate" onclick="loadToday()">更新</button></div>
               </div>
               <div id="todayTaskList" class="task-list"></div>
             </div>
@@ -1496,7 +1655,7 @@
               <div class="panel-title">
                 <div>
                   <h3>すぐ送れるLINE文面</h3>
-                  <p>実際の個別文面は「今日やること」内で編集してコピーできます。ここでは使う場面を整理します。</p>
+                  <p>よく使う文面の入口です。個別文面は各カードの「詳細」で編集できます。</p>
                 </div>
                 <button class="btn btn-slate" onclick="switchTab('followups')">チャット候補へ</button>
               </div>
@@ -2545,7 +2704,7 @@
     function applyShopSettingsToDashboard() {
       const shopName = getShopName();
       const serviceName = getServiceName();
-      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-7`;
+      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-7B`;
       setText("dashboardLogoText", getShopInitials(shopName));
       setText("dashboardShopName", shopName);
       setText("dashboardServiceName", serviceName);
@@ -2688,7 +2847,7 @@
     const pageMeta = {
       today: {
         title: "今日やること",
-        desc: "今日対応する順番・入庫予定・未対応相談・車検フォローを一画面で確認します。"
+        desc: "営業デモで見やすいよう、今日の入庫・未対応相談・フォロー候補をコンパクトに確認します。"
       },
       inquiries: {
         title: "相談一覧",
@@ -3212,15 +3371,47 @@
       todayTasksCache = buildTodayTasks(data);
 
       if (!todayTasksCache.length) {
-        box.innerHTML = `<div class="task-card green">
+        box.innerHTML = `<div class="task-card green compact-task">
           <div class="task-title">本日の緊急対応はありません</div>
           <div class="task-meta">新規相談・未返信・車検間近の候補が出るとここに表示されます。</div>
         </div>`;
         return;
       }
 
-      box.innerHTML = todayTasksCache.map((task, index) => `
-        <div class="task-card ${task.color}">
+      const expanded = Boolean(window.__kshTodayTasksExpanded);
+      const limit = expanded ? todayTasksCache.length : 5;
+      const visibleTasks = todayTasksCache.slice(0, limit);
+      const hiddenCount = Math.max(todayTasksCache.length - visibleTasks.length, 0);
+
+      box.innerHTML = visibleTasks.map((task, index) => renderCompactTodayTask(task, index)).join("") +
+        (hiddenCount ? `
+          <div class="compact-more-box">
+            <strong>残り ${hiddenCount} 件あります。</strong><br>
+            営業中は上位5件だけ見せれば十分です。必要な時だけ全件表示します。<br><br>
+            <button class="btn btn-slate" onclick="toggleTodayTasksExpanded()">全件表示する</button>
+            <button class="btn btn-primary" onclick="switchTab('followups')">チャット候補で見る</button>
+          </div>
+        ` : todayTasksCache.length > 5 ? `
+          <div class="compact-more-box">
+            全件表示中です。営業デモに戻す場合は5件表示に戻せます。<br><br>
+            <button class="btn btn-slate" onclick="toggleTodayTasksExpanded()">5件表示に戻す</button>
+          </div>
+        ` : "");
+    }
+
+    function toggleTodayTasksExpanded() {
+      window.__kshTodayTasksExpanded = !Boolean(window.__kshTodayTasksExpanded);
+      renderTodayTasks(dashboardCache || {});
+    }
+
+    function renderCompactTodayTask(task, index) {
+      const message = escapeHtml(task.editedMessage || task.message || "");
+      const vehicleText = buildTodayTaskVehicleText(task);
+      const dueText = task.nextShakenText || (task.dueDate ? formatDate(task.dueDate) : task.preferredVisitDate ? formatDate(task.preferredVisitDate) : "未設定");
+      const statusText = task.status || task.consultType || "確認";
+
+      return `
+        <div class="task-card ${task.color} compact-task">
           <div class="task-head">
             <div>
               <div class="task-title">${escapeHtml(task.title)}</div>
@@ -3229,56 +3420,59 @@
             ${autoBadge(task.badge, task.color)}
           </div>
 
-          ${renderTodayTaskDetail(task)}
+          <div class="compact-task-summary">
+            <div><span>お客様</span><strong>${escapeHtml(task.name || "未入力")}</strong></div>
+            <div><span>車両</span><strong>${escapeHtml(vehicleText)}</strong></div>
+            <div><span>対象日</span><strong>${escapeHtml(dueText)}</strong></div>
+            <div><span>状態</span><strong>${escapeHtml(statusText)}</strong></div>
+          </div>
 
-          <div class="task-context-box">
-            ${task.taskSummary ? `
+          <details class="compact-details">
+            <summary>詳細・LINE文面を開く</summary>
+            ${renderTodayTaskDetail(task)}
+            <div class="task-context-box">
+              ${task.taskSummary ? `
+                <div class="task-context-row">
+                  <div class="task-context-label">今日やること</div>
+                  <div class="task-context-text">${escapeHtml(task.taskSummary)}</div>
+                </div>
+              ` : ""}
+              ${task.inquiryMessage ? `
+                <div class="task-context-row">
+                  <div class="task-context-label">相談内容</div>
+                  <div class="task-context-text">${escapeHtml(task.inquiryMessage)}</div>
+                </div>
+              ` : ""}
+              ${task.proposalMemo ? `
+                <div class="task-context-row">
+                  <div class="task-context-label">メモ</div>
+                  <div class="task-context-text">${escapeHtml(task.proposalMemo)}</div>
+                </div>
+              ` : ""}
               <div class="task-context-row">
-                <div class="task-context-label">今日やること</div>
-                <div class="task-context-text">${escapeHtml(task.taskSummary)}</div>
-              </div>
-            ` : ""}
-            ${task.inquiryMessage ? `
-              <div class="task-context-row">
-                <div class="task-context-label">相談内容・お客様メッセージ</div>
-                <div class="task-context-text">${escapeHtml(task.inquiryMessage)}</div>
-              </div>
-            ` : ""}
-            ${task.proposalMemo ? `
-              <div class="task-context-row">
-                <div class="task-context-label">次回提案メモ・店舗メモ</div>
-                <div class="task-context-text">${escapeHtml(task.proposalMemo)}</div>
-              </div>
-            ` : ""}
-            <div class="task-context-row">
-              <div class="task-context-label">LINEチャット文面</div>
-              <div class="task-context-text">
-                <textarea
-                  id="todayMessage-${index}"
-                  class="editable-message-box"
-                  oninput="updateTodayTaskMessage(${index})"
-                >${escapeHtml(task.editedMessage || task.message || "")}</textarea>
-                <div class="editable-message-help">個別チャットへ貼り付ける前に、この場で文面を編集できます。編集後の内容がコピー・チャット送信済み記録に使われます。</div>
+                <div class="task-context-label">LINE文面</div>
+                <div class="task-context-text">
+                  <textarea
+                    id="todayMessage-${index}"
+                    class="editable-message-box"
+                    oninput="updateTodayTaskMessage(${index})"
+                  >${message}</textarea>
+                  <div class="editable-message-help">必要な時だけ開いて、編集・コピーします。</div>
+                </div>
               </div>
             </div>
-          </div>
+          </details>
 
-          <div class="task-actions">
-            <button class="btn btn-slate" onclick="copyTodayTaskName(${index})">名前コピー</button>
-            <button class="btn btn-slate" onclick="copyTodayTaskPhone(${index})">電話コピー</button>
-            <button class="btn btn-primary" onclick="copyTodayTaskMessage(${index})">編集後文面コピー</button>
-            <button class="btn btn-slate" onclick="resetTodayTaskMessage(${index})">自動文面に戻す</button>
-            ${task.customerId ? `<button class="btn btn-primary" onclick="openTodayTaskCustomerDetail(${index})">顧客詳細</button>` : ""}
-            ${task.inquiryId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : task.customerId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : ""}
-            ${task.inquiryId ? `<button class="btn btn-slate" onclick="openTodayTaskInquiry(${index})">相談一覧へ</button>` : ""}
-            <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">チャット送信済み</button>
-            <button class="btn btn-slate" onclick="markTodayTaskHandled(${index}, 'phone_called')">電話済み</button>
-            <button class="btn btn-slate" onclick="scheduleTodayTaskRecontact(${index}, 7)">1週間後に再連絡</button>
-            <button class="btn btn-dark" onclick="scheduleTodayTaskRecontact(${index}, 30)">1か月後に再連絡</button>
-            <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
+          <div class="task-actions compact-actions">
+            <button class="btn btn-primary" onclick="copyTodayTaskMessage(${index})">文面コピー</button>
+            ${task.customerId ? `<button class="btn btn-slate" onclick="openTodayTaskCustomerDetail(${index})">顧客詳細</button>` : ""}
+            ${task.inquiryId || task.customerId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : ""}
+            <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">送信済み</button>
+            <button class="btn btn-slate" onclick="scheduleTodayTaskRecontact(${index}, 3)">3日後</button>
+            <button class="btn btn-slate" onclick="scheduleTodayTaskRecontact(${index}, 7)">7日後</button>
           </div>
         </div>
-      `).join("");
+      `;
     }
 
     function renderTodayTaskDetail(task) {
@@ -3727,59 +3921,37 @@
         return;
       }
 
-      const groups = [
-        { key: "provisional", label: "仮入庫・確認待ち", hint: "正式な日時確認が必要", match: row => isProvisionalReservationStatus(row.status) },
-        { key: "confirmed", label: "確定入庫・入庫予定", hint: "本日来店予定", match: row => isConfirmedReservationStatus(row.status) && !String(row.status || "").includes("作業完了") },
-        { key: "completed", label: "完了連絡待ち・作業完了", hint: "文面コピー・次回提案へ", match: row => String(row.status || "").includes("完了") },
-        { key: "other", label: "その他", hint: "状況確認", match: row => true }
-      ];
+      const sortedRows = visibleRows.slice().sort((a, b) => String(a.reservation_time || "99:99").localeCompare(String(b.reservation_time || "99:99")));
+      const topRows = sortedRows.slice(0, 6);
+      const hiddenCount = Math.max(sortedRows.length - topRows.length, 0);
 
-      const used = new Set();
-      const htmlGroups = groups.map(group => {
-        const items = visibleRows.filter(row => {
-          const id = row.id || `${row.reservation_date}_${row.reservation_time}_${row.customer_id}`;
-          if (used.has(id)) return false;
-          const ok = group.match(row);
-          if (ok) used.add(id);
-          return ok;
-        });
-
-        if (!items.length) return "";
-
+      box.innerHTML = topRows.map(row => {
+        const customerName = row.customer?.name || row.customer_name || "未入力";
+        const vehicleName = row.vehicle?.car_name || row.car_name_snapshot || "車両未入力";
+        const plate = row.vehicle?.plate_last4 || row.plate_last4 || "";
+        const reservationId = escapeHtml(row.id || "");
         return `
-          <div class="reservation-status-group">
-            <div class="reservation-status-title">
-              <div>${escapeHtml(group.label)}</div>
-              <span>${items.length}件 / ${escapeHtml(group.hint)}</span>
+          <div class="list-item compact-reservation-item">
+            <div class="compact-reservation-line">
+              <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "時間未定")}　${escapeHtml(customerName)}</strong>
+              ${badgeStatus(row.status)}
             </div>
-            ${items.map(row => {
-              const customerName = row.customer?.name || row.customer_name || "未入力";
-              const vehicleName = row.vehicle?.car_name || row.car_name_snapshot || "車両未入力";
-              const plate = row.vehicle?.plate_last4 || row.plate_last4 || "";
-              const reservationId = escapeHtml(row.id || "");
-              return `
-                <div class="list-item">
-                  <div class="list-item-head">
-                    <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "時間未定")} / ${escapeHtml(row.work_type || "入庫予定")}</strong>
-                    ${badgeStatus(row.status)}
-                  </div>
-                  <div class="small">
-                    ${escapeHtml(customerName)} / ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""}
-                  </div>
-                  <div class="muted small">${escapeHtml(row.memo || "")}</div>
-                  <div class="reservation-actions">
-                    ${row.id ? `<button class="btn btn-slate" onclick="copyReservationMessage('${reservationId}')">文面コピー</button>` : ""}
-                    ${isProvisionalReservationStatus(row.status) && row.id ? `<button class="btn btn-green" onclick="confirmReservationQuick('${reservationId}')">入庫予定にする</button>` : ""}
-                    <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">一覧で確認</button>
-                  </div>
-                </div>
-              `;
-            }).join("")}
+            <div class="compact-reservation-meta">
+              ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""} / ${escapeHtml(row.work_type || "入庫予定")}
+            </div>
+            <div class="reservation-actions compact-actions">
+              ${row.id ? `<button class="btn btn-slate" onclick="copyReservationMessage('${reservationId}')">文面コピー</button>` : ""}
+              ${isProvisionalReservationStatus(row.status) && row.id ? `<button class="btn btn-green" onclick="confirmReservationQuick('${reservationId}')">確定</button>` : ""}
+              <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">一覧</button>
+            </div>
           </div>
         `;
-      }).join("");
-
-      box.innerHTML = htmlGroups || `<div class="list-item muted">本日の入庫予定はありません。</div>`;
+      }).join("") + (hiddenCount ? `
+        <div class="compact-more-box">
+          本日の入庫予定があと <strong>${hiddenCount}</strong> 件あります。<br>
+          <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">入庫予定一覧で確認</button>
+        </div>
+      ` : "");
     }
 
     async function loadInquiries() {
