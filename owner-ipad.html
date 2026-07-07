@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4C</title>
+  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4D</title>
 
   <style>
     :root {
@@ -685,6 +685,45 @@
       flex-wrap: wrap;
     }
 
+    .message-summary {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-weight: 950;
+      margin-bottom: 12px;
+      line-height: 1.55;
+    }
+
+    .message-variant-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .message-variant-row .filter-btn {
+      background: #e5e7eb;
+      color: #334155;
+      border-color: #e5e7eb;
+    }
+
+    .message-editor {
+      min-height: 230px;
+      font-size: 17px;
+      line-height: 1.75;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 4px rgba(37,99,235,.10);
+    }
+
+    .copy-feedback-note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 800;
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1124,6 +1163,37 @@
     </div>
   </div>
 
+
+  <div id="messageModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="messageModalTitle">LINE文面確認</h3>
+      </div>
+      <div class="modal-body">
+        <div id="messageModalSummary" class="message-summary">文面の対象を確認しています。</div>
+        <div class="message-variant-row">
+          <button class="filter-btn" onclick="setMessageVariant('soft')">やわらかめ</button>
+          <button class="filter-btn" onclick="setMessageVariant('short')">短め</button>
+          <button class="filter-btn" onclick="setMessageVariant('polite')">丁寧</button>
+          <button class="filter-btn" onclick="setMessageVariant('dayBefore')">前日確認</button>
+          <button class="filter-btn" onclick="setMessageVariant('recontact')">再連絡</button>
+        </div>
+        <div class="form-field">
+          <label>コピーするLINE文面</label>
+          <textarea id="messageEditorText" class="message-editor" placeholder="ここで文面を確認・編集できます。"></textarea>
+        </div>
+        <div class="copy-feedback-note">
+          この場で文面を直してからコピーできます。LINE公式チャットへ貼り付けて送信してください。
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-slate" onclick="closeMessageModal()">閉じる</button>
+        <button class="btn btn-slate" onclick="resetMessageEditor()">最初の文面に戻す</button>
+        <button class="btn btn-primary" onclick="copyEditedMessage()">編集後の文面をコピー</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const DEFAULT_DASHBOARD_TOKEN = "1234";
@@ -1164,7 +1234,7 @@
 
     function applyShopSettingsToIpad() {
       const shopName = getShopName();
-      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4C`;
+      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4D`;
       setText("ipadLogoText", getShopInitials(shopName));
       setText("ipadShopName", shopName);
       const today = dateYmd(new Date());
@@ -1200,6 +1270,7 @@
 
     let editingMemoReservationId = "";
     let completingReservationId = "";
+    let messageEditorContext = null;
 
     window.addEventListener("load", async () => {
       setupReturnUrl();
@@ -1312,7 +1383,7 @@
         throw new Error(
           "APIに接続できませんでした。\n\n" +
           "PC管理画面は動いているため、iPad画面の認証/CORS方式を確認してください。\n" +
-          "このSTEP KSH-BRUSH-4CBでは、管理コードをURL側にも付けて接続します。\n" +
+          "このSTEP KSH-BRUSH-4Dでは、管理コードをURL側にも付けて接続します。\n" +
           `確認URL：${WORKER_API_BASE}/health`
         );
       }
@@ -2279,29 +2350,160 @@
     function copyReservationMessage(id) {
       const row = findReservation(id);
       if (!row) return;
-      copyText(buildReservationChatMessage(row));
+      openReservationMessageEditor(row);
     }
 
     function copyTaskName(index) {
       const task = todayTasksCache[index];
-      if (task) copyText(task.name || "");
+      if (task) copyText(task.name || "", { label: "お客様名" });
     }
 
     function copyTaskPhone(index) {
       const task = todayTasksCache[index];
-      if (task) copyText(task.phone || "");
+      if (task) copyText(task.phone || "", { label: "電話番号" });
     }
 
     function copyTaskMessage(index) {
       const task = todayTasksCache[index];
-      if (task) copyText(task.message || "");
+      if (!task) return;
+      openTaskMessageEditor(task);
     }
 
     function copyCustomerMessage(customerId) {
       const row = customersCache.find(customer => String(customer.id) === String(customerId));
       if (!row) return;
+      openCustomerMessageEditor(row);
+    }
+
+    function openReservationMessageEditor(row) {
+      const name = row.customer?.name || row.customer_name || "お客様";
+      const vehicle = [row.vehicle?.maker, row.vehicle?.car_name || row.vehicle?.carName || row.car_name_snapshot].filter(Boolean).join(" ") || row.vehicle?.car_name || row.car_name || "お車";
+      const plate = row.vehicle?.plate_last4 || row.plate_last4 || "";
+      const date = row.reservation_date ? formatDate(row.reservation_date) : "入庫日";
+      const time = row.reservation_time ? String(row.reservation_time).slice(0, 5) : "";
+      const work = row.work_type || "作業";
+      const status = String(row.status || "");
+      const summary = `${name}様 / ${vehicle}${plate ? ` / 下4桁 ${plate}` : ""} / ${date}${time ? ` ${time}` : ""} / ${work}`;
+      const variants = buildReservationMessageVariants({ name, vehicle, plate, date, time, work, status });
+      openMessageModal({
+        title: "入庫予定のLINE文面",
+        summary,
+        variants,
+        label: "入庫予定のLINE文面"
+      });
+    }
+
+    function openTaskMessageEditor(task) {
+      const name = task.name || "お客様";
+      const vehicle = task.vehicle || task.car || task.carName || "お車";
+      const title = task.title || task.type || "ご連絡";
+      const base = task.message || `${name}様、${getShopName()}です。\n${title}の件でご連絡しました。\nご都合のよい時にご確認ください。`;
+      const variants = {
+        soft: base,
+        short: `${name}様\n${getShopName()}です。${title}の件でご連絡しました。\nご確認をお願いいたします。`,
+        polite: `${name}様\nいつも${getShopName()}をご利用いただきありがとうございます。\n${title}の件でご連絡いたしました。\nお手すきの際にご確認いただけますと幸いです。`,
+        dayBefore: `${name}様\n${getShopName()}です。\n明日のご来店・ご連絡予定について確認のご連絡です。\nご都合が変わる場合は、お早めにご返信ください。`,
+        recontact: `${name}様\n${getShopName()}です。\n先日ご案内した件について、その後いかがでしょうか。\nご不明点や日程のご希望があれば、お気軽にご返信ください。`
+      };
+      openMessageModal({
+        title: "今日やることのLINE文面",
+        summary: `${name}様 / ${vehicle} / ${title}`,
+        variants,
+        label: "今日やることのLINE文面"
+      });
+    }
+
+    function openCustomerMessageEditor(row) {
       const name = row.name || "お客様";
-      copyText(`${name}様、${getShopName()}です。お車の件でご連絡いたしました。ご都合のよい時にご確認ください。`);
+      const vehicle = [row.maker, row.car_name || row.carName].filter(Boolean).join(" ") || "お車";
+      const variants = {
+        soft: `${name}様\n${getShopName()}です。\nお車の件でご連絡いたしました。\nご都合のよい時にご確認ください。`,
+        short: `${name}様\n${getShopName()}です。お車の件でご連絡しました。\nご確認をお願いいたします。`,
+        polite: `${name}様\nいつも${getShopName()}をご利用いただきありがとうございます。\nお車の件で確認したいことがあり、ご連絡いたしました。\nお手すきの際にご確認いただけますと幸いです。`,
+        dayBefore: `${name}様\n${getShopName()}です。\n明日のご来店予定について確認のご連絡です。\nご都合が変わる場合は、お早めにご返信ください。`,
+        recontact: `${name}様\n${getShopName()}です。\n以前ご相談いただいた件で、その後いかがでしょうか。\n必要であれば日程や内容を改めてご相談ください。`
+      };
+      openMessageModal({
+        title: "顧客連絡のLINE文面",
+        summary: `${name}様 / ${vehicle}`,
+        variants,
+        label: "顧客連絡のLINE文面"
+      });
+    }
+
+    function buildReservationMessageVariants(input) {
+      const shop = getShopName();
+      const when = `${input.date}${input.time ? ` ${input.time}頃` : ""}`;
+      const vehicleLine = `${input.vehicle}${input.plate ? `（ナンバー下4桁：${input.plate}）` : ""}`;
+      const work = input.work || "作業";
+      const isProvisional = isProvisionalReservationStatus(input.status);
+      const isComplete = String(input.status || "").includes("作業完了");
+
+      if (isProvisional) {
+        return {
+          soft: `${input.name}様\n${shop}です。\n${when}の${work}について、仮入庫のご希望を確認しました。\n店舗側で確認後、正式な入庫日時をご連絡いたします。`,
+          short: `${input.name}様\n${shop}です。\n${work}の仮入庫希望を確認しました。\n確認後、正式な日時をご連絡します。`,
+          polite: `${input.name}様\nいつも${shop}をご利用いただきありがとうございます。\n${when}の${work}について、仮入庫のご希望を確認いたしました。\n店舗側で確認のうえ、正式な入庫日時をご案内いたします。`,
+          dayBefore: `${input.name}様\n${shop}です。\n明日の${work}仮入庫について確認のご連絡です。\nご都合が変わる場合は、お早めにご返信ください。`,
+          recontact: `${input.name}様\n${shop}です。\n先日の${work}入庫希望について、その後いかがでしょうか。\nご希望日時の調整が必要でしたら、お気軽にご返信ください。`
+        };
+      }
+
+      if (isComplete) {
+        return {
+          soft: `${input.name}様\n${shop}です。\n${vehicleLine}の${work}が完了しました。\nお引き取りや今後のご案内について、必要事項をご連絡いたします。`,
+          short: `${input.name}様\n${shop}です。\n${work}が完了しました。\nお引き取りについてご確認ください。`,
+          polite: `${input.name}様\nいつも${shop}をご利用いただきありがとうございます。\n${vehicleLine}の${work}が完了いたしました。\nお引き取り等について、確認のご連絡をいたします。`,
+          dayBefore: `${input.name}様\n${shop}です。\n明日のお引き取り・ご来店予定について確認のご連絡です。`,
+          recontact: `${input.name}様\n${shop}です。\n作業完了後の件でご連絡いたしました。\nご都合のよいタイミングでご確認ください。`
+        };
+      }
+
+      return {
+        soft: `${input.name}様\n${shop}です。\n${when}に${vehicleLine}の${work}でご来店予定となっています。\n変更や気になる点がありましたら、お気軽にご連絡ください。`,
+        short: `${input.name}様\n${shop}です。\n${when}の${work}入庫予定について確認です。\n変更があればご連絡ください。`,
+        polite: `${input.name}様\nいつも${shop}をご利用いただきありがとうございます。\n${when}に${vehicleLine}の${work}でご来店予定となっております。\nご都合の変更や気になる点がございましたら、お早めにご連絡ください。`,
+        dayBefore: `${input.name}様\n${shop}です。\n明日の${work}入庫予定について確認のご連絡です。\nご来店時は車検証など必要書類をお持ちください。\nご都合が変わる場合は、お早めにご連絡ください。`,
+        recontact: `${input.name}様\n${shop}です。\n${work}入庫予定の件で再度ご連絡いたしました。\n日程変更やご不明点があれば、お気軽にご返信ください。`
+      };
+    }
+
+    function openMessageModal(context) {
+      messageEditorContext = {
+        ...context,
+        currentVariant: "soft",
+        originalText: context.variants?.soft || ""
+      };
+      setText("messageModalTitle", context.title || "LINE文面確認");
+      setText("messageModalSummary", context.summary || "コピーする文面を確認してください。");
+      const input = document.getElementById("messageEditorText");
+      if (input) input.value = messageEditorContext.originalText;
+      document.getElementById("messageModal").classList.add("active");
+    }
+
+    function closeMessageModal() {
+      document.getElementById("messageModal").classList.remove("active");
+    }
+
+    function setMessageVariant(type) {
+      if (!messageEditorContext) return;
+      const value = messageEditorContext.variants?.[type] || messageEditorContext.variants?.soft || "";
+      const input = document.getElementById("messageEditorText");
+      if (input) input.value = value;
+      messageEditorContext.currentVariant = type;
+    }
+
+    function resetMessageEditor() {
+      if (!messageEditorContext) return;
+      const input = document.getElementById("messageEditorText");
+      if (input) input.value = messageEditorContext.originalText || "";
+    }
+
+    async function copyEditedMessage() {
+      const input = document.getElementById("messageEditorText");
+      const text = input ? input.value : "";
+      const label = messageEditorContext?.label || "LINE文面";
+      await copyText(text, { label });
     }
 
     function buildReservationChatMessage(row) {
@@ -2507,7 +2709,7 @@
           document.execCommand("copy");
           textarea.remove();
         }
-        if (!options.silent) showOk("コピーしました。");
+        if (!options.silent) showOk(`${options.label || "文面"}をコピーしました。LINE公式チャットへ貼り付けできます。`);
       } catch (error) {
         if (!options.silent) showError("コピーできませんでした。長押しで選択してコピーしてください。");
       }
@@ -2642,7 +2844,7 @@
   </script>
 
   <style>
-    /* STEP KSH-BRUSH-4C：iPad現場画面コンパクト化 */
+    /* STEP KSH-BRUSH-4D：iPad現場画面コンパクト化 */
     .ipad-compact {
       padding: 12px 13px;
       border-radius: 16px;
@@ -2775,7 +2977,7 @@
   </style>
 
   <script>
-    /* STEP KSH-BRUSH-4C：縦長対策。現場iPadでは最重要件数だけ先に見せる。 */
+    /* STEP KSH-BRUSH-4D：縦長対策。現場iPadでは最重要件数だけ先に見せる。 */
     let ipadShowAllProvisional = false;
     let ipadShowAllTodayTasks = false;
     let ipadShowAllReservations = false;
