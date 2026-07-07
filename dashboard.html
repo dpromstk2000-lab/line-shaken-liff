@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-7B</title>
+  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-7C</title>
 
   <style>
     :root {
@@ -215,7 +215,7 @@
       padding: 18px;
     }
 
-    /* STEP KSH-BRUSH-7B: 車検フォロー・LINE文面テンプレート強化 */
+    /* STEP KSH-BRUSH-7C: 車検フォロー・LINE文面テンプレート強化 */
     .daily-route {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1088,6 +1088,86 @@
     }
 
 
+    .message-editor-textarea {
+      width: 100%;
+      min-height: 210px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      padding: 12px 13px;
+      font-size: 14px;
+      line-height: 1.75;
+      background: #f8fafc;
+      color: #0f172a;
+      outline: none;
+    }
+
+    .message-editor-textarea:focus {
+      border-color: #2563eb;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .message-editor-source {
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      color: #1e3a8a;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      line-height: 1.55;
+    }
+
+    .message-editor-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+
+    .message-editor-options:empty {
+      display: none;
+    }
+
+    .copy-toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 220;
+      width: min(420px, calc(100vw - 44px));
+      background: #0f172a;
+      color: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.30);
+      padding: 14px 16px;
+      display: none;
+      line-height: 1.55;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .copy-toast.active {
+      display: block;
+      animation: fadeIn 0.16s ease;
+    }
+
+    .copy-toast strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .copy-toast span {
+      display: block;
+      font-size: 12px;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+
 
     .customer-detail-summary {
       display: grid;
@@ -1272,7 +1352,7 @@
       }
     }
 
-    /* STEP KSH-BRUSH-7B: 営業デモ用コンパクト化 */
+    /* STEP KSH-BRUSH-7C: 営業デモ用コンパクト化 */
     .compact-note {
       display: inline-flex;
       align-items: center;
@@ -1441,7 +1521,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-7B</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-7C</p>
           </div>
         </div>
       </div>
@@ -2656,11 +2736,46 @@
     </div>
   </div>
 
+
+  <div id="messageEditorOverlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="messageEditorTitle">LINE文面の確認・編集</h3>
+      </div>
+      <div class="modal-body">
+        <div id="messageEditorSource" class="message-editor-source"></div>
+        <div id="messageEditorOptions" class="message-editor-options"></div>
+        <textarea id="messageEditorTextarea" class="message-editor-textarea"></textarea>
+        <div class="small muted" style="margin-top:8px; line-height:1.7;">
+          この場で文面を直してからコピーできます。LINE公式チャットへ貼り付けて送信してください。
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-slate" onclick="closeMessageEditor()">閉じる</button>
+        <button class="btn btn-slate" onclick="resetMessageEditorText()">最初の文面に戻す</button>
+        <button class="btn btn-primary" onclick="copyMessageEditorText()">編集後の文面をコピー</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="copyToast" class="copy-toast">
+    <strong id="copyToastTitle">コピーしました</strong>
+    <span id="copyToastText"></span>
+  </div>
+
   <script>
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const KSH_DEMO_RESET_WORKER_URL = "https://ksh-demo-reset.dpromstk2000.workers.dev";
     const DEFAULT_DASHBOARD_TOKEN = "1234";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
+
+    let messageEditorState = {
+      title: "LINE文面の確認・編集",
+      source: "",
+      originalText: "",
+      options: []
+    };
+    let copyToastTimer = null;
 
 
     let shopSettings = {
@@ -2704,7 +2819,7 @@
     function applyShopSettingsToDashboard() {
       const shopName = getShopName();
       const serviceName = getServiceName();
-      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-7B`;
+      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-7C`;
       setText("dashboardLogoText", getShopInitials(shopName));
       setText("dashboardShopName", shopName);
       setText("dashboardServiceName", serviceName);
@@ -3464,7 +3579,7 @@
           </details>
 
           <div class="task-actions compact-actions">
-            <button class="btn btn-primary" onclick="copyTodayTaskMessage(${index})">文面コピー</button>
+            <button class="btn btn-primary" onclick="copyTodayTaskMessage(${index})">文面確認・編集</button>
             ${task.customerId ? `<button class="btn btn-slate" onclick="openTodayTaskCustomerDetail(${index})">顧客詳細</button>` : ""}
             ${task.inquiryId || task.customerId ? `<button class="btn btn-green" onclick="openReservationFromTodayTask(${index})">入庫予定へ</button>` : ""}
             <button class="btn btn-primary" onclick="markTodayTaskHandled(${index}, 'line_sent')">送信済み</button>
@@ -3940,7 +4055,7 @@
               ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""} / ${escapeHtml(row.work_type || "入庫予定")}
             </div>
             <div class="reservation-actions compact-actions">
-              ${row.id ? `<button class="btn btn-slate" onclick="copyReservationMessage('${reservationId}')">文面コピー</button>` : ""}
+              ${row.id ? `<button class="btn btn-slate" onclick="copyReservationMessage('${reservationId}')">文面確認</button>` : ""}
               ${isProvisionalReservationStatus(row.status) && row.id ? `<button class="btn btn-green" onclick="confirmReservationQuick('${reservationId}')">確定</button>` : ""}
               <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">一覧</button>
             </div>
@@ -4093,7 +4208,7 @@
               <button class="btn btn-green" onclick="openReservationFromInquiry('${row.id}')">入庫予定へ</button>
               <button class="btn btn-slate" onclick="copyInquiryName('${row.id}')">名前コピー</button>
               <button class="btn btn-slate" onclick="copyInquiryPhone('${row.id}')">電話コピー</button>
-              <button class="btn btn-slate" onclick="copyInquiryMessage('${row.id}')">文面コピー</button>
+              <button class="btn btn-slate" onclick="copyInquiryMessage('${row.id}')">文面確認</button>
             </div>
           </td>
         </tr>
@@ -4177,7 +4292,7 @@
             <div style="display:grid; gap:6px">
               ${isProvisionalReservationStatus(row.status) ? `<button class="btn btn-green" onclick="confirmReservationQuick('${row.id}')">入庫予定にする</button>` : ""}
               <button class="btn btn-primary" onclick="openEditReservationForm('${row.id}')">編集</button>
-              <button class="btn btn-slate" onclick="copyReservationMessage('${row.id}')">文面コピー</button>
+              <button class="btn btn-slate" onclick="copyReservationMessage('${row.id}')">文面確認</button>
               <button class="btn btn-red" onclick="confirmDeleteReservation('${row.id}')">削除</button>
             </div>
           </td>
@@ -5078,10 +5193,41 @@
       const date = reservation.reservation_date ? formatDate(reservation.reservation_date) : "入庫日";
       const time = reservation.reservation_time ? reservation.reservation_time.slice(0, 5) : "";
       const work = reservation.work_type || "作業";
+      const vehicleName = reservation.vehicle?.car_name || reservation.car_name_snapshot || "お車";
+      const shopName = getShopName();
+      const whenText = `${date}${time ? " " + time + "頃" : ""}`;
 
-      const message = `${name}様、${date}${time ? " " + time + "頃" : ""}の${work}入庫予定についてご連絡です。ご都合が変わる場合は、お早めにお知らせください。`;
+      const standard = `${name}様
+いつも${shopName}をご利用いただきありがとうございます。
+${whenText}の${work}入庫予定についてご連絡です。
+ご都合が変わる場合は、お早めにお知らせください。`;
 
-      copyText(message);
+      const soft = `${name}様
+${shopName}です。
+${whenText}に${vehicleName}の${work}でご来店予定となっています。
+変更や気になる点がありましたら、お気軽にご連絡ください。`;
+
+      const short = `${name}様
+${shopName}です。
+${whenText}の${work}入庫予定の確認です。
+変更がありましたらご連絡ください。`;
+
+      const dayBefore = `${name}様
+${shopName}です。
+明日${time ? " " + time + "頃" : ""}、${vehicleName}の${work}でご来店予定です。
+お気をつけてお越しください。`;
+
+      openMessageEditor({
+        title: "入庫予定のLINE文面",
+        source: `${name}様 / ${vehicleName} / ${whenText} / ${work}`,
+        text: soft,
+        options: [
+          { label: "やわらかめ", text: soft },
+          { label: "短め", text: short },
+          { label: "丁寧", text: standard },
+          { label: "前日確認", text: dayBefore }
+        ]
+      });
     }
 
     async function ensureCustomersLoaded() {
@@ -5158,7 +5304,7 @@
           <strong style="display:block;margin-top:4px">${escapeHtml(row.label || "文面")}</strong>
           <div class="small muted" style="margin-top:4px">${escapeHtml(row.timing || "")}</div>
           <div class="task-actions" style="margin-top:10px">
-            <button class="btn btn-slate" onclick="copyMessageTemplate(${index})">文面コピー</button>
+            <button class="btn btn-slate" onclick="copyMessageTemplate(${index})">文面確認</button>
           </div>
         </div>
       `).join("");
@@ -5167,7 +5313,12 @@
     function copyMessageTemplate(index) {
       const row = messageTemplatesCache[index];
       if (!row) return;
-      copyText(row.text || "");
+      openMessageEditor({
+        title: "LINE文面テンプレート",
+        source: row.label || "テンプレート",
+        text: row.text || "",
+        options: buildSimpleRewriteOptions(row.text || "", "")
+      });
     }
 
     function renderCandidateTemplateButtons(row, index) {
@@ -5274,7 +5425,7 @@
             <div class="task-actions">
               <button class="btn btn-slate" onclick="copyFollowupName(${index})">名前コピー</button>
               <button class="btn btn-slate" onclick="copyFollowupPhone(${index})">電話コピー</button>
-              <button class="btn btn-primary" onclick="copyFollowupMessage(${index})">編集後文面コピー</button>
+              <button class="btn btn-primary" onclick="copyFollowupMessage(${index})">編集後の文面確認</button>
               <button class="btn btn-slate" onclick="resetFollowupMessage(${index})">自動文面に戻す</button>
               <button class="btn btn-green" onclick="markFollowupHandled(${index}, 'line_sent')">チャット送信済み</button>
               <button class="btn btn-slate" onclick="markFollowupHandled(${index}, 'phone_called')">電話済み</button>
@@ -5423,7 +5574,7 @@
             <div class="message-box" style="margin-top:8px">${escapeHtml(row.message_preview || "")}</div>
             <div class="task-actions">
               <button class="btn btn-slate" onclick="copyOpportunityName(${index})">名前コピー</button>
-              <button class="btn btn-slate" onclick="copyOpportunityMessage(${index})">文面コピー</button>
+              <button class="btn btn-slate" onclick="copyOpportunityMessage(${index})">文面確認</button>
               <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
             </div>
           </td>
@@ -5453,7 +5604,7 @@
           <div class="task-actions">
             <button class="btn btn-slate" onclick="copyReminderName('${row.id}')">名前コピー</button>
             <button class="btn btn-slate" onclick="copyReminderPhone('${row.id}')">電話コピー</button>
-            <button class="btn btn-slate" onclick="copyReminderMessage('${row.id}')">文面コピー</button>
+            <button class="btn btn-slate" onclick="copyReminderMessage('${row.id}')">文面確認</button>
             <button class="btn btn-dark" onclick="openLineManager()">LINE公式チャット</button>
           </div>
         </div>
@@ -7391,7 +7542,14 @@
     }
 
     function copyFollowupMessage(index) {
-      copyText(getFollowupMessage(index));
+      const row = followupCandidatesCache[index];
+      const message = getFollowupMessage(index);
+      openMessageEditor({
+        title: "フォロー候補のLINE文面",
+        source: row ? `${row.customer_name || "お客様"} / ${row.car_name || "車両"} / ${row.reason || row.followup_type || "フォロー"}` : "フォロー候補",
+        text: message,
+        options: buildSimpleRewriteOptions(message, row ? row.customer_name : "")
+      });
     }
 
     function copyOpportunityName(index) {
@@ -7401,7 +7559,13 @@
 
     function copyOpportunityMessage(index) {
       const row = opportunitiesCache[index];
-      if (row) copyText(row.message_preview || "");
+      if (!row) return;
+      openMessageEditor({
+        title: "営業候補のLINE文面",
+        source: `${row.customer_name || "お客様"} / ${row.car_name || "車両"} / ${row.reason || "候補"}`,
+        text: row.message_preview || "",
+        options: buildSimpleRewriteOptions(row.message_preview || "", row.customer_name || "")
+      });
     }
 
     function sendOpportunityLine(index) {
@@ -7422,7 +7586,14 @@
     }
 
     function copyTodayTaskMessage(index) {
-      copyText(getTodayTaskMessage(index));
+      const task = todayTasksCache[index];
+      const message = getTodayTaskMessage(index);
+      openMessageEditor({
+        title: "今日やることのLINE文面",
+        source: task ? `${task.title || "対応候補"} / ${task.name || "お客様"} / ${buildTodayTaskVehicleText(task)}` : "今日やること",
+        text: message,
+        options: buildSimpleRewriteOptions(message, task ? task.name : "")
+      });
     }
 
     function sendTodayTaskLine(index) {
@@ -7431,7 +7602,77 @@
       sendLineMessage(task.customerId || "", task.lineUserId || "", getTodayTaskMessage(index));
     }
 
-    async function copyText(text) {
+    function openMessageEditor({ title, source, text, options = [] }) {
+      messageEditorState = {
+        title: title || "LINE文面の確認・編集",
+        source: source || "",
+        originalText: String(text || ""),
+        options: Array.isArray(options) ? options : []
+      };
+
+      document.getElementById("messageEditorTitle").textContent = messageEditorState.title;
+      document.getElementById("messageEditorSource").textContent = messageEditorState.source || "コピーする前に文面を確認できます。";
+      document.getElementById("messageEditorTextarea").value = messageEditorState.originalText;
+      renderMessageEditorOptions();
+      document.getElementById("messageEditorOverlay").classList.add("active");
+      setTimeout(() => document.getElementById("messageEditorTextarea")?.focus(), 80);
+    }
+
+    function renderMessageEditorOptions() {
+      const box = document.getElementById("messageEditorOptions");
+      if (!box) return;
+      const options = messageEditorState.options || [];
+      box.innerHTML = options.map((option, index) => `
+        <button class="btn btn-slate" onclick="applyMessageEditorOption(${index})">${escapeHtml(option.label || "文面")}</button>
+      `).join("");
+    }
+
+    function applyMessageEditorOption(index) {
+      const option = (messageEditorState.options || [])[index];
+      if (!option) return;
+      document.getElementById("messageEditorTextarea").value = option.text || "";
+      showCopyToast(`${option.label || "文面"}に切り替えました`, option.text || "");
+    }
+
+    function resetMessageEditorText() {
+      document.getElementById("messageEditorTextarea").value = messageEditorState.originalText || "";
+      showCopyToast("最初の文面に戻しました", messageEditorState.originalText || "");
+    }
+
+    function closeMessageEditor() {
+      document.getElementById("messageEditorOverlay").classList.remove("active");
+    }
+
+    async function copyMessageEditorText() {
+      const value = document.getElementById("messageEditorTextarea").value || "";
+      await copyText(value, messageEditorState.title || "LINE文面");
+      closeMessageEditor();
+    }
+
+    function buildSimpleRewriteOptions(message, customerName) {
+      const text = String(message || "").trim();
+      if (!text) return [];
+
+      const shopName = getShopName();
+      const name = String(customerName || "お客様").replace(/様$/, "") || "お客様";
+      const shortText = text
+        .replace(/いつも.*?をご利用いただきありがとうございます。\n?/g, `${shopName}です。\n`)
+        .replace(/ご都合が変わる場合は、お早めにお知らせください。/g, "変更がありましたらご連絡ください。")
+        .slice(0, 220);
+      const softText = text
+        .replace(/ご連絡です。/g, "ご案内です。")
+        .replace(/お早めにお知らせください。/g, "お気軽にご連絡ください。")
+        .replace(/未返信/g, "ご確認待ち");
+      const phoneText = `${name}様\n${shopName}です。\n先ほどの件でご連絡しました。\nご都合のよい時にご返信、またはお電話いただければ大丈夫です。`;
+
+      return [
+        { label: "やわらかめ", text: softText },
+        { label: "短め", text: shortText },
+        { label: "電話後フォロー", text: phoneText }
+      ];
+    }
+
+    async function copyText(text, label = "") {
       const value = String(text || "");
 
       if (!value) {
@@ -7441,7 +7682,8 @@
 
       try {
         await navigator.clipboard.writeText(value);
-        showOk("コピーしました。");
+        showOk(`${label ? label + "を" : ""}コピーしました。`);
+        showCopyToast(`${label || "文面"}をコピーしました`, value);
       } catch {
         const textarea = document.createElement("textarea");
         textarea.value = value;
@@ -7449,8 +7691,25 @@
         textarea.select();
         document.execCommand("copy");
         document.body.removeChild(textarea);
-        showOk("コピーしました。");
+        showOk(`${label ? label + "を" : ""}コピーしました。`);
+        showCopyToast(`${label || "文面"}をコピーしました`, value);
       }
+    }
+
+    function showCopyToast(title, text) {
+      const toast = document.getElementById("copyToast");
+      const titleEl = document.getElementById("copyToastTitle");
+      const textEl = document.getElementById("copyToastText");
+      if (!toast || !titleEl || !textEl) return;
+
+      titleEl.textContent = title || "コピーしました";
+      textEl.textContent = String(text || "").replace(/\s+/g, " ").trim();
+      toast.classList.add("active");
+
+      if (copyToastTimer) clearTimeout(copyToastTimer);
+      copyToastTimer = setTimeout(() => {
+        toast.classList.remove("active");
+      }, 3600);
     }
 
     function openLineManager() {
