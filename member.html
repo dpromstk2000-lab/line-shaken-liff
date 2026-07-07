@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DPRO CAR LINE｜マイカー会員ページ STEP KSH-BRUSH-6</title>
+  <title>DPRO CAR LINE｜マイカー会員ページ STEP KSH-BRUSH-6B</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root {
@@ -193,7 +193,7 @@
       font-size: 12px;
       font-weight: 800;
       box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-      z-index: 20;
+      z-index: 40;
       opacity: 0;
       pointer-events: none;
       transition: opacity .2s ease;
@@ -201,6 +201,32 @@
       text-align: center;
     }
     .toast.show { opacity: 1; }
+    .copy-notice {
+      position: fixed;
+      left: 50%; top: 16px;
+      transform: translate(-50%, -14px);
+      width: min(520px, calc(100% - 24px));
+      background: linear-gradient(135deg, rgba(46, 204, 113, 0.98), rgba(24, 139, 86, 0.98));
+      color: #fff;
+      border-radius: 18px;
+      padding: 14px 16px;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.42);
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .copy-notice.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    .copy-notice strong { display: block; font-size: 14px; margin-bottom: 3px; }
+    .copy-notice span { display: block; font-size: 12px; opacity: 0.94; }
+    .message-box.copied {
+      border-color: rgba(46, 204, 113, 0.65);
+      box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.12) inset;
+    }
   </style>
 </head>
 <body>
@@ -209,7 +235,7 @@
       <div class="logo">CAR</div>
       <h1 id="pageTitle">マイカー会員ページ</h1>
       <p id="pageLead">登録済みのお車・入庫予定・相談履歴を確認できます。</p>
-      <div class="version">STEP KSH-BRUSH-6 / member.html</div>
+      <div class="version">STEP KSH-BRUSH-6B / member.html</div>
     </header>
 
     <div id="alertArea"></div>
@@ -251,12 +277,16 @@
   </div>
 
   <div class="toast" id="toast">コピーしました</div>
+  <div class="copy-notice" id="copyNotice">
+    <strong id="copyNoticeTitle">コピーしました</strong>
+    <span id="copyNoticeText">LINEに貼り付けて送信できます。</span>
+  </div>
 
   <script>
     const LIFF_ID = "2010239091-K5EeUmBh";
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const SHOP_CODE = "street_house_kitsuki";
-    const VERSION = "STEP KSH-BRUSH-6";
+    const VERSION = "STEP KSH-BRUSH-6B";
 
     const state = {
       shop: {
@@ -694,7 +724,7 @@
       const vehicle = (state.profile?.vehicles || []).find(v => String(v.id) === String(vehicleId));
       const customer = state.profile?.customer || {};
       const text = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n${vehicle ? `${vehicleTitle(vehicle)}（ナンバー下4桁：${vehicle.plate_last4 || "未登録"}）` : "登録している車"}について相談したいです。\n\n相談内容：\n希望入庫日：\n希望時間：\n\nよろしくお願いします。`;
-      copyText(text);
+      copyText(text, "車両相談文面");
     }
 
     function copyReservationMessage(reservationId, type) {
@@ -704,41 +734,86 @@
       const dateText = reservation ? [formatDate(reservation.reservation_date), reservation.reservation_time].filter(Boolean).join(" ") : "";
       const car = vehicle ? `${vehicleTitle(vehicle)}（${vehicle.plate_last4 || "ナンバー未登録"}）` : "登録車両";
       let body = "";
+      let label = "入庫前確認";
       if (type === "change") {
-        body = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n以下の入庫予定について、日程変更を相談したいです。\n\n車両：${car}\n現在の予定：${dateText}\n希望日：\n希望時間：\n\nよろしくお願いします。`;
+        label = "日程変更相談";
+        body = `${state.shop.shop_name} 様
+
+${customer.name || ""}です。
+以下の入庫予定について、日程変更を相談したいです。
+
+車両：${car}
+現在の予定：${dateText}
+希望日：
+希望時間：
+
+よろしくお願いします。`;
       } else if (type === "cancel") {
-        body = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n以下の入庫予定について、キャンセルまたは再調整を相談したいです。\n\n車両：${car}\n現在の予定：${dateText}\n理由：\n\nよろしくお願いします。`;
+        label = "キャンセル相談";
+        body = `${state.shop.shop_name} 様
+
+${customer.name || ""}です。
+以下の入庫予定について、キャンセルまたは再調整を相談したいです。
+
+車両：${car}
+現在の予定：${dateText}
+理由：
+
+よろしくお願いします。`;
       } else {
-        body = `${state.shop.shop_name} 様\n\n${customer.name || ""}です。\n以下の入庫予定について確認です。\n\n車両：${car}\n予定：${dateText}\n当日必要なものや注意点があれば教えてください。\n\nよろしくお願いします。`;
+        label = "入庫前確認";
+        body = `${state.shop.shop_name} 様
+
+${customer.name || ""}です。
+以下の入庫予定について確認です。
+
+車両：${car}
+予定：${dateText}
+当日必要なものや注意点があれば教えてください。
+
+よろしくお願いします。`;
       }
-      copyText(body);
+      copyText(body, label);
     }
 
     function copyGeneralMessage(type) {
       const customer = state.profile?.customer || {};
       const firstVehicle = (state.profile?.vehicles || [])[0];
-      const carLine = firstVehicle ? `\n車両：${vehicleTitle(firstVehicle)}（ナンバー下4桁：${firstVehicle.plate_last4 || "未登録"}）` : "";
+      const carLine = firstVehicle ? `
+車両：${vehicleTitle(firstVehicle)}（ナンバー下4桁：${firstVehicle.plate_last4 || "未登録"}）` : "";
       const nameLine = customer.name ? `${customer.name}です。` : "相談です。";
       let subject = "";
       let detail = "";
+      let label = "その他相談";
       if (type === "shaken") {
+        label = "車検相談";
         subject = "車検について相談したいです。";
         detail = "車検見積もり・入庫可能日を教えてください。";
       } else if (type === "oil") {
+        label = "オイル交換相談";
         subject = "オイル交換について相談したいです。";
         detail = "作業可能日と目安費用を教えてください。";
       } else if (type === "estimate") {
+        label = "見積もり相談";
         subject = "見積もりについて相談したいです。";
         detail = "内容を確認して、次の進め方を相談したいです。";
       } else {
+        label = "その他相談";
         subject = "車のことで相談したいです。";
         detail = "相談内容：\n希望入庫日：\n希望時間：";
       }
-      const text = `${state.shop.shop_name} 様\n\n${nameLine}${carLine}\n\n${subject}\n${detail}\n\nよろしくお願いします。`;
-      copyText(text);
+      const text = `${state.shop.shop_name} 様
+
+${nameLine}${carLine}
+
+${subject}
+${detail}
+
+よろしくお願いします。`;
+      copyText(text, label);
     }
 
-    async function copyText(text) {
+    async function copyText(text, label = "LINE文面") {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
@@ -754,12 +829,33 @@
           document.body.removeChild(textarea);
         }
         const box = document.getElementById("lastCopiedBox");
-        if (box) box.textContent = text;
-        showToast("LINE文面をコピーしました");
+        if (box) {
+          box.textContent = `コピーしました：${label}
+
+${text}`;
+          box.classList.add("copied");
+          clearTimeout(copyText.boxTimer);
+          copyText.boxTimer = setTimeout(() => box.classList.remove("copied"), 2600);
+          box.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        showCopyNotice(label);
+        showToast(`コピーしました：${label}`);
       } catch (error) {
         console.error(error);
         showToast("コピーできませんでした。長押しで選択してください。", true);
       }
+    }
+
+    function showCopyNotice(label) {
+      const notice = document.getElementById("copyNotice");
+      const title = document.getElementById("copyNoticeTitle");
+      const text = document.getElementById("copyNoticeText");
+      if (!notice || !title || !text) return;
+      title.textContent = `コピーしました：${label}`;
+      text.textContent = "LINEの入力欄に貼り付けて送信できます。下の文面欄にもコピー内容を表示しました。";
+      notice.classList.add("show");
+      clearTimeout(showCopyNotice.timer);
+      showCopyNotice.timer = setTimeout(() => notice.classList.remove("show"), 2800);
     }
 
     function showToast(message) {
@@ -767,7 +863,7 @@
       toast.textContent = message;
       toast.classList.add("show");
       clearTimeout(showToast.timer);
-      showToast.timer = setTimeout(() => toast.classList.remove("show"), 2200);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 2400);
     }
 
     function isUpcomingReservation(row) {
