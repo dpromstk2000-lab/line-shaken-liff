@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-BRUSH-4D</title>
+  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-PHONE-3</title>
 
   <style>
     :root {
@@ -1078,13 +1078,13 @@
         <div class="toolbar">
           <div>
             <h2>顧客検索</h2>
-            <p>名前・電話番号・車種・ナンバー下4桁で検索できます。</p>
+            <p>名前・電話番号（ハイフンあり/なし）・車種・ナンバー下4桁で検索できます。</p>
           </div>
         </div>
 
         <div class="search-box">
           <div class="search-row">
-            <input id="customerKeyword" type="search" placeholder="例：山田、090、ジムニー、1234" onkeydown="if(event.key==='Enter'){ searchCustomers(); }" />
+            <input id="customerKeyword" type="search" placeholder="例：山田、090-1111-2222、09011112222、ジムニー、1234" onkeydown="if(event.key==='Enter'){ searchCustomers(); }" />
             <button class="btn btn-primary" onclick="searchCustomers()">検索</button>
           </div>
         </div>
@@ -1234,7 +1234,7 @@
 
     function applyShopSettingsToIpad() {
       const shopName = getShopName();
-      document.title = `${shopName}｜現場受付専用iPad STEP KSH-BRUSH-4D`;
+      document.title = `${shopName}｜現場受付専用iPad STEP KSH-PHONE-3`;
       setText("ipadLogoText", getShopInitials(shopName));
       setText("ipadShopName", shopName);
       const today = dateYmd(new Date());
@@ -1311,7 +1311,7 @@
 
       if (tab === "today") loadToday();
       if (tab === "reservations") loadReservations();
-      if (tab === "customers") renderCustomers(customersCache);
+      if (tab === "customers") searchCustomers();
     }
 
     function refreshCurrent() {
@@ -1383,7 +1383,7 @@
         throw new Error(
           "APIに接続できませんでした。\n\n" +
           "PC管理画面は動いているため、iPad画面の認証/CORS方式を確認してください。\n" +
-          "このSTEP KSH-BRUSH-4Dでは、管理コードをURL側にも付けて接続します。\n" +
+          "このSTEP KSH-PHONE-3では、管理コードをURL側にも付けて接続します。\n" +
           `確認URL：${WORKER_API_BASE}/health`
         );
       }
@@ -2283,10 +2283,20 @@
       const keyword = document.getElementById("customerKeyword").value.trim();
       setLoading(true);
       try {
-        const query = keyword ? `/api/customers?keyword=${encodeURIComponent(keyword)}&limit=100` : "/api/customers?limit=100";
-        const data = await api(query);
+        // STEP KSH-PHONE-3:
+        // Worker側の電話番号正規化に加えて、iPad画面側でも全顧客を取得して正規化検索します。
+        // これにより 090-1111-2222 / 09011112222 / 090 1111 2222 / +81 90... を同じ電話番号として扱います。
+        const data = await api("/api/customers?limit=1000");
         customersCache = data.customers || [];
-        renderCustomers(customersCache);
+
+        const rows = keyword
+          ? customersCache.filter(customer => customerMatchesKeyword(customer, keyword)).slice(0, 100)
+          : customersCache.slice(0, 100);
+
+        renderCustomers(rows, {
+          keyword,
+          total: customersCache.length
+        });
       } catch (error) {
         showError(error.message);
       } finally {
@@ -2294,14 +2304,20 @@
       }
     }
 
-    function renderCustomers(rows) {
+    function renderCustomers(rows, meta = {}) {
       const box = document.getElementById("customerList");
       if (!rows || !rows.length) {
-        box.innerHTML = `<div class="empty">検索すると顧客情報が表示されます。</div>`;
+        box.innerHTML = meta.keyword
+          ? `<div class="empty">該当する顧客が見つかりません。電話番号は 090-1111-2222 / 09011112222 / 090 1111 2222 のどれでも検索できます。</div>`
+          : `<div class="empty">検索すると顧客情報が表示されます。</div>`;
         return;
       }
 
-      box.innerHTML = rows.map(row => {
+      const countLabel = meta.keyword
+        ? `<div class="small muted" style="margin:0 0 10px; font-weight:800;">${escapeHtml(rows.length)}件表示 / 全${escapeHtml(meta.total || rows.length)}件</div>`
+        : "";
+
+      box.innerHTML = countLabel + rows.map(row => {
         const vehicles = Array.isArray(row.vehicles) ? row.vehicles : [];
         return `
           <article class="customer-card">
@@ -2742,6 +2758,77 @@
       if (el) el.textContent = value;
     }
 
+    // STEP KSH-PHONE-3:
+    // owner-ipad.html 側の顧客検索でも、電話番号の表記ゆれを吸収します。
+    function toHalfWidthSearchText(value) {
+      return String(value ?? "")
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
+        .replace(/[＋]/g, "+")
+        .replace(/[（]/g, "(")
+        .replace(/[）]/g, ")")
+        .replace(/[－ー―‐‑‒–—−]/g, "-");
+    }
+
+    function normalizeSearchText(value) {
+      return toHalfWidthSearchText(value)
+        .toLowerCase()
+        .trim();
+    }
+
+    function normalizePhoneForSearch(value) {
+      const text = toHalfWidthSearchText(value);
+      let digits = text.replace(/[^0-9]/g, "");
+
+      // +81 90 1111 2222 / 819011112222 のような入力も 09011112222 として扱う。
+      if (digits.startsWith("81") && digits.length >= 11) {
+        const rest = digits.slice(2);
+        digits = rest.startsWith("0") ? rest : `0${rest}`;
+      }
+
+      return digits;
+    }
+
+    function buildCustomerKeywordText(customer) {
+      const vehicles = Array.isArray(customer?.vehicles) ? customer.vehicles : [];
+      return normalizeSearchText([
+        customer?.name,
+        customer?.phone,
+        customer?.status,
+        customer?.line_display_name,
+        customer?.memo,
+        customer?.next_proposal_memo,
+        ...vehicles.flatMap(vehicle => [
+          vehicle.car_name,
+          vehicle.maker,
+          vehicle.model,
+          vehicle.plate_last4,
+          vehicle.next_shaken_date,
+          vehicle.next_shaken_year,
+          vehicle.next_shaken_month,
+          vehicle.next_oil_change_date,
+          vehicle.status,
+          vehicle.memo,
+          vehicle.next_proposal_memo
+        ])
+      ].filter(Boolean).join(" "));
+    }
+
+    function customerMatchesKeyword(customer, keywordInput) {
+      const keyword = normalizeSearchText(keywordInput);
+      if (!keyword) return true;
+
+      const text = buildCustomerKeywordText(customer);
+      if (text.includes(keyword)) return true;
+
+      const keywordPhone = normalizePhoneForSearch(keywordInput);
+      if (keywordPhone) {
+        const customerPhone = normalizePhoneForSearch(customer?.phone);
+        if (customerPhone && customerPhone.includes(keywordPhone)) return true;
+      }
+
+      return false;
+    }
+
     function normalizeNullableNumber(value) {
       if (value === null || value === undefined || value === "") return null;
       const n = Number(value);
@@ -2844,7 +2931,7 @@
   </script>
 
   <style>
-    /* STEP KSH-BRUSH-4D：iPad現場画面コンパクト化 */
+    /* STEP KSH-PHONE-3：iPad現場画面コンパクト化 */
     .ipad-compact {
       padding: 12px 13px;
       border-radius: 16px;
@@ -2977,7 +3064,7 @@
   </style>
 
   <script>
-    /* STEP KSH-BRUSH-4D：縦長対策。現場iPadでは最重要件数だけ先に見せる。 */
+    /* STEP KSH-PHONE-3：縦長対策。現場iPadでは最重要件数だけ先に見せる。 */
     let ipadShowAllProvisional = false;
     let ipadShowAllTodayTasks = false;
     let ipadShowAllReservations = false;
