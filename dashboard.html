@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-BRUSH-7C</title>
+  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-PHONE-2</title>
 
   <style>
     :root {
@@ -1521,7 +1521,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-BRUSH-7C</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-PHONE-2</p>
           </div>
         </div>
       </div>
@@ -1877,7 +1877,7 @@
               <div class="form-field">
                 <label>顧客検索</label>
                 <div style="display:flex; gap:8px; flex-wrap:wrap">
-                  <input id="reservationCustomerSearch" type="text" placeholder="名前・電話番号・車種・ナンバー下4桁で検索" style="flex:1; min-width:240px" oninput="searchReservationCustomers()" />
+                  <input id="reservationCustomerSearch" type="text" placeholder="名前・電話番号（09011112222も可）・車種・ナンバー下4桁で検索" style="flex:1; min-width:240px" oninput="searchReservationCustomers()" />
                   <button class="btn btn-primary" onclick="searchReservationCustomers()">検索</button>
                 </div>
               </div>
@@ -2324,7 +2324,7 @@
         <section id="section-customers" class="section">
           <div class="toolbar">
             <div class="toolbar-left">
-              <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話で検索" />
+              <input id="customerKeyword" class="input-sm" type="text" placeholder="名前・車種・電話（09011112222も可）で検索" />
               <button class="btn btn-primary" onclick="loadCustomers()">検索</button>
               <button class="btn btn-green" onclick="openNewCustomerForm()">＋ 顧客を追加</button>
             </div>
@@ -2819,7 +2819,7 @@
     function applyShopSettingsToDashboard() {
       const shopName = getShopName();
       const serviceName = getServiceName();
-      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-BRUSH-7C`;
+      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-PHONE-2`;
       setText("dashboardLogoText", getShopInitials(shopName));
       setText("dashboardShopName", shopName);
       setText("dashboardServiceName", serviceName);
@@ -4547,30 +4547,11 @@
       const box = document.getElementById("reservationCustomerResults");
       if (!box) return;
 
-      const keyword = (document.getElementById("reservationCustomerSearch")?.value || "").trim().toLowerCase();
+      const keyword = document.getElementById("reservationCustomerSearch")?.value || "";
 
-      const results = customersCache.filter(customer => {
-        if (!keyword) return true;
-
-        const text = [
-          customer.name,
-          customer.phone,
-          customer.status,
-          customer.line_display_name,
-          customer.memo,
-          ...(customer.vehicles || []).flatMap(v => [
-            v.car_name,
-            v.maker,
-            v.model,
-            v.plate_last4,
-            v.next_shaken_date,
-            v.next_shaken_year,
-            v.next_shaken_month
-          ])
-        ].filter(Boolean).join(" ").toLowerCase();
-
-        return text.includes(keyword);
-      }).slice(0, 30);
+      const results = customersCache
+        .filter(customer => customerMatchesKeyword(customer, keyword))
+        .slice(0, 30);
 
       if (!results.length) {
         box.innerHTML = `<div class="list-item muted">該当する顧客が見つかりません。</div>`;
@@ -5233,7 +5214,7 @@ ${shopName}です。
     async function ensureCustomersLoaded() {
       if (customersCache.length) return;
 
-      const data = await api("/api/customers?limit=500");
+      const data = await api("/api/customers?limit=1000");
       customersCache = data.customers || [];
     }
 
@@ -5780,8 +5761,9 @@ ${shopName}です。
       clearAlert();
 
       try {
-        const keyword = document.getElementById("customerKeyword").value.trim();
-        const data = await api(`/api/customers?keyword=${encodeURIComponent(keyword)}&limit=500`);
+        // STEP KSH-PHONE-2:
+        // Worker側の検索だけに依存せず、PC画面側でも電話番号を正規化して絞り込む。
+        const data = await api("/api/customers?limit=1000");
         customersCache = data.customers || [];
         renderCustomers();
 
@@ -6541,8 +6523,11 @@ ${shopName}です。
 
     function renderCustomers() {
       const body = document.getElementById("customerTableBody");
+      const keyword = document.getElementById("customerKeyword")?.value || "";
 
-      const filtered = customersCache.filter(customer => customerMatchesFilter(customer, currentCustomerFilter));
+      const filtered = customersCache
+        .filter(customer => customerMatchesFilter(customer, currentCustomerFilter))
+        .filter(customer => customerMatchesKeyword(customer, keyword));
 
       document.getElementById("customerCountLabel").textContent =
         `${filtered.length}件表示 / 全${customersCache.length}件`;
@@ -7796,6 +7781,77 @@ ${shopName}です。
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    // STEP KSH-PHONE-2:
+    // dashboard.html 側の顧客検索でも、090-1111-2222 / 09011112222 / 090 1111 2222 / +81 90... を同じ電話番号として扱う。
+    function toHalfWidthSearchText(value) {
+      return String(value ?? "")
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
+        .replace(/[＋]/g, "+")
+        .replace(/[（]/g, "(")
+        .replace(/[）]/g, ")")
+        .replace(/[－ー―‐‑‒–—−]/g, "-");
+    }
+
+    function normalizeSearchText(value) {
+      return toHalfWidthSearchText(value)
+        .toLowerCase()
+        .trim();
+    }
+
+    function normalizePhoneForSearch(value) {
+      const text = toHalfWidthSearchText(value);
+      let digits = text.replace(/[^0-9]/g, "");
+
+      // +81 90 1111 2222 / 819011112222 のような入力も 09011112222 として扱う。
+      if (digits.startsWith("81") && digits.length >= 11) {
+        const rest = digits.slice(2);
+        digits = rest.startsWith("0") ? rest : `0${rest}`;
+      }
+
+      return digits;
+    }
+
+    function buildCustomerKeywordText(customer) {
+      const vehicles = Array.isArray(customer?.vehicles) ? customer.vehicles : [];
+      return normalizeSearchText([
+        customer?.name,
+        customer?.phone,
+        customer?.status,
+        customer?.line_display_name,
+        customer?.memo,
+        customer?.next_proposal_memo,
+        ...vehicles.flatMap(v => [
+          v.car_name,
+          v.maker,
+          v.model,
+          v.plate_last4,
+          v.next_shaken_date,
+          v.next_shaken_year,
+          v.next_shaken_month,
+          v.next_oil_change_date,
+          v.status,
+          v.memo,
+          v.next_proposal_memo
+        ])
+      ].filter(Boolean).join(" "));
+    }
+
+    function customerMatchesKeyword(customer, keywordInput) {
+      const keyword = normalizeSearchText(keywordInput);
+      if (!keyword) return true;
+
+      const text = buildCustomerKeywordText(customer);
+      if (text.includes(keyword)) return true;
+
+      const keywordPhone = normalizePhoneForSearch(keywordInput);
+      if (keywordPhone) {
+        const customerPhone = normalizePhoneForSearch(customer?.phone);
+        if (customerPhone && customerPhone.includes(keywordPhone)) return true;
+      }
+
+      return false;
     }
 
     function formatDate(value) {
