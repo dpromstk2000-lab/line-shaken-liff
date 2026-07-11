@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜車検・整備・カスタム相談 STEP KSH-BRUSH-5</title>
+  <title>製品紹介デモ｜DPRO CAR LINE｜車検・整備・カスタム相談 STEP KSH-BRUSH-5</title>
 
   <!-- LIFF SDK -->
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  
 
   <style>
     :root {
@@ -728,7 +728,7 @@
 
 <body>
   <div id="embed-demo-banner" style="display:none;position:sticky;top:0;z-index:9999;padding:9px 14px;text-align:center;background:#fff7ed;border-bottom:1px solid #fdba74;color:#9a3412;font-size:12px;font-weight:900;">
-    製品紹介用デモです。画面操作は確認できますが、相談・仮入庫データは送信されません。
+    製品紹介用デモです。LINE認証なしで画面を確認できます。相談・仮入庫データは送信されません。
   </div>
 
   <div class="wrap">
@@ -970,6 +970,17 @@
   </div>
 
   <script>
+    window.liff = window.liff || {
+      init: async () => {},
+      isLoggedIn: () => false,
+      login: () => {},
+      getProfile: async () => ({
+        userId: "demo_line_user",
+        displayName: "デモユーザー",
+        pictureUrl: ""
+      })
+    };
+
     // =====================================================
     // 設定
     // =====================================================
@@ -1077,7 +1088,7 @@
     // =====================================================
 
     const PAGE_PARAMS = new URLSearchParams(window.location.search);
-    const IS_EMBED_DEMO = PAGE_PARAMS.get("embed_demo") === "1";
+    const IS_EMBED_DEMO = true;
 
     window.addEventListener("load", async () => {
       initYearMonthSelect();

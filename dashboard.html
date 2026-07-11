@@ -1514,6 +1514,10 @@
 </head>
 
 <body>
+  <div id="embed-demo-banner" style="display:none;position:sticky;top:0;z-index:9999;padding:9px 14px;text-align:center;background:#fff7ed;border-bottom:1px solid #fdba74;color:#9a3412;font-size:12px;font-weight:900;">
+    製品紹介用デモです。閲覧・画面切り替えはできますが、予約・顧客・売上・店舗設定の更新は実行されません。
+  </div>
+
   <div class="app">
     <aside id="sidebar" class="sidebar">
       <div class="brand">
@@ -2994,7 +2998,33 @@
       }
     };
 
+    const PAGE_PARAMS_EMBED = new URLSearchParams(window.location.search);
+    const IS_EMBED_DEMO = PAGE_PARAMS_EMBED.get("embed_demo") === "1";
+
+    const ORIGINAL_FETCH_EMBED_DEMO = window.fetch.bind(window);
+    window.fetch = async function(resource, options = {}) {
+      const method = String(options.method || "GET").toUpperCase();
+
+      if (IS_EMBED_DEMO && method !== "GET") {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: "製品紹介用デモでは更新操作は実行されません。"
+        }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      return ORIGINAL_FETCH_EMBED_DEMO(resource, options);
+    };
+
     window.addEventListener("load", async () => {
+      if (IS_EMBED_DEMO) {
+        dashboardToken = "1234";
+        try { localStorage.setItem("ksh_dashboard_token", "1234"); } catch (error) {}
+        const banner = document.getElementById("embed-demo-banner");
+        if (banner) banner.style.display = "block";
+      }
       document.getElementById("tokenInput").value = dashboardToken;
       initReservationDates();
       initCustomerFormLimits();
