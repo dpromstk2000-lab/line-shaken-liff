@@ -1,0 +1,135 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-BASELINE"
+  step: "STEP KSH-NEXT-1-R2"
+  title: "DPRO 車検・整備工場 LINE 現状基準台帳"
+  generated_at_utc: "2026-07-22T13:39:14.415570+00:00"
+  source_commit: "54e2cde3af797b7b088180c2bbc42ab60d39de43"
+  repository_expected: "dpromstk2000-lab/line-shaken-liff"
+safety:
+  functional_files_changed: false
+  database_changed: false
+  worker_changed: false
+  backup_tag_required: true
+  config_js_required: false
+current_files:
+  - path: "index.html"
+    required: true
+    exists: true
+    bytes: 71279
+    lines: 2215
+    sha256: "a4003c47fb78026c80be9da6a466c99e22370ee1a8cbfb295005a5f47f2d8b0a"
+    expected_previous_step: "STEP KSH-BRUSH-5"
+    detected_markers:
+      - "STEP KSH-BRUSH-5"
+      - "KSH-BRUSH-5"
+      - "ksh-line-demo-api.dpromstk2000.workers.dev"
+  - path: "member.html"
+    required: true
+    exists: true
+    bytes: 38610
+    lines: 958
+    sha256: "7f3281928e7ab405976ed158e85f1bddf5c807432d8ea6fd28c45c299576c3f3"
+    expected_previous_step: "STEP KSH-BRUSH-6B"
+    detected_markers:
+      - "STEP KSH-BRUSH-6B"
+      - "step-ksh-brush-6"
+      - "KSH-BRUSH-6B"
+      - "ksh-line-demo-api.dpromstk2000.workers.dev"
+      - "ksh-brush-6"
+  - path: "dashboard.html"
+    required: true
+    exists: true
+    bytes: 306928
+    lines: 8067
+    sha256: "98a2bdbf260783fad1251f4554d00eafa8832cbeb3d95abaeb896c684664a8f2"
+    expected_previous_step: "STEP KSH-BRUSH-7C"
+    detected_markers:
+      - "STEP KSH-BRUSH-7C"
+      - "KSH-PHONE-2"
+      - "KSH-BRUSH-7C"
+      - "ksh-line-demo-api.dpromstk2000.workers.dev"
+      - "ksh-demo-reset.dpromstk2000.workers.dev"
+      - "ksh-demo-reset-secret"
+  - path: "owner-ipad.html"
+    required: true
+    exists: true
+    bytes: 126679
+    lines: 3297
+    sha256: "1495dfdcf1cf380e2951a9ffbf97ca06a0d7f4cf0d566fb9fdc922f1e7884499"
+    expected_previous_step: "STEP KSH-BRUSH-4D"
+    detected_markers:
+      - "KSH-PHONE-3"
+      - "ksh-line-demo-api.dpromstk2000.workers.dev"
+  - path: "system-check.html"
+    required: true
+    exists: true
+    bytes: 33402
+    lines: 994
+    sha256: "7f20684bdc0993a1ab317ccb7ebee95f2125a3903edf16207fd980f3d414f498"
+    expected_previous_step: "STEP KSH-BRUSH-9"
+    detected_markers:
+      - "STEP KSH-BRUSH-9"
+      - "step-ksh-brush-9"
+      - "step-ksh-brush-5"
+      - "step-ksh-brush-4"
+      - "step-ksh-brush-7"
+      - "step-ksh-brush-6"
+      - "KSH-BRUSH-9"
+      - "ksh-line-demo-api.dpromstk2000.workers.dev"
+      - "ksh-demo-reset.dpromstk2000.workers.dev"
+      - "ksh-brush-9"
+      - "ksh-brush-5"
+      - "ksh-brush-4"
+  - path: "config.js"
+    required: false
+    exists: false
+    bytes: 0
+    lines: 0
+    sha256: ""
+    expected_previous_step: ""
+    detected_markers:
+      - ""
+  - path: "worker.js"
+    required: false
+    exists: false
+    bytes: 0
+    lines: 0
+    sha256: ""
+    expected_previous_step: "STEP KSH-BRUSH-7E"
+    detected_markers:
+      - ""
+  - path: "owner.html"
+    required: false
+    exists: false
+    bytes: 0
+    lines: 0
+    sha256: ""
+    expected_previous_step: ""
+    detected_markers:
+      - ""
+  - path: "staff.html"
+    required: false
+    exists: false
+    bytes: 0
+    lines: 0
+    sha256: ""
+    expected_previous_step: ""
+    detected_markers:
+      - ""
+sql_files:
+  - ""
+existing_workflows:
+  - ""
+next_acceptance:
+  owner_operation_policy: "裏側は強く、毎日の操作は簡単にする"
+  daily_primary_actions_max_clicks: 3
+  list_default_limit: 30
+  image_policy:
+    thumbnail_list: true
+    lazy_load_detail: true
+  preserve:
+    - "既存顧客・車両・予約データ"
+    - "電話・店頭・LINE受付"
+    - "PC管理・iPad受付・会員ページ"
+    - "system-check・demo_prepare"
