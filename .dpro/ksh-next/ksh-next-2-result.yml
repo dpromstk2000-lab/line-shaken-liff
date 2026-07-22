@@ -1,0 +1,29 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-2-RESULT"
+  step: "STEP KSH-NEXT-2"
+  title: "オーナーPC 今日やること画面整理"
+  generated_at_utc: "2026-07-22T14:03:29.969489+00:00"
+target:
+  file: "dashboard.html"
+  before_sha256: "98a2bdbf260783fad1251f4554d00eafa8832cbeb3d95abaeb896c684664a8f2"
+  after_sha256: "7e0495872a0e415db58bd80670f756f0a50a8e844b4cb1a1aebcc0135aa962b4"
+  before_bytes: 306928
+  after_bytes: 310868
+  added_bytes: 3940
+changes:
+  - "電話・店頭受付のクイック操作を追加"
+  - "顧客・車両画面へのクイック操作を追加"
+  - "iPad受付と最新更新をトップへ配置"
+  - "朝の確認ルートを3段階へ整理し折りたたみ化"
+  - "既存のKPI・今日の業務ボード・一覧・API処理を維持"
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  existing_ids_removed: false
+  external_library_added: false
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-3"
+  title: "受付・予約・入庫データ統合"

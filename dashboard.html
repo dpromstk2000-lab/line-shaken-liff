@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO CAR LINE｜オーナーダッシュボード STEP KSH-PHONE-2</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-2</title>
 
   <style>
     :root {
@@ -1510,6 +1510,143 @@
       }
     }
 
+
+    /* STEP KSH-NEXT-2: OWNER TODAY UI */
+    .next-today-intro {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 18px;
+      border: 2px solid #bfdbfe;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+      box-shadow: 0 8px 24px rgba(30, 58, 138, 0.07);
+    }
+
+    .next-today-intro h3 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      line-height: 1.4;
+    }
+
+    .next-today-intro p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .next-quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .next-quick-actions .btn {
+      min-height: 44px;
+      padding: 10px 14px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .next-guide {
+      margin-bottom: 16px;
+      padding: 0;
+      overflow: hidden;
+      box-shadow: none;
+      border-color: #dbeafe;
+    }
+
+    .next-guide > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 16px;
+      background: #f8fafc;
+      font-weight: 900;
+      font-size: 14px;
+      color: #1e3a8a;
+      user-select: none;
+    }
+
+    .next-guide > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .next-guide > summary::after {
+      content: "＋";
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .next-guide[open] > summary::after {
+      content: "－";
+    }
+
+    .next-guide-body {
+      padding: 14px 16px 16px;
+      border-top: 1px solid #dbeafe;
+    }
+
+    .daily-route.next-route {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 0;
+    }
+
+    .next-route .route-step {
+      min-height: 94px;
+    }
+
+    .next-scope-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    @media (max-width: 1040px) {
+      .next-today-intro {
+        grid-template-columns: 1fr;
+      }
+
+      .next-quick-actions {
+        justify-content: flex-start;
+      }
+
+      .daily-route.next-route {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .next-today-intro {
+        padding: 14px;
+      }
+
+      .next-quick-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+      }
+
+      .next-quick-actions .btn {
+        width: 100%;
+      }
+    }
+
   </style>
 </head>
 
@@ -1525,7 +1662,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-PHONE-2</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-2</p>
           </div>
         </div>
       </div>
@@ -1554,7 +1691,7 @@
         <div>
           <button class="btn btn-slate mobile-menu" onclick="toggleSidebar()">☰</button>
           <h2 id="pageTitle">今日やること</h2>
-          <p id="pageDesc">営業デモで見やすいよう、今日の入庫・未対応相談・フォロー候補をコンパクトに確認します。</p>
+          <p id="pageDesc">毎日の主要操作をこの画面から始めます。電話・店頭受付、入庫対応、顧客・車両確認へすぐ移動できます。</p>
         </div>
         <div class="top-actions">
           <button class="btn btn-orange" onclick="openIpadDashboard()">iPad用画面</button>
@@ -1579,37 +1716,42 @@
         <div id="alertBox" class="alert"></div>
 
         <section id="section-today" class="section active">
-          <div class="card card-pad" style="margin-bottom:16px; border:2px solid #bfdbfe; background:#eff6ff;">
-            <div class="panel-title">
-              <div>
-                <h3>今日見る順番</h3>
-                <p>車屋オーナーが朝一番に確認する流れです。売上ではなく、対応・入庫・連絡を先に見ます。</p>
-              </div>
-              <button class="btn btn-primary" onclick="loadToday()">最新状態に更新</button>
+          <div class="next-today-intro">
+            <div>
+              <h3>今日の業務をここから開始</h3>
+              <p>毎日使う操作だけを先に表示しています。細かな設定や売上確認は別画面なので、日常操作は増えません。</p>
+              <span class="next-scope-note">DPRO NEXT標準：主要操作は3操作以内</span>
             </div>
-            <div class="daily-route">
-              <div class="route-step">
-                <div class="route-step-number">1</div>
-                <div><strong>未対応相談を見る</strong><span>新規相談・見積もり後未返信・入庫希望を確認します。</span></div>
-              </div>
-              <div class="route-step">
-                <div class="route-step-number">2</div>
-                <div><strong>仮入庫を確定する</strong><span>お客様の希望日を確認し、正式な入庫予定へ変更します。</span></div>
-              </div>
-              <div class="route-step">
-                <div class="route-step-number">3</div>
-                <div><strong>本日の入庫を処理する</strong><span>入庫済み・作業中・完了連絡待ちに進めます。</span></div>
-              </div>
-              <div class="route-step">
-                <div class="route-step-number">4</div>
-                <div><strong>LINE文面を送る</strong><span>車検案内・見積もり後再連絡・完了連絡をコピーします。</span></div>
-              </div>
-              <div class="route-step">
-                <div class="route-step-number">5</div>
-                <div><strong>次回フォローを残す</strong><span>3日後・7日後の再連絡や次回車検案内につなげます。</span></div>
-              </div>
+            <div class="next-quick-actions" aria-label="今日のクイック操作">
+              <button class="btn btn-green" onclick="openNextQuickReservation()">＋ 電話・店頭受付</button>
+              <button class="btn btn-primary" onclick="openNextCustomerList()">顧客・車両を見る</button>
+              <button class="btn btn-orange" onclick="openIpadDashboard()">iPad受付</button>
+              <button class="btn btn-slate" onclick="loadToday()">最新状態に更新</button>
             </div>
           </div>
+
+          <details class="card card-pad next-guide">
+            <summary>
+              <span>朝の確認ルート</span>
+              <span class="small muted">必要な時だけ開く</span>
+            </summary>
+            <div class="next-guide-body">
+              <div class="daily-route next-route">
+                <div class="route-step">
+                  <div class="route-step-number">1</div>
+                  <div><strong>未対応・仮入庫</strong><span>新規相談と、お客様希望日の確認が必要な案件を処理します。</span></div>
+                </div>
+                <div class="route-step">
+                  <div class="route-step-number">2</div>
+                  <div><strong>本日の入庫・作業</strong><span>来店、入庫済み、作業中、完了連絡を順番に進めます。</span></div>
+                </div>
+                <div class="route-step">
+                  <div class="route-step-number">3</div>
+                  <div><strong>連絡・次回フォロー</strong><span>見積もり後、車検、オイル交換、再連絡予定を確認します。</span></div>
+                </div>
+              </div>
+            </div>
+          </details>
 
           <div class="grid4">
             <div class="card kpi shortcut-kpi" role="button" tabindex="0" title="今日やること一覧へ移動" aria-label="今日やること一覧へ移動" onclick="openDashboardShortcut('todayTasks')" onkeydown="handleShortcutCardKey(event, 'todayTasks')">
@@ -2966,7 +3108,7 @@
     const pageMeta = {
       today: {
         title: "今日やること",
-        desc: "営業デモで見やすいよう、今日の入庫・未対応相談・フォロー候補をコンパクトに確認します。"
+        desc: "毎日の主要操作をこの画面から始めます。電話・店頭受付、入庫対応、顧客・車両確認へすぐ移動できます。"
       },
       inquiries: {
         title: "相談一覧",
@@ -3173,6 +3315,30 @@
         scrollDashboardTarget("inquiryFilterSummary");
         return;
       }
+    }
+
+    /* STEP KSH-NEXT-2 quick actions */
+    function openNextQuickReservation() {
+      switchTab("reservations");
+      window.setTimeout(() => {
+        Promise.resolve(openNewReservationForm()).catch(error => {
+          showError(error && error.message ? error.message : "受付画面を開けませんでした。");
+        });
+      }, 420);
+    }
+
+    function openNextCustomerList() {
+      switchTab("customers");
+      window.setTimeout(() => {
+        const target =
+          document.getElementById("customerSearch") ||
+          document.getElementById("customerSearchInput") ||
+          document.getElementById("customerTableBody");
+        if (target && typeof target.focus === "function") target.focus();
+        if (target && typeof target.scrollIntoView === "function") {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 420);
     }
 
     function toggleTokenBox() {
