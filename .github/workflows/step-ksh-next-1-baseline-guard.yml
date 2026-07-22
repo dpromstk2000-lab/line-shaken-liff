@@ -1,0 +1,359 @@
+name: STEP KSH-NEXT-1 Baseline Guard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-1-baseline-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-1-baseline-guard
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Inspect current KSH system and create baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import os
+          import re
+
+          root = Path(".")
+          output_dir = root / ".dpro" / "ksh-next"
+          output_dir.mkdir(parents=True, exist_ok=True)
+
+          required_files = [
+              "index.html",
+              "member.html",
+              "dashboard.html",
+              "owner-ipad.html",
+              "system-check.html",
+              "config.js",
+          ]
+
+          optional_files = [
+              "worker.js",
+              "owner.html",
+              "staff.html",
+          ]
+
+          expected_previous_steps = {
+              "worker.js": "STEP KSH-BRUSH-7E",
+              "dashboard.html": "STEP KSH-BRUSH-7C",
+              "owner-ipad.html": "STEP KSH-BRUSH-4D",
+              "index.html": "STEP KSH-BRUSH-5",
+              "member.html": "STEP KSH-BRUSH-6B",
+              "system-check.html": "STEP KSH-BRUSH-9",
+          }
+
+          missing = [name for name in required_files if not (root / name).is_file()]
+          if missing:
+              raise SystemExit(
+                  "必須ファイルが不足しています。安全のため停止します: "
+                  + ", ".join(missing)
+              )
+
+          def quote(value):
+              return json.dumps(str(value), ensure_ascii=False)
+
+          def sha256(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          def detect_markers(text):
+              patterns = [
+                  r"STEP[\s_-]+KSH[\s_-]+(?:BRUSH|NEXT)[\s_-]*[A-Z0-9.-]+",
+                  r"KSH-[A-Z0-9._-]+",
+                  r'VERSION\s*[:=]\s*["\']([^"\']+)["\']',
+              ]
+              found = []
+              for pattern in patterns:
+                  for match in re.finditer(pattern, text, flags=re.I):
+                      value = match.group(1) if match.lastindex else match.group(0)
+                      value = re.sub(r"\s+", " ", value).strip()
+                      if value and value not in found:
+                          found.append(value)
+                      if len(found) >= 12:
+                          return found
+              return found
+
+          inspected = []
+          for name in required_files + optional_files:
+              path = root / name
+              if not path.is_file():
+                  inspected.append({
+                      "path": name,
+                      "required": name in required_files,
+                      "exists": False,
+                      "bytes": 0,
+                      "lines": 0,
+                      "sha256": "",
+                      "markers": [],
+                      "expected_previous_step": expected_previous_steps.get(name, ""),
+                  })
+                  continue
+
+              data = path.read_bytes()
+              text = data.decode("utf-8", errors="replace")
+              inspected.append({
+                  "path": name,
+                  "required": name in required_files,
+                  "exists": True,
+                  "bytes": len(data),
+                  "lines": text.count("\n") + 1,
+                  "sha256": sha256(path),
+                  "markers": detect_markers(text),
+                  "expected_previous_step": expected_previous_steps.get(name, ""),
+              })
+
+          sql_files = sorted(
+              str(path).replace("\\", "/")
+              for path in root.rglob("*.sql")
+              if ".git" not in path.parts
+          )
+
+          workflows_dir = root / ".github" / "workflows"
+          workflow_files = sorted(
+              str(path).replace("\\", "/")
+              for path in workflows_dir.glob("*.yml")
+              if path.name != "step-ksh-next-1-baseline-guard.yml"
+          ) if workflows_dir.exists() else []
+
+          generated_at = datetime.now(timezone.utc).isoformat()
+          before_sha = os.environ.get("BEFORE_SHA", "")
+
+          baseline_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-BASELINE"',
+              '  step: "STEP KSH-NEXT-1"',
+              '  title: "DPRO 車検・整備工場 LINE 現状基準台帳"',
+              f"  generated_at_utc: {quote(generated_at)}",
+              f"  source_commit: {quote(before_sha)}",
+              '  repository_expected: "dpromstk2000-lab/line-shaken-liff"',
+              "safety:",
+              "  functional_files_changed: false",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  backup_tag_required: true",
+              "current_files:",
+          ]
+
+          for item in inspected:
+              baseline_lines.extend([
+                  f"  - path: {quote(item['path'])}",
+                  f"    required: {str(item['required']).lower()}",
+                  f"    exists: {str(item['exists']).lower()}",
+                  f"    bytes: {item['bytes']}",
+                  f"    lines: {item['lines']}",
+                  f"    sha256: {quote(item['sha256'])}",
+                  f"    expected_previous_step: {quote(item['expected_previous_step'])}",
+                  "    detected_markers:",
+              ])
+              if item["markers"]:
+                  baseline_lines.extend(
+                      f"      - {quote(marker)}"
+                      for marker in item["markers"]
+                  )
+              else:
+                  baseline_lines.append('      - ""')
+
+          baseline_lines.append("sql_files:")
+          if sql_files:
+              baseline_lines.extend(f"  - {quote(name)}" for name in sql_files)
+          else:
+              baseline_lines.append('  - ""')
+
+          baseline_lines.append("existing_workflows:")
+          if workflow_files:
+              baseline_lines.extend(f"  - {quote(name)}" for name in workflow_files)
+          else:
+              baseline_lines.append('  - ""')
+
+          baseline_lines.extend([
+              "next_acceptance:",
+              '  owner_operation_policy: "裏側は強く、毎日の操作は簡単にする"',
+              "  daily_primary_actions_max_clicks: 3",
+              "  list_default_limit: 30",
+              "  image_policy:",
+              "    thumbnail_list: true",
+              "    lazy_load_detail: true",
+              "  preserve:",
+              '    - "既存顧客・車両・予約データ"',
+              '    - "電話・店頭・LINE受付"',
+              '    - "PC管理・iPad受付・会員ページ"',
+              '    - "system-check・demo_prepare"',
+          ])
+
+          (output_dir / "baseline.yml").write_text(
+              "\n".join(baseline_lines) + "\n",
+              encoding="utf-8",
+          )
+
+          plan_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-PLAN"',
+              '  title: "DPRO 車検・整備工場 LINE DPRO NEXT実装計画"',
+              '  current_step: "STEP KSH-NEXT-1"',
+              "principles:",
+              '  - "既存機能を壊さず追加型で進める"',
+              '  - "オーナーの毎日の主要操作は3操作以内"',
+              '  - "今日やることを最初に表示する"',
+              '  - "顧客だけでなく車両単位で履歴を管理する"',
+              '  - "全件・全画像を初期表示で取得しない"',
+              '  - "PC・iPad・LINE会員ページの役割を分ける"',
+              "scope:",
+              "  included:",
+              '    - "車検・点検・一般整備・修理相談"',
+              '    - "LINE・電話・店頭受付統合"',
+              '    - "複数車両管理"',
+              '    - "入庫から引渡しまでの進捗"',
+              '    - "見積確認・承認"',
+              '    - "作業前後写真"',
+              '    - "車検・点検・交換時期フォロー"',
+              "  excluded:",
+              '    - "中古車販売・在庫"',
+              '    - "買取査定"',
+              '    - "本格会計・請求"',
+              '    - "高度な部品在庫"',
+              "steps:",
+              '  - id: "KSH-NEXT-1"',
+              '    title: "正常版保護・現状基準台帳"',
+              '    status: "completed_after_workflow_success"',
+              '  - id: "KSH-NEXT-2"',
+              '    title: "現状差分判定・PC管理画面の今日やること整理"',
+              '    status: "next"',
+              '  - id: "KSH-NEXT-3"',
+              '    title: "受付・予約・入庫データ統合"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-4"',
+              '    title: "整備案件・進捗タイムライン"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-5"',
+              '    title: "見積確認・承認"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-6"',
+              '    title: "受付iPad最適化"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-7"',
+              '    title: "マイカーページ・整備履歴"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-8"',
+              '    title: "次回整備・車検フォロー"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-9"',
+              '    title: "性能・セキュリティ・system-check"',
+              '    status: "pending"',
+              '  - id: "KSH-NEXT-10"',
+              '    title: "製品サイト・操作体験シート・完成判定"',
+              '    status: "pending"',
+          ]
+          (output_dir / "plan.yml").write_text(
+              "\n".join(plan_lines) + "\n",
+              encoding="utf-8",
+          )
+
+          print("Baseline created:", output_dir / "baseline.yml")
+          print("Plan created:", output_dir / "plan.yml")
+          print("Required files:", len(required_files))
+          print("SQL files:", len(sql_files))
+          PY
+
+      - name: Validate current files and generated baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f index.html
+          test -f member.html
+          test -f dashboard.html
+          test -f owner-ipad.html
+          test -f system-check.html
+          test -f config.js
+          test -f .dpro/ksh-next/baseline.yml
+          test -f .dpro/ksh-next/plan.yml
+
+          grep -q 'step: "STEP KSH-NEXT-1"' .dpro/ksh-next/baseline.yml
+          grep -q 'functional_files_changed: false' .dpro/ksh-next/baseline.yml
+          grep -q 'source_commit:' .dpro/ksh-next/baseline.yml
+          grep -q 'id: "KSH-NEXT-2"' .dpro/ksh-next/plan.yml
+
+          python3 <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class Parser(HTMLParser):
+              pass
+
+          for name in [
+              "index.html",
+              "member.html",
+              "dashboard.html",
+              "owner-ipad.html",
+              "system-check.html",
+          ]:
+              parser = Parser()
+              parser.feed(Path(name).read_text(encoding="utf-8"))
+              parser.close()
+              print("HTML parser OK:", name)
+          PY
+
+          node --check config.js
+
+          echo "STEP KSH-NEXT-1 validation passed."
+
+      - name: Create baseline backup tag and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKUP_TAG="ksh-next-1-baseline-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+
+          rm -f ".github/workflows/step-ksh-next-1-baseline-guard.yml"
+
+          git config user.name "DPRO STEP KSH-NEXT-1"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "STEP KSH-NEXT-1 create safe baseline"
+          git push origin HEAD:main
