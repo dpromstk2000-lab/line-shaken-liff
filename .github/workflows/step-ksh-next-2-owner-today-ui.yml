@@ -1,0 +1,543 @@
+name: STEP KSH-NEXT-2 Owner Today UI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-2-owner-today-ui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-2-owner-today-ui
+  cancel-in-progress: false
+
+jobs:
+  owner-today-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Verify KSH-NEXT-1 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f dashboard.html
+          test -f .dpro/ksh-next/baseline.yml
+          test -f .dpro/ksh-next/plan.yml
+
+          grep -q 'id="section-today"' dashboard.html
+          grep -q 'class="daily-route"' dashboard.html
+          grep -q 'id="kpiTodayTasks"' dashboard.html
+          grep -q 'id="todayTaskList"' dashboard.html
+          grep -q 'function loadToday()' dashboard.html
+          grep -q 'function openNewReservationForm()' dashboard.html
+          grep -q 'function openIpadDashboard()' dashboard.html
+          grep -q 'id: "KSH-NEXT-2"' .dpro/ksh-next/plan.yml
+
+          if grep -q 'STEP KSH-NEXT-2: OWNER TODAY UI' dashboard.html; then
+            echo "STEP KSH-NEXT-2 is already applied."
+            exit 1
+          fi
+
+      - name: Create safety tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          BACKUP_TAG="ksh-next-2-before-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+          echo "BACKUP_TAG=$BACKUP_TAG" >> "$GITHUB_ENV"
+
+      - name: Apply DPRO NEXT owner today UI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import re
+
+          dashboard_path = Path("dashboard.html")
+          plan_path = Path(".dpro/ksh-next/plan.yml")
+          result_path = Path(".dpro/ksh-next/ksh-next-2-result.yml")
+
+          original = dashboard_path.read_text(encoding="utf-8")
+          text = original
+
+          def replace_once(source, old, new, label):
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return source.replace(old, new, 1)
+
+          def quote(value):
+              return json.dumps(str(value), ensure_ascii=False)
+
+          def sha256_text(value):
+              return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+          old_desc = "営業デモで見やすいよう、今日の入庫・未対応相談・フォロー候補をコンパクトに確認します。"
+          new_desc = "毎日の主要操作をこの画面から始めます。電話・店頭受付、入庫対応、顧客・車両確認へすぐ移動できます。"
+
+          text, title_count = re.subn(
+              r"<title>[^<]*オーナーダッシュボード[^<]*</title>",
+              "<title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-2</title>",
+              text,
+              count=1,
+          )
+          if title_count != 1:
+              raise SystemExit(f"title update failed: {title_count}")
+
+          text = replace_once(
+              text,
+              '<p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-PHONE-2</p>',
+              '<p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-2</p>',
+              "brand step",
+          )
+
+          desc_count = text.count(old_desc)
+          if desc_count < 2:
+              raise SystemExit(f"today description markers are insufficient: {desc_count}")
+          text = text.replace(old_desc, new_desc)
+
+          css_marker = "/* STEP KSH-NEXT-2: OWNER TODAY UI */"
+          css = r'''
+              /* STEP KSH-NEXT-2: OWNER TODAY UI */
+              .next-today-intro {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 18px;
+                align-items: center;
+                margin-bottom: 14px;
+                padding: 18px;
+                border: 2px solid #bfdbfe;
+                border-radius: 18px;
+                background: linear-gradient(135deg, #eff6ff, #ffffff);
+                box-shadow: 0 8px 24px rgba(30, 58, 138, 0.07);
+              }
+
+              .next-today-intro h3 {
+                margin: 0 0 5px;
+                font-size: 19px;
+                line-height: 1.4;
+              }
+
+              .next-today-intro p {
+                margin: 0;
+                color: var(--muted);
+                font-size: 13px;
+                line-height: 1.65;
+              }
+
+              .next-quick-actions {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+                gap: 8px;
+              }
+
+              .next-quick-actions .btn {
+                min-height: 44px;
+                padding: 10px 14px;
+                font-size: 13px;
+                white-space: nowrap;
+              }
+
+              .next-guide {
+                margin-bottom: 16px;
+                padding: 0;
+                overflow: hidden;
+                box-shadow: none;
+                border-color: #dbeafe;
+              }
+
+              .next-guide > summary {
+                list-style: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 13px 16px;
+                background: #f8fafc;
+                font-weight: 900;
+                font-size: 14px;
+                color: #1e3a8a;
+                user-select: none;
+              }
+
+              .next-guide > summary::-webkit-details-marker {
+                display: none;
+              }
+
+              .next-guide > summary::after {
+                content: "＋";
+                font-size: 18px;
+                line-height: 1;
+              }
+
+              .next-guide[open] > summary::after {
+                content: "－";
+              }
+
+              .next-guide-body {
+                padding: 14px 16px 16px;
+                border-top: 1px solid #dbeafe;
+              }
+
+              .daily-route.next-route {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                margin-top: 0;
+              }
+
+              .next-route .route-step {
+                min-height: 94px;
+              }
+
+              .next-scope-note {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                margin-top: 8px;
+                padding: 5px 9px;
+                border-radius: 999px;
+                background: #ecfdf5;
+                color: #166534;
+                border: 1px solid #bbf7d0;
+                font-size: 11px;
+                font-weight: 900;
+              }
+
+              @media (max-width: 1040px) {
+                .next-today-intro {
+                  grid-template-columns: 1fr;
+                }
+
+                .next-quick-actions {
+                  justify-content: flex-start;
+                }
+
+                .daily-route.next-route {
+                  grid-template-columns: 1fr;
+                }
+              }
+
+              @media (max-width: 620px) {
+                .next-today-intro {
+                  padding: 14px;
+                }
+
+                .next-quick-actions {
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  width: 100%;
+                }
+
+                .next-quick-actions .btn {
+                  width: 100%;
+                }
+              }
+          '''
+          if css_marker in text:
+              raise SystemExit("KSH-NEXT-2 CSS marker already exists")
+          text = replace_once(text, "  </style>", css + "\n  </style>", "style close")
+
+          section_pattern = re.compile(
+              r'(<section id="section-today" class="section active">\s*)(.*?)(\s*<div class="grid4">)',
+              flags=re.S,
+          )
+          match = section_pattern.search(text)
+          if not match:
+              raise SystemExit("today section introduction was not found")
+
+          next_intro = r'''<div class="next-today-intro">
+                      <div>
+                        <h3>今日の業務をここから開始</h3>
+                        <p>毎日使う操作だけを先に表示しています。細かな設定や売上確認は別画面なので、日常操作は増えません。</p>
+                        <span class="next-scope-note">DPRO NEXT標準：主要操作は3操作以内</span>
+                      </div>
+                      <div class="next-quick-actions" aria-label="今日のクイック操作">
+                        <button class="btn btn-green" onclick="openNextQuickReservation()">＋ 電話・店頭受付</button>
+                        <button class="btn btn-primary" onclick="openNextCustomerList()">顧客・車両を見る</button>
+                        <button class="btn btn-orange" onclick="openIpadDashboard()">iPad受付</button>
+                        <button class="btn btn-slate" onclick="loadToday()">最新状態に更新</button>
+                      </div>
+                    </div>
+
+                    <details class="card card-pad next-guide">
+                      <summary>
+                        <span>朝の確認ルート</span>
+                        <span class="small muted">必要な時だけ開く</span>
+                      </summary>
+                      <div class="next-guide-body">
+                        <div class="daily-route next-route">
+                          <div class="route-step">
+                            <div class="route-step-number">1</div>
+                            <div><strong>未対応・仮入庫</strong><span>新規相談と、お客様希望日の確認が必要な案件を処理します。</span></div>
+                          </div>
+                          <div class="route-step">
+                            <div class="route-step-number">2</div>
+                            <div><strong>本日の入庫・作業</strong><span>来店、入庫済み、作業中、完了連絡を順番に進めます。</span></div>
+                          </div>
+                          <div class="route-step">
+                            <div class="route-step-number">3</div>
+                            <div><strong>連絡・次回フォロー</strong><span>見積もり後、車検、オイル交換、再連絡予定を確認します。</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </details>'''
+
+          text = (
+              text[:match.start()]
+              + match.group(1)
+              + next_intro
+              + match.group(3)
+              + text[match.end():]
+          )
+
+          js_anchor = "    function toggleTokenBox() {"
+          helper_marker = "    /* STEP KSH-NEXT-2 quick actions */"
+          helper_js = r'''    /* STEP KSH-NEXT-2 quick actions */
+              function openNextQuickReservation() {
+                switchTab("reservations");
+                window.setTimeout(() => {
+                  Promise.resolve(openNewReservationForm()).catch(error => {
+                    showError(error && error.message ? error.message : "受付画面を開けませんでした。");
+                  });
+                }, 420);
+              }
+
+              function openNextCustomerList() {
+                switchTab("customers");
+                window.setTimeout(() => {
+                  const target =
+                    document.getElementById("customerSearch") ||
+                    document.getElementById("customerSearchInput") ||
+                    document.getElementById("customerTableBody");
+                  if (target && typeof target.focus === "function") target.focus();
+                  if (target && typeof target.scrollIntoView === "function") {
+                    target.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                }, 420);
+              }
+
+          '''
+          if helper_marker in text:
+              raise SystemExit("KSH-NEXT-2 helper marker already exists")
+          text = replace_once(text, js_anchor, helper_js + js_anchor, "JS helper anchor")
+
+          before_bytes = len(original.encode("utf-8"))
+          after_bytes = len(text.encode("utf-8"))
+          added_bytes = after_bytes - before_bytes
+
+          if added_bytes <= 0 or added_bytes > 30000:
+              raise SystemExit(f"unexpected dashboard size change: {added_bytes} bytes")
+
+          dashboard_path.write_text(text, encoding="utf-8")
+
+          plan = plan_path.read_text(encoding="utf-8")
+          old_step_2 = '\n'.join([
+              '  - id: "KSH-NEXT-2"',
+              '    title: "現状差分判定・PC管理画面の今日やること整理"',
+              '    status: "next"',
+          ])
+          new_step_2 = '\n'.join([
+              '  - id: "KSH-NEXT-2"',
+              '    title: "現状差分判定・PC管理画面の今日やること整理"',
+              '    status: "completed_after_workflow_success"',
+          ])
+          old_step_3 = '\n'.join([
+              '  - id: "KSH-NEXT-3"',
+              '    title: "受付・予約・入庫データ統合"',
+              '    status: "pending"',
+          ])
+          new_step_3 = '\n'.join([
+              '  - id: "KSH-NEXT-3"',
+              '    title: "受付・予約・入庫データ統合"',
+              '    status: "next"',
+          ])
+
+          if old_step_2 not in plan:
+              raise SystemExit("KSH-NEXT-2 plan status marker was not found")
+          if old_step_3 not in plan:
+              raise SystemExit("KSH-NEXT-3 plan status marker was not found")
+
+          plan = plan.replace(old_step_2, new_step_2, 1)
+          plan = plan.replace(old_step_3, new_step_3, 1)
+          plan = plan.replace(
+              '  current_step: "STEP KSH-NEXT-1-R2"',
+              '  current_step: "STEP KSH-NEXT-2"',
+              1,
+          )
+          plan_path.write_text(plan, encoding="utf-8")
+
+          result_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-2-RESULT"',
+              '  step: "STEP KSH-NEXT-2"',
+              '  title: "オーナーPC 今日やること画面整理"',
+              f"  generated_at_utc: {quote(datetime.now(timezone.utc).isoformat())}",
+              "target:",
+              '  file: "dashboard.html"',
+              f"  before_sha256: {quote(sha256_text(original))}",
+              f"  after_sha256: {quote(sha256_text(text))}",
+              f"  before_bytes: {before_bytes}",
+              f"  after_bytes: {after_bytes}",
+              f"  added_bytes: {added_bytes}",
+              "changes:",
+              '  - "電話・店頭受付のクイック操作を追加"',
+              '  - "顧客・車両画面へのクイック操作を追加"',
+              '  - "iPad受付と最新更新をトップへ配置"',
+              '  - "朝の確認ルートを3段階へ整理し折りたたみ化"',
+              '  - "既存のKPI・今日の業務ボード・一覧・API処理を維持"',
+              "safety:",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  existing_api_changed: false",
+              "  existing_ids_removed: false",
+              "  external_library_added: false",
+              "  backup_tag_created: true",
+              "next_step:",
+              '  id: "KSH-NEXT-3"',
+              '  title: "受付・予約・入庫データ統合"',
+          ]
+          result_path.write_text("\n".join(result_lines) + "\n", encoding="utf-8")
+
+          print("dashboard updated")
+          print("before bytes:", before_bytes)
+          print("after bytes:", after_bytes)
+          print("added bytes:", added_bytes)
+          PY
+
+      - name: Validate HTML IDs and JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from collections import Counter
+          import re
+          import subprocess
+          import tempfile
+
+          path = Path("dashboard.html")
+          text = path.read_text(encoding="utf-8")
+
+          class Parser(HTMLParser):
+              pass
+
+          parser = Parser()
+          parser.feed(text)
+          parser.close()
+
+          ids = re.findall(r'\bid=["\']([^"\']+)["\']', text)
+          duplicates = sorted(key for key, count in Counter(ids).items() if count > 1)
+          if duplicates:
+              raise SystemExit("duplicate IDs: " + ", ".join(duplicates))
+
+          required = [
+              "STEP KSH-NEXT-2: OWNER TODAY UI",
+              "openNextQuickReservation",
+              "openNextCustomerList",
+              "今日の業務をここから開始",
+              "DPRO NEXT標準：主要操作は3操作以内",
+              'id="section-today"',
+              'id="kpiTodayTasks"',
+              'id="todayTaskList"',
+              "function loadToday()",
+              "function openNewReservationForm()",
+          ]
+          for marker in required:
+              if marker not in text:
+                  raise SystemExit("missing marker: " + marker)
+
+          external_scripts = re.findall(
+              r'<script\b[^>]*\bsrc=["\'](https?://[^"\']+)["\']',
+              text,
+              flags=re.I,
+          )
+          if external_scripts:
+              raise SystemExit("external scripts detected: " + ", ".join(external_scripts))
+
+          inline_scripts = []
+          for attrs, body in re.findall(
+              r"<script\b([^>]*)>(.*?)</script>",
+              text,
+              flags=re.I | re.S,
+          ):
+              if re.search(r"\bsrc\s*=", attrs, flags=re.I):
+                  continue
+              if body.strip():
+                  inline_scripts.append(body)
+
+          if not inline_scripts:
+              raise SystemExit("inline JavaScript was not found")
+
+          for index, script in enumerate(inline_scripts, start=1):
+              temp = Path(tempfile.gettempdir()) / f"ksh-next-2-script-{index}.js"
+              temp.write_text(script, encoding="utf-8")
+              subprocess.run(["node", "--check", str(temp)], check=True)
+              print("JavaScript syntax OK:", index)
+
+          print("HTML parser OK")
+          print("ID uniqueness OK:", len(ids), "IDs")
+          PY
+
+      - name: Validate DPRO NEXT operation policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f .dpro/ksh-next/ksh-next-2-result.yml
+
+          grep -q 'step: "STEP KSH-NEXT-2"' .dpro/ksh-next/ksh-next-2-result.yml
+          grep -q 'database_changed: false' .dpro/ksh-next/ksh-next-2-result.yml
+          grep -q 'worker_changed: false' .dpro/ksh-next/ksh-next-2-result.yml
+          grep -q 'existing_api_changed: false' .dpro/ksh-next/ksh-next-2-result.yml
+          grep -q 'id: "KSH-NEXT-3"' .dpro/ksh-next/plan.yml
+          grep -q 'status: "next"' .dpro/ksh-next/plan.yml
+
+          echo "DPRO NEXT owner operation checks passed."
+
+      - name: Commit KSH-NEXT-2
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f ".github/workflows/step-ksh-next-2-owner-today-ui.yml"
+
+          git config user.name "DPRO STEP KSH-NEXT-2"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 1
+          fi
+
+          git commit -m "STEP KSH-NEXT-2 simplify owner today operations"
+          git push origin HEAD:main
