@@ -3,8 +3,8 @@ document:
   id: "DPRO-KSH-NEXT-BASELINE"
   step: "STEP KSH-NEXT-1-R2"
   title: "DPRO 車検・整備工場 LINE 現状基準台帳"
-  generated_at_utc: "2026-07-22T13:39:14.415570+00:00"
-  source_commit: "54e2cde3af797b7b088180c2bbc42ab60d39de43"
+  generated_at_utc: "2026-07-22T13:46:34.219820+00:00"
+  source_commit: "379f01fc77d67a0257b17f562f6fadc310a6cbe4"
   repository_expected: "dpromstk2000-lab/line-shaken-liff"
 safety:
   functional_files_changed: false
