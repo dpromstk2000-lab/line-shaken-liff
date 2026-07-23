@@ -1,0 +1,100 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-9-FRONTEND-AUDIT"
+  step: "STEP KSH-NEXT-9"
+  generated_at_utc: "2026-07-23T02:33:47.264396+00:00"
+summary:
+  html_parse_ok: true
+  duplicate_html_ids: false
+  javascript_syntax_ok: true
+  missing_local_scripts: false
+  duplicate_script_references: false
+  script_order_ok: true
+  public_admin_markers_detected: false
+  member_metadata_hiding_present: true
+  system_check_noindex: true
+  audited_total_bytes: 723491
+files:
+  - path: "index.html"
+    bytes: 71279
+    sha256: "a4003c47fb78026c80be9da6a466c99e22370ee1a8cbfb295005a5f47f2d8b0a"
+    hard_limit_bytes: 1400000
+  - path: "dashboard.html"
+    bytes: 346478
+    sha256: "51559b5783544b9c4060e52bfb99036a0d53b1a688ec894b658ca4751c5b6fd1"
+    hard_limit_bytes: 1900000
+  - path: "owner-ipad.html"
+    bytes: 133184
+    sha256: "b80833423a5cb0af3a9511c573500a81ef4301be75d0703a59c623e3e4ba6219"
+    hard_limit_bytes: 1500000
+  - path: "member.html"
+    bytes: 38768
+    sha256: "547d919998a316793d99f5482c944948dd7efae280506e176242f7e99b46c385"
+    hard_limit_bytes: 1300000
+  - path: "system-check.html"
+    bytes: 37734
+    sha256: "7e63cd2cb564e43c144879054be5a5b7f13359d4bff71417ac68edbc49c98327"
+    hard_limit_bytes: 1100000
+  - path: "ksh-next-5-owner-estimate.js"
+    bytes: 14133
+    sha256: "7622dae5bd130e076b05b6273decdcd0c0b40a81ba72a75d166c00a0630f412f"
+    hard_limit_bytes: 350000
+  - path: "ksh-next-5-member-estimate.js"
+    bytes: 12240
+    sha256: "38e0f8ed51e13a6e572b88fc2b1535be7922d6252d59a10599869a00935afc8d"
+    hard_limit_bytes: 350000
+  - path: "ksh-next-6-ipad-operations.js"
+    bytes: 15211
+    sha256: "4a8917929233f367bbce80de1633cbe4e89d214256a704d9ff81bace6dd9765a"
+    hard_limit_bytes: 380000
+  - path: "ksh-next-7-member-history.js"
+    bytes: 26601
+    sha256: "b46c21164adb90da12c3aa5aebbfc5822dce85eec387e0d942b6cd0a37b80a91"
+    hard_limit_bytes: 400000
+  - path: "ksh-next-8-followup-cockpit.js"
+    bytes: 14263
+    sha256: "473c4d4cbbdd40ab2924f6e03bf758c32d89d510ffd870c753e7c7b8e7587a8c"
+    hard_limit_bytes: 400000
+  - path: "ksh-next-9-system-audit.js"
+    bytes: 13600
+    sha256: "b39644c535313be3ae1f43d5fcd8c95812d63940ef383489a9233b398b7c7b04"
+    hard_limit_bytes: 450000
+html_details:
+  - path: "index.html"
+    bytes: 71279
+    ids: 55
+    inline_scripts: 1
+    local_scripts: 0
+  - path: "dashboard.html"
+    bytes: 346478
+    ids: 217
+    inline_scripts: 1
+    local_scripts: 2
+  - path: "owner-ipad.html"
+    bytes: 133184
+    ids: 69
+    inline_scripts: 2
+    local_scripts: 1
+  - path: "member.html"
+    bytes: 38768
+    ids: 10
+    inline_scripts: 1
+    local_scripts: 2
+  - path: "system-check.html"
+    bytes: 37734
+    ids: 18
+    inline_scripts: 1
+    local_scripts: 1
+local_script_references:
+  - html: "dashboard.html"
+    script: "ksh-next-5-owner-estimate.js"
+  - html: "dashboard.html"
+    script: "ksh-next-8-followup-cockpit.js"
+  - html: "owner-ipad.html"
+    script: "ksh-next-6-ipad-operations.js"
+  - html: "member.html"
+    script: "ksh-next-5-member-estimate.js"
+  - html: "member.html"
+    script: "ksh-next-7-member-history.js"
+  - html: "system-check.html"
+    script: "ksh-next-9-system-audit.js"

@@ -1,0 +1,44 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-9-RESULT"
+  step: "STEP KSH-NEXT-9"
+  title: "性能・セキュリティ・system-check"
+  generated_at_utc: "2026-07-23T02:33:46.685778+00:00"
+targets:
+  - "system-check.html"
+  - "ksh-next-9-system-audit.js"
+  - ".dpro/ksh-next/frontend-audit.yml"
+hashes:
+  system_check_before: "7f20684bdc0993a1ab317ccb7ebee95f2125a3903edf16207fd980f3d414f498"
+  system_check_after: "7e63cd2cb564e43c144879054be5a5b7f13359d4bff71417ac68edbc49c98327"
+changes:
+  - "公開画面・追加JavaScriptの存在・容量・読込時間を検査"
+  - "無効な管理コードが管理APIで拒否されることを検査"
+  - "公開画面への管理用ヘッダー・Reset秘密情報の混入を検査"
+  - "管理コードを永続保存からタブ単位の一時保存へ変更"
+  - "管理コード削除ボタンを追加"
+  - "全検査を4件ずつ並列実行し待ち時間を短縮"
+  - "OK・注意・NG・検査時間を表示"
+  - "検査結果をコピー可能に変更"
+  - "DPRO NEXTの目視確認項目へ更新"
+  - "検索エンジン除外とreferrer抑制を追加"
+performance_policy:
+  concurrent_check_batch: 4
+  request_timeout_seconds: 12
+  page_hard_size_limits_enabled: true
+  all_records_loaded_on_start: false
+security_policy:
+  system_check_admin_token_persistent_storage: false
+  invalid_admin_token_rejection_check: true
+  public_admin_marker_scan: true
+  system_check_noindex: true
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  automatic_line_send_added: false
+  demo_reset_behavior_changed: false
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-10"
+  title: "製品サイト・操作体験シート・完成判定"
