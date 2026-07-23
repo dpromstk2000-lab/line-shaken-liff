@@ -1,0 +1,855 @@
+name: STEP KSH-NEXT-10A R4 A4 One Page Sheet
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-10a-operation-sheet-r4-one-page.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-10a-r4-a4-one-page
+  cancel-in-progress: false
+
+jobs:
+  a4-one-page-sheet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Verify current two-page package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f index.html
+          test -f index-product-demo.html
+          test -f dashboard.html
+          test -f owner-ipad.html
+          test -f member.html
+          test -f system-check.html
+          test -f .dpro/ksh-next/plan.yml
+          test -f .dpro/ksh-next/ksh-next-10a-result.yml
+          test -f deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf
+
+          grep -q 'current_step: "STEP KSH-NEXT-10A"' .dpro/ksh-next/plan.yml
+          grep -q 'operation_sheet_completed_product_site_pending' .dpro/ksh-next/plan.yml
+          grep -q 'pdf_page_count: 2' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'operation_sheet: "completed"' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'qr_decoded_from_pdf_render: true' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q '操作体験シートPDF' system-check.html
+
+          if [ -f .dpro/ksh-next/ksh-next-10a-r4-result.yml ]; then
+            echo "STEP KSH-NEXT-10A R4 is already applied."
+            exit 1
+          fi
+
+          echo "Two-page KSH-NEXT-10A package verified. It will be replaced by the DPRO standard A4 one-page sheet."
+
+      - name: Create safety tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKUP_TAG="ksh-next-10a-r4-before-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+          echo "BACKUP_TAG=$BACKUP_TAG" >> "$GITHUB_ENV"
+
+      - name: Install PDF and browser tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            fonts-ipafont-gothic \
+            poppler-utils \
+            zbar-tools \
+            zip
+
+          python3 -m pip install --disable-pip-version-check \
+            "qrcode[pil]>=7.4,<9" \
+            "Pillow>=10,<12" \
+            "pypdf>=5,<7"
+
+          rm -rf /tmp/ksh-next-10-r4-playwright
+          mkdir -p /tmp/ksh-next-10-r4-playwright
+          cd /tmp/ksh-next-10-r4-playwright
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.60.0 >/dev/null
+          node -e "const p=require('playwright/package.json'); if(p.version!=='1.60.0') throw new Error('Unexpected Playwright version: '+p.version); console.log('Playwright', p.version)"
+          npx playwright install --with-deps chromium
+
+      - name: Generate DPRO standard A4 one-page sheet
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DELIVER="deliverables/ksh-next-10"
+          rm -rf "$DELIVER"
+          mkdir -p "$DELIVER/screens" "$DELIVER/qr" "$DELIVER/_renders"
+
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+          import qrcode
+
+          deliver = Path("deliverables/ksh-next-10")
+          qrs = deliver / "qr"
+
+          system_base = "https://dpromstk2000-lab.github.io/line-shaken-liff"
+          product_base = "https://dpromstk2000-lab.github.io/dpro-line-systems-site"
+          official_line = "https://lin.ee/YxJGXv6D"
+
+          urls = {
+              "product": f"{product_base}/systems/car-service.html",
+              "customer": f"{system_base}/index.html?v=step-ksh-next-10",
+              "dashboard": f"{system_base}/dashboard.html?embed_demo=1&v=step-ksh-next-8",
+              "ipad": f"{system_base}/owner-ipad.html?embed_demo=1&v=step-ksh-next-6",
+              "member": f"{system_base}/member.html?demo=1&v=step-ksh-next-7",
+              "system_check": f"{system_base}/system-check.html?v=step-ksh-next-9",
+              "official_line": official_line,
+          }
+
+          capture_urls = {
+              "customer": f"{system_base}/index-product-demo.html?v=step-ksh-next-10-r4",
+              "dashboard": urls["dashboard"],
+              "ipad": urls["ipad"],
+              "member": urls["member"],
+          }
+
+          (deliver / "urls.json").write_text(
+              json.dumps({"qr_urls": urls, "capture_urls": capture_urls}, ensure_ascii=False, indent=2),
+              encoding="utf-8",
+          )
+
+          for key in ["product", "customer", "dashboard", "ipad", "member", "official_line"]:
+              qr = qrcode.QRCode(
+                  version=None,
+                  error_correction=qrcode.constants.ERROR_CORRECT_H,
+                  box_size=12,
+                  border=4,
+              )
+              qr.add_data(urls[key])
+              qr.make(fit=True)
+              image = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+              image.save(qrs / f"{key}.png", quality=100)
+
+          print("Six QR images generated")
+          print(json.dumps(urls, ensure_ascii=False, indent=2))
+          PY
+
+          cat > /tmp/ksh-next-10-r4-playwright/capture.mjs <<'JS'
+          import { chromium } from "playwright";
+          import fs from "fs";
+          import path from "path";
+
+          const root = process.cwd();
+          const deliver = path.join(root, "deliverables", "ksh-next-10");
+          const config = JSON.parse(fs.readFileSync(path.join(deliver, "urls.json"), "utf8"));
+          const browser = await chromium.launch({ headless: true });
+
+          async function capture(name, url, viewport, waitMs = 3500) {
+            const page = await browser.newPage({
+              viewport,
+              deviceScaleFactor: 1.5,
+              locale: "ja-JP",
+              colorScheme: "light",
+            });
+
+            const response = await page.goto(url, {
+              waitUntil: "networkidle",
+              timeout: 90000,
+            });
+
+            if (!response || !response.ok()) {
+              throw new Error(`${name}: HTTP ${response?.status() || "no response"}: ${url}`);
+            }
+
+            await page.waitForTimeout(waitMs);
+            await page.screenshot({
+              path: path.join(deliver, "screens", `${name}.png`),
+              fullPage: false,
+            });
+
+            console.log(`${name}: ${response.status()} / ${await page.title()}`);
+            await page.close();
+          }
+
+          await capture("customer", config.capture_urls.customer, { width: 430, height: 900 }, 2500);
+          await capture("dashboard", config.capture_urls.dashboard, { width: 1440, height: 920 }, 4500);
+          await capture("ipad", config.capture_urls.ipad, { width: 1180, height: 820 }, 4000);
+          await capture("member", config.capture_urls.member, { width: 430, height: 900 }, 4000);
+
+          await browser.close();
+          JS
+
+          node /tmp/ksh-next-10-r4-playwright/capture.mjs
+
+          python3 <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          import json
+          import html
+
+          deliver = Path("deliverables/ksh-next-10")
+          screens = deliver / "screens"
+          config = json.loads((deliver / "urls.json").read_text(encoding="utf-8"))
+          urls = config["qr_urls"]
+
+          for name in ["customer", "dashboard", "ipad", "member"]:
+              path = screens / f"{name}.png"
+              if not path.is_file() or path.stat().st_size < 20000:
+                  raise SystemExit(f"screenshot missing or too small: {path}")
+              image = Image.open(path).convert("RGB")
+              variance = sum(ImageStat.Stat(image.resize((120, 120))).var) / 3
+              if variance < 80:
+                  raise SystemExit(f"screenshot appears blank: {path}, variance={variance:.2f}")
+              print(name, image.size, path.stat().st_size, f"variance={variance:.1f}")
+
+          def e(value):
+              return html.escape(str(value), quote=True)
+
+          qr_cards = [
+              ("product", "製品紹介", "1"),
+              ("customer", "お客様画面", "2"),
+              ("dashboard", "オーナーPC", "3"),
+              ("ipad", "店舗iPad", "4"),
+              ("member", "マイカー会員", "5"),
+          ]
+
+          qr_html = []
+          for key, title, number in qr_cards:
+              qr_html.append(f"""
+                <article class="qr-card">
+                  <img src="qr/{key}.png" alt="{e(title)} QRコード">
+                  <strong>{e(title)}</strong>
+                  <span>{number}</span>
+                </article>
+              """)
+
+          html_text = f"""<!doctype html>
+          <html lang="ja">
+          <head>
+          <meta charset="utf-8">
+          <title>DPRO 車検・整備工場 LINE オーナー様用操作体験シート</title>
+          <style>
+          @page {{ size: A4 portrait; margin: 0; }}
+          * {{ box-sizing: border-box; }}
+          html, body {{
+            margin: 0; padding: 0;
+            font-family: "IPA Gothic", "Noto Sans CJK JP", sans-serif;
+            color: #36272a;
+          }}
+          body {{ background: #f4eadc; }}
+          .page {{
+            width: 210mm;
+            height: 297mm;
+            background: #fbf4e9;
+            overflow: hidden;
+            position: relative;
+          }}
+          .hero {{
+            height: 31mm;
+            padding: 5.2mm 8.5mm 4.2mm;
+            color: #fff;
+            background:
+              radial-gradient(circle at 97% 5%, #8f281f 0 20mm, transparent 20.3mm),
+              #332327;
+            position: relative;
+          }}
+          .hero h1 {{ margin: 0; font-size: 22pt; line-height: 1.18; letter-spacing: .01em; }}
+          .hero h2 {{ margin: 1.4mm 0 0; font-size: 12.5pt; font-weight: 500; }}
+          .hero p {{ margin: 2.8mm 0 0; font-size: 8.5pt; color: #eadfe0; }}
+          .status {{
+            position: absolute; right: 8mm; top: 10mm;
+            background: #6f8c75; border-radius: 999px;
+            padding: 3mm 4.6mm; font-size: 8.4pt; font-weight: 700;
+          }}
+          .content {{ padding: 3mm 8.5mm 4mm; }}
+          .section-title {{
+            margin: 0 0 2mm;
+            color: #8d3c32;
+            font-size: 13.5pt;
+            font-weight: 500;
+          }}
+          .section-title small {{
+            margin-left: 4mm; color: #8e8179;
+            font-size: 7.2pt;
+          }}
+          .qr-grid {{
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 2.2mm; margin-bottom: 2.6mm;
+          }}
+          .qr-card {{
+            height: 35.2mm;
+            border: .35mm solid #dcc8b9;
+            border-radius: 4mm;
+            background: rgba(255,255,255,.62);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+          }}
+          .qr-card img {{ width: 20mm; height: 20mm; object-fit: contain; }}
+          .qr-card strong {{ margin-top: 1.7mm; font-size: 8.2pt; font-weight: 500; }}
+          .qr-card span {{ margin-top: .9mm; color: #a83a30; font-size: 6.8pt; }}
+          .demo-order {{
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 2.2mm; margin-bottom: 2.8mm;
+          }}
+          .step {{
+            height: 11mm; border-radius: 999px;
+            padding: 1.7mm 2.4mm;
+            border: .35mm solid #ddcbbd;
+            background: #f6e7e8;
+            display: grid; grid-template-columns: 7mm 1fr;
+            column-gap: 2mm; align-items: center;
+          }}
+          .step:nth-child(1), .step:nth-child(5) {{ background: #fff0c6; }}
+          .step b {{
+            width: 6.5mm; height: 6.5mm; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: #b83e34; color: white; font-size: 7pt;
+          }}
+          .step:nth-child(1) b, .step:nth-child(5) b {{ background: #d59d29; }}
+          .step strong {{ display: block; font-size: 7.3pt; font-weight: 500; }}
+          .step span {{ display: block; font-size: 6.3pt; color: #746967; margin-top: .5mm; }}
+          .visuals {{
+            height: 49.5mm;
+            display: grid; grid-template-columns: 1.58fr .82fr;
+            gap: 3mm; margin-bottom: 2.8mm;
+          }}
+          .visual-large, .visual-small {{
+            border: .35mm solid #dcc8b9;
+            border-radius: 3.5mm;
+            overflow: hidden; background: white; position: relative;
+          }}
+          .visual-large img, .visual-small img {{
+            width: 100%; height: 100%; object-fit: cover; object-position: top;
+          }}
+          .visual-side {{ display: grid; grid-template-rows: 1fr 1fr; gap: 2.5mm; }}
+          .label {{
+            position: absolute; z-index: 2; top: 2.5mm; left: 3mm;
+            min-width: 36mm; text-align: center;
+            padding: 2mm 3mm; border-radius: 999px;
+            background: #3e282d; color: #fff; font-size: 8pt;
+          }}
+          .visual-small .label {{ background: #7b4553; min-width: 29mm; }}
+          .visual-small:last-child .label {{ background: #6f8c75; }}
+          .effects {{
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: 2.8mm; margin-bottom: 2.8mm;
+          }}
+          .effect {{
+            min-height: 22.5mm; border-radius: 3.5mm;
+            border: .35mm solid #ddcbbd; padding: 3mm;
+          }}
+          .effect:nth-child(1) {{ background: #fae9eb; }}
+          .effect:nth-child(2) {{ background: #e8f0ec; }}
+          .effect:nth-child(3) {{ background: #fff0c8; }}
+          .effect h3 {{ margin: 0 0 1.8mm; font-size: 10pt; font-weight: 500; }}
+          .effect p {{ margin: 0; font-size: 7.2pt; line-height: 1.55; color: #7b6d68; }}
+          .urls {{
+            min-height: 25mm; border: .35mm solid #dcc8b9;
+            border-radius: 3.5mm; background: rgba(255,255,255,.62);
+            padding: 2.6mm 3.5mm; margin-bottom: 3.8mm;
+          }}
+          .url-row {{
+            display: grid; grid-template-columns: 23mm 1fr;
+            gap: 2mm; margin-bottom: 1.4mm;
+            font-size: 6.8pt; line-height: 1.3;
+          }}
+          .url-row:last-child {{ margin-bottom: 0; }}
+          .url-row b {{ color: #a23e35; font-weight: 500; }}
+          .url-row span {{ word-break: break-all; color: #4e4544; }}
+          .cta {{
+            height: 72mm; border-radius: 4mm;
+            background: #332327; color: #fff;
+            padding: 5mm 5.5mm; position: relative;
+          }}
+          .cta h2 {{ margin: 0; font-size: 14pt; font-weight: 500; }}
+          .cta > p {{ margin: 2.5mm 0 5mm; font-size: 7.5pt; color: #dfd0d2; }}
+          .cta-cards {{
+            width: calc(100% - 29mm);
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: 3mm;
+          }}
+          .cta-card {{ height: 20mm; border-radius: 3mm; padding: 4mm; }}
+          .cta-card:nth-child(1) {{ background: #b6342b; }}
+          .cta-card:nth-child(2) {{ background: #d29d2f; }}
+          .cta-card:nth-child(3) {{ background: #718c77; }}
+          .cta-card strong {{ font-size: 9pt; font-weight: 500; }}
+          .cta-card span {{ display: block; margin-top: 2mm; font-size: 6.8pt; color: rgba(255,255,255,.82); }}
+          .line-button {{
+            position: absolute; left: 5.5mm; bottom: 5mm;
+            width: 102mm; height: 12mm; border-radius: 999px;
+            background: #f0791d; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 9pt;
+          }}
+          .line-copy {{
+            position: absolute; left: 112mm; bottom: 6mm;
+            font-size: 6.8pt; line-height: 1.55; color: #dfd0d2;
+          }}
+          .official-qr {{
+            position: absolute; right: 5.5mm; bottom: 4mm;
+            width: 23mm; text-align: center; font-size: 6.4pt; color: #dfd0d2;
+          }}
+          .official-qr img {{
+            width: 21mm; height: 21mm; background: white; padding: 1mm;
+            display: block; margin: 0 auto 1mm;
+          }}
+          </style>
+          </head>
+          <body>
+          <section class="page">
+            <header class="hero">
+              <h1>DPRO 車検・整備工場 LINE</h1>
+              <h2>オーナー様用 操作体験シート</h2>
+              <p>受付・作業進捗・見積承認・整備履歴・次回フォローを、実際の画面で5分体験</p>
+              <div class="status">公開確認済み / DPRO NEXT完成版</div>
+            </header>
+
+            <main class="content">
+              <h2 class="section-title">1　スマホでQRを読み取る
+                <small>デモ環境です。本番店舗データではありません。</small>
+              </h2>
+              <div class="qr-grid">{''.join(qr_html)}</div>
+
+              <h2 class="section-title">2　5分で見る順番</h2>
+              <div class="demo-order">
+                <div class="step"><b>1</b><div><strong>製品紹介</strong><span>30秒</span></div></div>
+                <div class="step"><b>2</b><div><strong>LINE相談</strong><span>1分</span></div></div>
+                <div class="step"><b>3</b><div><strong>オーナーPC</strong><span>2分</span></div></div>
+                <div class="step"><b>4</b><div><strong>店舗iPad</strong><span>1分</span></div></div>
+                <div class="step"><b>5</b><div><strong>マイカー会員</strong><span>30秒</span></div></div>
+              </div>
+
+              <div class="visuals">
+                <div class="visual-large">
+                  <span class="label">オーナーPC</span>
+                  <img src="screens/dashboard.png" alt="オーナーPC管理画面">
+                </div>
+                <div class="visual-side">
+                  <div class="visual-small">
+                    <span class="label">店舗iPad</span>
+                    <img src="screens/ipad.png" alt="店舗iPad画面">
+                  </div>
+                  <div class="visual-small">
+                    <span class="label">進捗・履歴</span>
+                    <img src="screens/member.png" alt="マイカー会員ページ">
+                  </div>
+                </div>
+              </div>
+
+              <h2 class="section-title">3　導入効果</h2>
+              <div class="effects">
+                <article class="effect"><h3>受付を一本化</h3><p>LINE・電話・店頭受付を同じ顧客・車両データへまとめ、二重入力を減らします。</p></article>
+                <article class="effect"><h3>見積と進捗を共有</h3><p>点検から見積承認、作業中、引渡しまでをPC・iPad・会員ページで確認できます。</p></article>
+                <article class="effect"><h3>次回来店を案内</h3><p>車検・オイル交換・前回作業・次回提案から、必要なお客様だけをフォローします。</p></article>
+              </div>
+
+              <h2 class="section-title">4　PCで開くフルURL</h2>
+              <div class="urls">
+                <div class="url-row"><b>製品紹介</b><span>{e(urls["product"])}</span></div>
+                <div class="url-row"><b>お客様画面</b><span>{e(urls["customer"])}</span></div>
+                <div class="url-row"><b>オーナーPC</b><span>{e(urls["dashboard"])}</span></div>
+                <div class="url-row"><b>店舗iPad</b><span>{e(urls["ipad"])}</span></div>
+                <div class="url-row"><b>マイカー会員</b><span>{e(urls["member"])}</span></div>
+              </div>
+
+              <section class="cta">
+                <h2>5　まずは5分、実際の画面を触ってください。</h2>
+                <p>導入時は店舗名・営業時間・休業日・受付内容を、お店の運用に合わせて設定します。</p>
+                <div class="cta-cards">
+                  <div class="cta-card"><strong>受付</strong><span>LINE・電話・店頭</span></div>
+                  <div class="cta-card"><strong>進捗・見積</strong><span>現在位置・お客様承認</span></div>
+                  <div class="cta-card"><strong>再来店</strong><span>車検・オイル・次回提案</span></div>
+                </div>
+                <div class="line-button">DPRO公式LINEでデモ・導入相談</div>
+                <div class="line-copy">{e(urls["official_line"])}<br>DPRO LINE SYSTEMS</div>
+                <div class="official-qr"><img src="qr/official_line.png" alt="DPRO公式LINE QRコード">公式LINE</div>
+              </section>
+            </main>
+          </section>
+          </body>
+          </html>
+          """
+
+          if html_text.count('<section class="page">') != 1:
+              raise SystemExit("operation sheet must contain exactly one A4 page")
+          if urls["product"] not in html_text or urls["official_line"] not in html_text:
+              raise SystemExit("required public URLs were not embedded")
+
+          (deliver / "operation-sheet-one-page.html").write_text(html_text, encoding="utf-8")
+          print("DPRO standard A4 one-page HTML generated")
+          PY
+
+          cat > /tmp/ksh-next-10-r4-playwright/print-pdf.mjs <<'JS'
+          import { chromium } from "playwright";
+          import path from "path";
+          import { pathToFileURL } from "url";
+
+          const root = process.cwd();
+          const deliver = path.join(root, "deliverables", "ksh-next-10");
+          const htmlPath = path.join(deliver, "operation-sheet-one-page.html");
+          const pdfPath = path.join(deliver, "DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf");
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ locale: "ja-JP" });
+          await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load", timeout: 60000 });
+          await page.emulateMedia({ media: "print" });
+          await page.pdf({
+            path: pdfPath,
+            format: "A4",
+            printBackground: true,
+            margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" },
+            preferCSSPageSize: true,
+          });
+          await browser.close();
+          console.log(pdfPath);
+          JS
+
+          node /tmp/ksh-next-10-r4-playwright/print-pdf.mjs
+
+      - name: Verify one-page PDF and all QR codes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DELIVER="deliverables/ksh-next-10"
+          PDF="$DELIVER/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
+          RENDERS="$DELIVER/_renders"
+          PREVIEW="$DELIVER/DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png"
+
+          test -s "$PDF"
+
+          python3 <<'PY'
+          from pathlib import Path
+          from pypdf import PdfReader
+
+          pdf = Path("deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf")
+          reader = PdfReader(str(pdf))
+
+          if len(reader.pages) != 1:
+              raise SystemExit(f"DPRO standard sheet must be exactly 1 page, found {len(reader.pages)}")
+
+          page = reader.pages[0]
+          width = float(page.mediabox.width)
+          height = float(page.mediabox.height)
+
+          if not (590 <= width <= 600 and 838 <= height <= 850):
+              raise SystemExit(f"PDF is not A4 portrait: {width} x {height}")
+
+          print("PDF is exactly one A4 portrait page")
+          PY
+
+          rm -rf "$RENDERS"
+          mkdir -p "$RENDERS"
+          pdftoppm -png -r 240 -singlefile "$PDF" "$RENDERS/one-page"
+          test -s "$RENDERS/one-page.png"
+          cp "$RENDERS/one-page.png" "$PREVIEW"
+
+          python3 <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+
+          preview = Path("deliverables/ksh-next-10/DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png")
+          image = Image.open(preview).convert("RGB")
+
+          if image.width < 1900 or image.height < 2700:
+              raise SystemExit(f"Rendered preview resolution is too small: {image.size}")
+
+          variance = sum(ImageStat.Stat(image.resize((180, 260))).var) / 3
+          if variance < 150:
+              raise SystemExit(f"Rendered one-page sheet appears blank: variance={variance:.2f}")
+
+          print("Rendered one-page preview:", image.size, preview.stat().st_size, f"variance={variance:.1f}")
+          PY
+
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+          import subprocess
+
+          deliver = Path("deliverables/ksh-next-10")
+          config = json.loads((deliver / "urls.json").read_text(encoding="utf-8"))
+          expected = {
+              config["qr_urls"]["product"],
+              config["qr_urls"]["customer"],
+              config["qr_urls"]["dashboard"],
+              config["qr_urls"]["ipad"],
+              config["qr_urls"]["member"],
+              config["qr_urls"]["official_line"],
+          }
+
+          result = subprocess.run(
+              ["zbarimg", "--quiet", "--raw", str(deliver / "_renders" / "one-page.png")],
+              text=True,
+              capture_output=True,
+              check=False,
+          )
+
+          decoded = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+          missing = expected - decoded
+
+          if missing:
+              raise SystemExit(
+                  "QR decoding from final one-page PDF failed.\n"
+                  f"missing={sorted(missing)}\n"
+                  f"decoded={sorted(decoded)}\n"
+                  f"stderr={result.stderr}"
+              )
+
+          verification = [
+              "DPRO KSH NEXT A4 ONE-PAGE QR READING VERIFICATION",
+              "Result: PASS",
+              "PDF pages: 1",
+              "Source: final rendered PDF at 240 dpi",
+              "",
+          ]
+          for url in sorted(expected):
+              verification.append(f"PASS: {url}")
+
+          (deliver / "DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt").write_text(
+              "\n".join(verification) + "\n",
+              encoding="utf-8",
+          )
+
+          print(f"QR decoding PASS: {len(decoded)} codes")
+          for url in sorted(decoded):
+              print(url)
+          PY
+
+          rm -f "$DELIVER/DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PDF_PNG_20260723.zip"
+          rm -f "$DELIVER/DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PNG_ONLY_20260723.zip"
+
+          (
+            cd "$DELIVER"
+            zip -9 "DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PDF_PNG_20260723.zip" \
+              "DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf" \
+              "DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png" \
+              "DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt"
+
+            zip -9 "DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PNG_ONLY_20260723.zip" \
+              "DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png" \
+              "DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt"
+          )
+
+          test -s "$DELIVER/DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PDF_PNG_20260723.zip"
+          test -s "$DELIVER/DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PNG_ONLY_20260723.zip"
+
+          rm -rf "$DELIVER/_renders" "$DELIVER/qr" "$DELIVER/screens"
+          rm -f "$DELIVER/operation-sheet-one-page.html" "$DELIVER/urls.json"
+
+          test ! -e "$DELIVER/DPRO_KSH_NEXT_internal_sales_sheet_page2.png"
+          test ! -e "$DELIVER/DPRO_KSH_NEXT_owner_operation_sheet_page1.png"
+          test ! -e "$DELIVER/DPRO_KSH_NEXT_operation_sheet_PDF_PNG_20260723.zip"
+          test ! -e "$DELIVER/DPRO_KSH_NEXT_operation_sheet_PNG_ONLY_20260723.zip"
+
+          echo "DPRO standard A4 one-page PDF, PNG, QR verification and ZIP packages: OK"
+
+      - name: Replace completion records
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+
+          deliver = Path("deliverables/ksh-next-10")
+          plan_path = Path(".dpro/ksh-next/plan.yml")
+          old_result_path = Path(".dpro/ksh-next/ksh-next-10a-result.yml")
+          r4_result_path = Path(".dpro/ksh-next/ksh-next-10a-r4-result.yml")
+
+          def sha256(path):
+              digest = hashlib.sha256()
+              digest.update(path.read_bytes())
+              return digest.hexdigest()
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return text.replace(old, new, 1)
+
+          names = [
+              "DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf",
+              "DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png",
+              "DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PDF_PNG_20260723.zip",
+              "DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PNG_ONLY_20260723.zip",
+              "DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt",
+          ]
+
+          for name in names:
+              path = deliver / name
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f"deliverable missing: {path}")
+
+          plan = plan_path.read_text(encoding="utf-8")
+          plan = replace_once(
+              plan,
+              '  current_step: "STEP KSH-NEXT-10A"',
+              '  current_step: "STEP KSH-NEXT-10A-R4"',
+              "plan current step",
+          )
+          plan = replace_once(
+              plan,
+              '    status: "operation_sheet_completed_product_site_pending"',
+              '    status: "operation_sheet_a4_one_page_completed_product_site_pending"',
+              "plan step 10 status",
+          )
+          plan_path.write_text(plan, encoding="utf-8")
+
+          pdf_url = (
+              "https://dpromstk2000-lab.github.io/line-shaken-liff/"
+              "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
+          )
+
+          lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-10A-R4-RESULT"',
+              '  step: "STEP KSH-NEXT-10A-R4"',
+              '  title: "DPRO標準 A4縦1枚 操作体験シート修正"',
+              f'  generated_at_utc: {json.dumps(datetime.now(timezone.utc).isoformat())}',
+              "correction:",
+              '  previous_version: "A4 portrait 2 pages"',
+              '  corrected_version: "A4 portrait exactly 1 page"',
+              "  corrected_from_two_page_version: true",
+              "  internal_sales_page_removed: true",
+              "completion_state:",
+              '  core_system: "completed"',
+              '  system_check: "18/18 OK"',
+              '  operation_sheet: "completed - DPRO standard A4 one page"',
+              '  qr_reading: "PASS from final rendered one-page PDF"',
+              '  product_site: "pending STEP KSH-NEXT-10B"',
+              '  final_judgment: "pending product-site publication"',
+              "deliverables:",
+          ]
+
+          for name in names:
+              path = deliver / name
+              lines.extend([
+                  f'  - path: {json.dumps(path.as_posix())}',
+                  f"    bytes: {path.stat().st_size}",
+                  f'    sha256: {json.dumps(sha256(path))}',
+              ])
+
+          lines.extend([
+              "public_urls:",
+              f'  operation_sheet_pdf: {json.dumps(pdf_url)}',
+              '  product: "https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems/car-service.html"',
+              '  customer: "https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10"',
+              '  dashboard: "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8"',
+              '  ipad: "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6"',
+              '  member: "https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7"',
+              '  official_line: "https://lin.ee/YxJGXv6D"',
+              "standard:",
+              "  dpro_owner_operation_sheet: true",
+              "  a4_portrait: true",
+              "  page_count: 1",
+              "  top_qr_count: 5",
+              "  official_line_qr_included: true",
+              "  screenshots_included: true",
+              "  five_minute_route_included: true",
+              "  effects_included: true",
+              "  full_urls_included: true",
+              "safety:",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  existing_api_changed: false",
+              "  qr_decoded_from_final_pdf_render: true",
+              "  backup_tag_created: true",
+              "next_action:",
+              '  id: "KSH-NEXT-10B"',
+              '  title: "DPRO製品サイト更新・最終完成判定"',
+          ])
+
+          r4_result_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          # Replace the old result so all later workflows read the corrected standard.
+          old_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-10A-RESULT"',
+              '  step: "STEP KSH-NEXT-10A-R4"',
+              '  title: "操作体験シート・QR検査・完成候補パッケージ（A4縦1枚修正版）"',
+              f'  generated_at_utc: {json.dumps(datetime.now(timezone.utc).isoformat())}',
+              "completion_state:",
+              '  core_system: "completed"',
+              '  system_check: "18/18 OK"',
+              '  operation_sheet: "completed - A4 portrait exactly 1 page"',
+              '  qr_reading: "PASS from final rendered PDF"',
+              '  product_site: "pending STEP KSH-NEXT-10B"',
+              '  final_judgment: "pending product-site publication"',
+              "safety:",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  existing_api_changed: false",
+              "  qr_decoded_from_pdf_render: true",
+              "  pdf_page_count: 1",
+              "  pdf_a4_portrait: true",
+              "  dpro_standard_a4_one_page: true",
+              "  internal_sales_sheet_included: false",
+              "next_action:",
+              '  id: "KSH-NEXT-10B"',
+              '  title: "DPRO製品サイト更新・最終完成判定"',
+          ]
+          old_result_path.write_text("\n".join(old_lines) + "\n", encoding="utf-8")
+
+          print("Corrected result records and plan updated")
+          PY
+
+          grep -q 'current_step: "STEP KSH-NEXT-10A-R4"' .dpro/ksh-next/plan.yml
+          grep -q 'operation_sheet_a4_one_page_completed_product_site_pending' .dpro/ksh-next/plan.yml
+          grep -q 'pdf_page_count: 1' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'dpro_standard_a4_one_page: true' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'internal_sales_sheet_included: false' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'page_count: 1' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          grep -q 'top_qr_count: 5' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          grep -q 'official_line_qr_included: true' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+
+          echo "KSH-NEXT-10A R4 one-page completion checks passed."
+
+      - name: Commit KSH-NEXT-10A R4
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f ".github/workflows/step-ksh-next-10a-operation-sheet.yml"
+          rm -f ".github/workflows/step-ksh-next-10a-operation-sheet-r2.yml"
+          rm -f ".github/workflows/step-ksh-next-10a-operation-sheet-r3.yml"
+          rm -f ".github/workflows/step-ksh-next-10a-operation-sheet-r4-one-page.yml"
+
+          git config user.name "DPRO STEP KSH-NEXT-10A R4"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 1
+          fi
+
+          git commit -m "STEP KSH-NEXT-10A R4 correct operation sheet to A4 one page"
+          git push origin HEAD:main
