@@ -1,0 +1,1241 @@
+name: STEP KSH-NEXT-6 iPad Operations
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-6-ipad-operations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-6-ipad-operations
+  cancel-in-progress: false
+
+jobs:
+  ipad-operations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Verify KSH-NEXT-5 completion
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f owner-ipad.html
+          test -f dashboard.html
+          test -f ksh-next-5-owner-estimate.js
+          test -f .dpro/ksh-next/plan.yml
+          test -f .dpro/ksh-next/ksh-next-5-result.yml
+
+          grep -q 'STEP KSH-PHONE-3' owner-ipad.html
+          grep -q 'id="section-intake" class="section active"' owner-ipad.html
+          grep -q 'id="section-today" class="section"' owner-ipad.html
+          grep -q 'id="todayReservationList"' owner-ipad.html
+          grep -q 'function renderReservationCard(row, mode)' owner-ipad.html
+          grep -q 'function patchReservation(row, overrides = {})' owner-ipad.html
+          grep -q 'function buildReservationPayload(row, overrides = {})' owner-ipad.html
+          grep -q 'current_step: "STEP KSH-NEXT-5"' .dpro/ksh-next/plan.yml
+          grep -A2 'id: "KSH-NEXT-6"' .dpro/ksh-next/plan.yml | grep -q 'status: "next"'
+
+          if grep -q 'STEP KSH-NEXT-6: IPAD OPERATIONS' owner-ipad.html; then
+            echo "STEP KSH-NEXT-6 is already applied."
+            exit 1
+          fi
+
+          if [ -f ksh-next-6-ipad-operations.js ]; then
+            echo "KSH-NEXT-6 JavaScript already exists. Stop to prevent duplicate application."
+            exit 1
+          fi
+
+          echo "KSH-NEXT-5 completion verified."
+
+      - name: Create safety tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKUP_TAG="ksh-next-6-before-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+          echo "BACKUP_TAG=$BACKUP_TAG" >> "$GITHUB_ENV"
+
+      - name: Apply iPad operation optimization
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import re
+
+          ipad_path = Path("owner-ipad.html")
+          plan_path = Path(".dpro/ksh-next/plan.yml")
+          result_path = Path(".dpro/ksh-next/ksh-next-6-result.yml")
+          ipad_js_path = Path("ksh-next-6-ipad-operations.js")
+
+          original = ipad_path.read_text(encoding="utf-8")
+          text = original
+
+          def replace_once(source, old, new, label):
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return source.replace(old, new, 1)
+
+          def quote(value):
+              return json.dumps(str(value), ensure_ascii=False)
+
+          def sha256_text(value):
+              return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+          text = replace_once(
+              text,
+              "<title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-PHONE-3</title>",
+              "<title>DPRO 車検・整備工場 LINE｜受付iPad STEP KSH-NEXT-6</title>",
+              "iPad title",
+          )
+
+          text = replace_once(
+              text,
+              '''        <nav class="tabs">
+                    <button id="tab-intake" class="tab-btn active" onclick="switchTab('intake')">受付</button>
+                    <button id="tab-today" class="tab-btn" onclick="switchTab('today')">今日</button>
+                    <button id="tab-reservations" class="tab-btn" onclick="switchTab('reservations')">入庫予定</button>
+                    <button id="tab-customers" class="tab-btn" onclick="switchTab('customers')">顧客検索</button>
+                  </nav>''',
+              '''        <nav class="tabs">
+                    <button id="tab-today" class="tab-btn active" onclick="switchTab('today')">今日の現場</button>
+                    <button id="tab-intake" class="tab-btn" onclick="switchTab('intake')">電話・店頭受付</button>
+                    <button id="tab-reservations" class="tab-btn" onclick="switchTab('reservations')">今後の予定</button>
+                    <button id="tab-customers" class="tab-btn" onclick="switchTab('customers')">顧客検索</button>
+                  </nav>''',
+              "iPad tabs",
+          )
+
+          text = replace_once(
+              text,
+              '<section id="section-intake" class="section active">',
+              '<section id="section-intake" class="section">',
+              "intake default inactive",
+          )
+          text = replace_once(
+              text,
+              '<section id="section-today" class="section">',
+              '<section id="section-today" class="section active">',
+              "today default active",
+          )
+
+          text = replace_once(
+              text,
+              '''        <div class="workflow-guide">
+                    <div class="guide-card"><strong><b>1</b>顧客・車両を入力</strong><p>電話番号が同じ場合は既存顧客として更新し、重複登録を減らします。</p></div>
+                    <div class="guide-card"><strong><b>2</b>入庫日時を選択</strong><p>今日以降の日付、営業時間内の30分単位だけを選びます。</p></div>
+                    <div class="guide-card"><strong><b>3</b>保存してLINE連絡</strong><p>保存後、確認文面をコピーしてLINE公式・電話対応に使います。</p></div>
+                  </div>''',
+              '''        <details class="ipad-guide-details">
+                    <summary>受付手順を確認する</summary>
+                    <div class="workflow-guide">
+                      <div class="guide-card"><strong><b>1</b>顧客・車両を入力</strong><p>電話番号が同じ場合は既存顧客として更新し、重複登録を減らします。</p></div>
+                      <div class="guide-card"><strong><b>2</b>入庫日時を選択</strong><p>今日以降の日付、営業時間内の30分単位だけを選びます。</p></div>
+                      <div class="guide-card"><strong><b>3</b>保存してLINE連絡</strong><p>保存後、確認文面をコピーしてLINE公式・電話対応に使います。</p></div>
+                    </div>
+                  </details>''',
+              "intake guide collapse",
+          )
+
+          text = replace_once(
+              text,
+              '''              <div class="form-field">
+                          <label>作業内容</label>
+                          <select id="intakeWorkType">''',
+              '''              <div class="form-field">
+                          <label>受付経路</label>
+                          <select id="intakeReceptionChannel">
+                            <option value="電話" selected>電話</option>
+                            <option value="店頭">店頭</option>
+                            <option value="管理者代理">管理者代理</option>
+                          </select>
+                        </div>
+                        <div class="form-field">
+                          <label>作業内容</label>
+                          <select id="intakeWorkType">''',
+              "intake reception channel",
+          )
+
+          text = replace_once(
+              text,
+              '''        <div class="toolbar">
+                    <div>
+                      <h2>今日の現場ボード</h2>
+                      <p>本日の入庫・仮入庫確認・未対応相談だけを表示します。売上は表示しません。</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="loadToday()">今日を更新</button>
+                  </div>''',
+              '''        <div class="toolbar">
+                    <div>
+                      <h2>今日の現場ボード</h2>
+                      <p>到着待ち・作業中・引渡し待ちを最初に確認します。設定と売上はPC管理画面に分けています。</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="loadToday()">最新状態に更新</button>
+                  </div>
+
+                  <div class="ipad-quick-bar" aria-label="iPadクイック操作">
+                    <button class="btn btn-primary" onclick="openIpadIntake('電話')">＋ 電話受付</button>
+                    <button class="btn btn-orange" onclick="openIpadIntake('店頭')">＋ 店頭受付</button>
+                    <button class="btn btn-slate" onclick="switchTab('customers')">顧客・車両検索</button>
+                    <button class="btn btn-dark" onclick="goBackToPc()">PC管理画面</button>
+                  </div>''',
+              "today toolbar quick actions",
+          )
+
+          old_summary = '''        <div class="summary-grid">
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayReservationPanel')" onkeydown="summaryCardKey(event, 'todayReservationPanel')">
+                      <span>本日の入庫</span>
+                      <strong id="countTodayReservations">-</strong>
+                      <small>今日の来店・作業予定</small>
+                      <em class="tap-hint">押すと表示</em>
+                    </div>
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('provisionalPanel')" onkeydown="summaryCardKey(event, 'provisionalPanel')">
+                      <span>仮入庫確認</span>
+                      <strong id="countProvisional">-</strong>
+                      <small>日時確認が必要</small>
+                      <em class="tap-hint">押すと表示</em>
+                    </div>
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayTaskPanel')" onkeydown="summaryCardKey(event, 'todayTaskPanel')">
+                      <span>未対応相談</span>
+                      <strong id="countOpenTasks">-</strong>
+                      <small>返信・電話が必要</small>
+                      <em class="tap-hint">押すと表示</em>
+                    </div>
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayReservationPanel')" onkeydown="summaryCardKey(event, 'todayReservationPanel')">
+                      <span>作業中</span>
+                      <strong id="countWorking">-</strong>
+                      <small>現場で進行中</small>
+                      <em class="tap-hint">押すと表示</em>
+                    </div>
+                  </div>'''
+
+          new_summary = '''        <div class="summary-grid ipad-next-summary">
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('arrivalPanel')" onkeydown="summaryCardKey(event, 'arrivalPanel')">
+                      <span>到着待ち</span>
+                      <strong id="countArrivalWaiting">-</strong>
+                      <small>本日まだ受付前</small>
+                      <em class="tap-hint">一覧へ</em>
+                    </div>
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('workingPanel')" onkeydown="summaryCardKey(event, 'workingPanel')">
+                      <span>作業中</span>
+                      <strong id="countWorking">-</strong>
+                      <small>点検・見積・整備中</small>
+                      <em class="tap-hint">一覧へ</em>
+                    </div>
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('readyPanel')" onkeydown="summaryCardKey(event, 'readyPanel')">
+                      <span>引渡し待ち</span>
+                      <strong id="countReady">-</strong>
+                      <small>お客様へ連絡・引渡し</small>
+                      <em class="tap-hint">一覧へ</em>
+                    </div>
+                    <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayTaskPanel')" onkeydown="summaryCardKey(event, 'todayTaskPanel')">
+                      <span>未対応・連絡</span>
+                      <strong id="countOpenTasks">-</strong>
+                      <small>相談・再連絡・仮入庫</small>
+                      <em class="tap-hint">確認する</em>
+                    </div>
+                    <strong id="countTodayReservations" hidden>-</strong>
+                    <strong id="countProvisional" hidden>-</strong>
+                  </div>'''
+          text = replace_once(text, old_summary, new_summary, "today summary cards")
+
+          old_provisional = '''        <div id="provisionalPanel" class="panel priority-panel section-anchor" style="margin-bottom:16px;">
+                    <div class="panel-head">
+                      <div>
+                        <h3>仮入庫確認</h3>
+                        <p>お客様の希望日時です。問題なければ「この日時で入庫予定にする」を押します。</p>
+                      </div>
+                      <button class="btn btn-orange" onclick="switchTab('reservations'); setReservationFilter('provisional')">仮入庫だけ見る</button>
+                    </div>
+                    <div id="provisionalReservationList" class="panel-body card-list"></div>
+                  </div>'''
+
+          new_provisional = '''        <details id="provisionalPanel" class="ipad-collapsible-panel section-anchor">
+                    <summary>
+                      <span>仮入庫・日時確認</span>
+                      <span id="provisionalSummaryCount" class="badge badge-orange">0件</span>
+                    </summary>
+                    <div class="panel-body">
+                      <p class="compact-mini-help">お客様の希望日時です。問題なければ入庫予定へ変更します。</p>
+                      <div id="provisionalReservationList" class="card-list"></div>
+                    </div>
+                  </details>'''
+          text = replace_once(text, old_provisional, new_provisional, "provisional collapse")
+
+          old_board = '''        <div class="grid2">
+                    <div id="todayReservationPanel" class="panel section-anchor">
+                      <div class="panel-head">
+                        <div>
+                          <h3>本日の入庫・作業</h3>
+                          <p>状態変更とメモをここで行います。</p>
+                        </div>
+                      </div>
+                      <div id="todayReservationList" class="panel-body card-list"></div>
+                    </div>
+
+                    <div id="todayTaskPanel" class="panel section-anchor">
+                      <div class="panel-head">
+                        <div>
+                          <h3>今日やること</h3>
+                          <p>新規相談・仮入庫・再連絡・LINE候補。</p>
+                        </div>
+                      </div>
+                      <div id="todayTaskList" class="panel-body card-list"></div>
+                    </div>
+                  </div>'''
+
+          new_board = '''        <div class="ipad-board-grid">
+                    <div id="arrivalPanel" class="panel section-anchor ipad-lane arrival-lane">
+                      <div class="panel-head">
+                        <div><h3>到着待ち</h3><p>来店したら「受付・入庫済み」へ進めます。</p></div>
+                      </div>
+                      <div id="arrivalReservationList" class="panel-body card-list"></div>
+                    </div>
+
+                    <div id="workingPanel" class="panel section-anchor ipad-lane working-lane">
+                      <div class="panel-head">
+                        <div><h3>作業中</h3><p>点検・見積・確認・作業・最終確認。</p></div>
+                      </div>
+                      <div id="workingReservationList" class="panel-body card-list"></div>
+                    </div>
+
+                    <div id="readyPanel" class="panel section-anchor ipad-lane ready-lane">
+                      <div class="panel-head">
+                        <div><h3>引渡し待ち</h3><p>LINE連絡後、完了処理はPC管理画面で行います。</p></div>
+                      </div>
+                      <div id="readyReservationList" class="panel-body card-list"></div>
+                    </div>
+                  </div>
+
+                  <div id="todayReservationPanel" hidden>
+                    <div id="todayReservationList"></div>
+                  </div>
+
+                  <details id="todayTaskPanel" class="ipad-collapsible-panel section-anchor">
+                    <summary>
+                      <span>未対応相談・再連絡</span>
+                      <span id="todayTaskSummaryCount" class="badge badge-red">0件</span>
+                    </summary>
+                    <div id="todayTaskList" class="panel-body card-list"></div>
+                  </details>'''
+          text = replace_once(text, old_board, new_board, "today three-lane board")
+
+          text = replace_once(
+              text,
+              'document.title = `${shopName}｜現場受付専用iPad STEP KSH-PHONE-3`;',
+              'document.title = `${shopName}｜受付iPad STEP KSH-NEXT-6`;',
+              "dynamic iPad title",
+          )
+
+          text = replace_once(
+              text,
+              '    let currentTab = "intake";',
+              '    let currentTab = "today";',
+              "default current tab",
+          )
+
+          text = replace_once(
+              text,
+              '''      const workType = getIntakeValue("intakeWorkType") || "車検";
+                const status = getIntakeValue("intakeStatus") || "入庫予定";''',
+              '''      const receptionChannel = getIntakeValue("intakeReceptionChannel") || "電話";
+                const workType = getIntakeValue("intakeWorkType") || "車検";
+                const status = getIntakeValue("intakeStatus") || "入庫予定";''',
+              "intake reception value",
+          )
+
+          text = replace_once(
+              text,
+              '''            memo: [
+                        "iPad電話・店頭受付から登録",
+                        memo
+                      ].filter(Boolean).join("\\n")''',
+              '''            memo: [
+                        `【受付経路：${receptionChannel}】`,
+                        `【進捗：${status === "仮入庫" ? "仮入庫" : "入庫予定"}】`,
+                        "iPad受付から登録",
+                        memo
+                      ].filter(Boolean).join("\\n")''',
+              "intake metadata",
+          )
+
+          ipad_css = r'''
+            <style>
+              /* STEP KSH-NEXT-6: IPAD OPERATIONS */
+              .ipad-quick-bar {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 9px;
+                margin-bottom: 14px;
+                padding: 12px;
+                border: 1px solid #dbeafe;
+                border-radius: 18px;
+                background: linear-gradient(135deg, #eff6ff, #ffffff);
+                box-shadow: var(--shadow);
+              }
+
+              .ipad-quick-bar .btn {
+                min-height: 52px;
+                width: 100%;
+              }
+
+              .ipad-next-summary {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+              }
+
+              .ipad-board-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 13px;
+                align-items: start;
+                margin-bottom: 14px;
+              }
+
+              .ipad-lane {
+                min-width: 0;
+              }
+
+              .arrival-lane { border-top: 5px solid #2563eb; }
+              .working-lane { border-top: 5px solid #7c3aed; }
+              .ready-lane { border-top: 5px solid #16a34a; }
+
+              .ipad-lane .panel-head {
+                padding: 14px 14px 0;
+              }
+
+              .ipad-lane .panel-body {
+                padding: 12px 14px 14px;
+              }
+
+              .ipad-collapsible-panel {
+                margin-bottom: 14px;
+                border: 1px solid var(--line);
+                border-radius: 18px;
+                background: #ffffff;
+                box-shadow: var(--shadow);
+                overflow: hidden;
+              }
+
+              .ipad-collapsible-panel > summary {
+                list-style: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                min-height: 54px;
+                padding: 12px 15px;
+                color: #0f172a;
+                font-size: 15px;
+                font-weight: 950;
+                background: #f8fafc;
+              }
+
+              .ipad-collapsible-panel > summary::-webkit-details-marker,
+              .ipad-guide-details > summary::-webkit-details-marker {
+                display: none;
+              }
+
+              .ipad-collapsible-panel > summary::before,
+              .ipad-guide-details > summary::before {
+                content: "＋";
+                color: #1e3a8a;
+                font-size: 18px;
+              }
+
+              .ipad-collapsible-panel[open] > summary::before,
+              .ipad-guide-details[open] > summary::before {
+                content: "－";
+              }
+
+              .ipad-guide-details {
+                margin-bottom: 14px;
+                border: 1px solid #dbeafe;
+                border-radius: 16px;
+                background: #f8fafc;
+                overflow: hidden;
+              }
+
+              .ipad-guide-details > summary {
+                list-style: none;
+                cursor: pointer;
+                padding: 12px 14px;
+                color: #1e3a8a;
+                font-size: 13px;
+                font-weight: 950;
+              }
+
+              .ipad-guide-details .workflow-guide {
+                margin: 0;
+                padding: 0 12px 12px;
+              }
+
+              .ipad-next-progress {
+                display: grid;
+                grid-template-columns: repeat(8, minmax(8px, 1fr));
+                gap: 3px;
+                margin-top: 8px;
+              }
+
+              .ipad-next-progress span {
+                height: 6px;
+                border-radius: 999px;
+                background: #e2e8f0;
+              }
+
+              .ipad-next-progress span.done { background: #2563eb; }
+              .ipad-next-progress span.current { background: #f59e0b; }
+              .ipad-next-progress span.complete { background: #16a34a; }
+
+              .ipad-stage-badge {
+                display: inline-flex;
+                align-items: center;
+                min-height: 28px;
+                padding: 5px 9px;
+                border-radius: 999px;
+                border: 1px solid #c4b5fd;
+                background: #f5f3ff;
+                color: #5b21b6;
+                font-size: 11px;
+                font-weight: 950;
+                white-space: nowrap;
+              }
+
+              .ipad-stage-badge.waiting {
+                border-color: #93c5fd;
+                background: #eff6ff;
+                color: #1e40af;
+              }
+
+              .ipad-stage-badge.ready {
+                border-color: #86efac;
+                background: #f0fdf4;
+                color: #166534;
+              }
+
+              .ipad-stage-badge.attention {
+                border-color: #fdba74;
+                background: #fff7ed;
+                color: #9a3412;
+              }
+
+              .ipad-estimate-note {
+                margin-top: 8px;
+                padding: 8px 10px;
+                border-radius: 11px;
+                background: #fffbeb;
+                border: 1px solid #fde68a;
+                color: #92400e;
+                font-size: 11px;
+                line-height: 1.55;
+                font-weight: 850;
+              }
+
+              .ipad-empty-lane {
+                padding: 16px 10px;
+                color: #64748b;
+                text-align: center;
+                font-size: 12px;
+                font-weight: 850;
+              }
+
+              @media (max-width: 1050px) {
+                .ipad-board-grid {
+                  grid-template-columns: 1fr;
+                }
+
+                .ipad-quick-bar {
+                  grid-template-columns: 1fr 1fr;
+                }
+              }
+
+              @media (max-width: 640px) {
+                .ipad-next-summary {
+                  grid-template-columns: 1fr 1fr;
+                }
+
+                .ipad-quick-bar {
+                  grid-template-columns: 1fr 1fr;
+                }
+              }
+            </style>
+          '''
+          text = replace_once(text, "</head>", ipad_css + "\n</head>", "iPad NEXT CSS")
+
+          text = replace_once(
+              text,
+              "</body>",
+              '  <script src="ksh-next-6-ipad-operations.js?v=20260723"></script>\n</body>',
+              "iPad NEXT script",
+          )
+
+          ipad_js = r'''(() => {
+            "use strict";
+
+            const RECEPTION_PATTERN = /^【受付経路：(LINE|電話|店頭|管理者代理)】\s*/m;
+            const PROGRESS_PATTERN = /^【進捗：([^】]+)】\s*/m;
+            const ESTIMATE_VERSION_PATTERN = /^【見積版：(\d+)】\s*/m;
+            const ESTIMATE_AMOUNT_PATTERN = /^【見積金額：(\d+)】\s*/m;
+            const ESTIMATE_DATE_PATTERN = /^【見積提示日：([^】]+)】\s*/m;
+            const ESTIMATE_DETAILS_PATTERN = /^【見積内容：([^】]*)】\s*/m;
+            const ESTIMATE_RESPONSE_MARKER = "【見積回答】";
+
+            const PROGRESS_STAGES = [
+              "入庫予定",
+              "受付・入庫済み",
+              "点検中",
+              "見積作成中",
+              "お客様確認待ち",
+              "作業中",
+              "最終確認",
+              "引渡し可能"
+            ];
+
+            const originalOpenMemoModal = openMemoModal;
+            const originalSaveMemoModal = saveMemoModal;
+            let memoMetadataPrefix = "";
+
+            function stripOperationalMetadata(memo) {
+              return String(memo || "")
+                .replace(RECEPTION_PATTERN, "")
+                .replace(PROGRESS_PATTERN, "")
+                .replace(ESTIMATE_VERSION_PATTERN, "")
+                .replace(ESTIMATE_AMOUNT_PATTERN, "")
+                .replace(ESTIMATE_DATE_PATTERN, "")
+                .replace(ESTIMATE_DETAILS_PATTERN, "")
+                .trim();
+            }
+
+            function metadataLines(memo) {
+              return String(memo || "")
+                .split(/\r?\n/)
+                .filter(line =>
+                  /^【受付経路：/.test(line) ||
+                  /^【進捗：/.test(line) ||
+                  /^【見積版：/.test(line) ||
+                  /^【見積金額：/.test(line) ||
+                  /^【見積提示日：/.test(line) ||
+                  /^【見積内容：/.test(line)
+                )
+                .join("\n");
+            }
+
+            function inferReceptionChannel(row) {
+              return String(row?.memo || "").match(RECEPTION_PATTERN)?.[1] ||
+                (row?.inquiry_id ? "LINE" : "未記録");
+            }
+
+            function inferProgressStage(row) {
+              const explicit = String(row?.memo || "").match(PROGRESS_PATTERN)?.[1] || "";
+              if (explicit) return explicit;
+
+              const status = String(row?.status || "");
+              if (status.includes("仮入庫")) return "仮入庫";
+              if (status.includes("作業完了")) return "引渡し完了";
+              if (status.includes("作業中")) return "作業中";
+              if (status.includes("入庫済み")) return "受付・入庫済み";
+              return "入庫予定";
+            }
+
+            function broadStatus(stage) {
+              if (stage === "仮入庫") return "仮入庫";
+              if (stage === "入庫予定") return "入庫予定";
+              if (stage === "受付・入庫済み") return "入庫済み";
+              if (stage === "引渡し完了") return "作業完了";
+              return "作業中";
+            }
+
+            function applyProgress(row, stage) {
+              const currentMemo = String(row?.memo || "");
+              const currentReception = currentMemo.match(RECEPTION_PATTERN)?.[0]?.trim() ||
+                `【受付経路：${inferReceptionChannel(row) === "未記録" ? "管理者代理" : inferReceptionChannel(row)}】`;
+
+              const estimateLines = currentMemo
+                .split(/\r?\n/)
+                .filter(line =>
+                  /^【見積版：/.test(line) ||
+                  /^【見積金額：/.test(line) ||
+                  /^【見積提示日：/.test(line) ||
+                  /^【見積内容：/.test(line)
+                );
+
+              return [
+                currentReception,
+                `【進捗：${stage}】`,
+                ...estimateLines,
+                stripOperationalMetadata(currentMemo)
+              ].filter(Boolean).join("\n");
+            }
+
+            function parseEstimate(row) {
+              const memo = String(row?.memo || "");
+              const version = Number(memo.match(ESTIMATE_VERSION_PATTERN)?.[1] || 0);
+              const amount = Number(memo.match(ESTIMATE_AMOUNT_PATTERN)?.[1] || 0);
+              if (!version && !amount) return null;
+              return { version: version || 1, amount };
+            }
+
+            function parseEstimateResponse(inquiry) {
+              const message = String(inquiry?.message || "");
+              if (!message.includes(ESTIMATE_RESPONSE_MARKER)) return null;
+              return {
+                reservationId: message.match(/^予約ID：(.+)$/m)?.[1]?.trim() || "",
+                version: Number(message.match(/^見積版：(\d+)$/m)?.[1] || 0),
+                answer: message.match(/^回答：(承認|変更相談)$/m)?.[1] || "",
+                memo: message.match(/^お客様メモ：([\s\S]*)$/m)?.[1]?.trim() || "",
+                createdAt: inquiry?.created_at || ""
+              };
+            }
+
+            function estimateResponse(row) {
+              const estimate = parseEstimate(row);
+              if (!estimate) return null;
+              return (dashboardCache?.recentInquiries || [])
+                .map(parseEstimateResponse)
+                .filter(Boolean)
+                .filter(item =>
+                  String(item.reservationId) === String(row.id) &&
+                  Number(item.version) === Number(estimate.version)
+                )
+                .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+            }
+
+            function stageClass(stage) {
+              if (stage === "引渡し可能") return "ready";
+              if (stage === "仮入庫" || stage === "お客様確認待ち") return "attention";
+              if (stage === "入庫予定") return "waiting";
+              return "";
+            }
+
+            function stageBadge(row) {
+              const stage = inferProgressStage(row);
+              return `<span class="ipad-stage-badge ${stageClass(stage)}">${escapeHtml(stage)}</span>`;
+            }
+
+            function renderProgressTrack(row) {
+              const stage = inferProgressStage(row);
+              const index = PROGRESS_STAGES.indexOf(stage);
+              const complete = stage === "引渡し完了";
+              const parts = PROGRESS_STAGES.map((_, itemIndex) => {
+                let cls = "";
+                if (complete) cls = "complete";
+                else if (itemIndex < index) cls = "done";
+                else if (itemIndex === index) cls = "current";
+                return `<span class="${cls}"></span>`;
+              }).join("");
+              return `<div class="ipad-next-progress" aria-label="${escapeHtml(stage)}">${parts}</div>`;
+            }
+
+            function nextStage(row) {
+              const stage = inferProgressStage(row);
+              if (stage === "仮入庫") return "入庫予定";
+              const index = PROGRESS_STAGES.indexOf(stage);
+              if (index < 0 || index >= PROGRESS_STAGES.length - 1) return "";
+              return PROGRESS_STAGES[index + 1];
+            }
+
+            function laneFor(row) {
+              const stage = inferProgressStage(row);
+              if (stage === "引渡し可能") return "ready";
+              if (["受付・入庫済み", "点検中", "見積作成中", "お客様確認待ち", "作業中", "最終確認"].includes(stage)) {
+                return "working";
+              }
+              return "arrival";
+            }
+
+            function estimateStatusHtml(row) {
+              const estimate = parseEstimate(row);
+              if (!estimate) return "";
+              const response = estimateResponse(row);
+              const label = response?.answer === "承認"
+                ? "見積承認済み"
+                : response?.answer === "変更相談"
+                  ? "見積変更相談あり"
+                  : "見積回答待ち";
+              return `<div class="ipad-estimate-note">${escapeHtml(label)} / ${Number(estimate.amount || 0).toLocaleString("ja-JP")}円${response?.memo ? `<br>${escapeHtml(response.memo)}` : ""}</div>`;
+            }
+
+            function canAdvance(row) {
+              const stage = inferProgressStage(row);
+              if (stage !== "お客様確認待ち") return true;
+              return estimateResponse(row)?.answer === "承認";
+            }
+
+            function primaryAction(row) {
+              const stage = inferProgressStage(row);
+              const next = nextStage(row);
+              const id = escapeAttr(row.id || "");
+
+              if (stage === "引渡し可能") {
+                return `<button class="btn btn-green" onclick="goBackToPc()">PCで引渡し完了</button>`;
+              }
+
+              if (stage === "お客様確認待ち" && !canAdvance(row)) {
+                const response = estimateResponse(row);
+                return `<button class="btn btn-orange" disabled>${response?.answer === "変更相談" ? "見積変更相談あり" : "見積承認待ち"}</button>`;
+              }
+
+              if (!next) return "";
+              return `<button class="btn ${next === "入庫予定" ? "btn-green" : "btn-primary"}" onclick="advanceIpadProgress('${id}')">${escapeHtml(next)}へ</button>`;
+            }
+
+            window.advanceIpadProgress = async function(reservationId) {
+              const row = findReservation(reservationId);
+              if (!row) {
+                showError("対象の入庫予定が見つかりません。");
+                return;
+              }
+
+              const current = inferProgressStage(row);
+              const next = nextStage(row);
+              if (!next) {
+                showError("次の進捗はありません。");
+                return;
+              }
+
+              if (!canAdvance(row)) {
+                showError("見積承認が確認できるまで作業開始へ進めません。");
+                return;
+              }
+
+              const name = row.customer?.name || row.customer_name || "お客様";
+              if (!confirm(`${name}様の進捗を「${current}」から「${next}」へ進めますか？`)) return;
+
+              await patchReservation(row, {
+                status: broadStatus(next),
+                memo: applyProgress(row, next)
+              });
+            };
+
+            window.openIpadIntake = function(channel) {
+              switchTab("intake");
+              const select = document.getElementById("intakeReceptionChannel");
+              if (select) select.value = ["電話", "店頭", "管理者代理"].includes(channel) ? channel : "電話";
+              window.setTimeout(() => document.getElementById("intakeName")?.focus(), 150);
+            };
+
+            renderTodaySummary = function() {
+              const all = uniqueReservations([
+                ...todayReservationsCache,
+                ...reservationsCache
+              ]).filter(row => !isHiddenReservation(row));
+
+              const today = dateYmd(new Date());
+              const arrival = all.filter(row =>
+                laneFor(row) === "arrival" &&
+                normalizeDateInput(row.reservation_date || "") === today &&
+                !isProvisionalReservationStatus(row.status)
+              );
+              const working = all.filter(row => laneFor(row) === "working");
+              const ready = all.filter(row => laneFor(row) === "ready");
+              const openTasks = todayTasksCache.length + provisionalReservationsCache.length;
+
+              setText("countArrivalWaiting", `${arrival.length}件`);
+              setText("countWorking", `${working.length}件`);
+              setText("countReady", `${ready.length}件`);
+              setText("countOpenTasks", `${openTasks}件`);
+              setText("countTodayReservations", `${todayReservationsCache.length}件`);
+              setText("countProvisional", `${provisionalReservationsCache.length}件`);
+              setText("provisionalSummaryCount", `${provisionalReservationsCache.length}件`);
+              setText("todayTaskSummaryCount", `${todayTasksCache.length}件`);
+            };
+
+            renderTodayReservations = function() {
+              const today = dateYmd(new Date());
+              const all = uniqueReservations([
+                ...todayReservationsCache,
+                ...reservationsCache
+              ])
+                .filter(row => !isHiddenReservation(row))
+                .sort(sortReservations);
+
+              const arrival = all.filter(row =>
+                laneFor(row) === "arrival" &&
+                normalizeDateInput(row.reservation_date || "") === today &&
+                !isProvisionalReservationStatus(row.status)
+              );
+              const working = all.filter(row => laneFor(row) === "working");
+              const ready = all.filter(row => laneFor(row) === "ready");
+
+              const fill = (id, rows, emptyText) => {
+                const box = document.getElementById(id);
+                if (!box) return;
+                box.innerHTML = rows.length
+                  ? rows.map(row => renderReservationCard(row, "today")).join("")
+                  : `<div class="ipad-empty-lane">${escapeHtml(emptyText)}</div>`;
+              };
+
+              fill("arrivalReservationList", arrival, "現在、到着待ちはありません。");
+              fill("workingReservationList", working, "現在、進行中の作業はありません。");
+              fill("readyReservationList", ready, "現在、引渡し待ちはありません。");
+            };
+
+            renderReservationCard = function(row, mode) {
+              const customer = row.customer || {};
+              const vehicle = row.vehicle || {};
+              const time = row.reservation_time ? String(row.reservation_time).slice(0, 5) : "未定";
+              const date = normalizeDateInput(row.reservation_date || "");
+              const customerName = customer.name || row.customer_name || "お客様";
+              const phone = customer.phone || row.customer_phone || "";
+              const vehicleText = buildVehicleLabel(vehicle, row);
+              const work = row.work_type || "作業";
+              const memo = stripOperationalMetadata(row.memo || row.completion_memo || "");
+              const reception = inferReceptionChannel(row);
+              const compactDate = mode === "today" ? "本日" : formatDateShort(date);
+
+              return `
+                <article class="work-card ipad-compact ${getReservationCardClass(row.status || "")}">
+                  <div class="work-head">
+                    <div class="time-badge">${escapeHtml(time)}<small>${escapeHtml(compactDate)}</small></div>
+                    <div class="work-title">
+                      <div class="customer-name">${escapeHtml(customerName)} 様</div>
+                      <div class="work-sub">${escapeHtml(vehicleText)} / ${escapeHtml(work)}</div>
+                    </div>
+                    ${stageBadge(row)}
+                  </div>
+
+                  <div class="compact-line">
+                    <span class="compact-chip">受付：${escapeHtml(reception)}</span>
+                    <span class="compact-chip">📞 ${escapeHtml(phone || "電話未入力")}</span>
+                  </div>
+
+                  ${renderProgressTrack(row)}
+                  ${estimateStatusHtml(row)}
+
+                  <details class="compact-details">
+                    <summary>詳細・メモ</summary>
+                    <div class="compact-details-body">
+          入庫日：${escapeHtml(formatDate(date))}
+          作業内容：${escapeHtml(work)}
+          車両：${escapeHtml(vehicleText)}
+          メモ：${escapeHtml(memo || "メモなし")}
+                    </div>
+                  </details>
+
+                  <div class="actions">
+                    ${primaryAction(row)}
+                    <button class="btn btn-primary" onclick="copyReservationMessage('${escapeAttr(row.id)}')">LINE文面</button>
+                    <button class="btn btn-slate" onclick="openMemoModal('${escapeAttr(row.id)}')">メモ</button>
+                  </div>
+                </article>
+              `;
+            };
+
+            openMemoModal = function(reservationId) {
+              const row = findReservation(reservationId);
+              if (!row) {
+                showError("対象の入庫予定が見つかりません。");
+                return;
+              }
+              memoMetadataPrefix = metadataLines(row.memo || "");
+              editingMemoReservationId = reservationId;
+              document.getElementById("memoModalTitle").textContent = `${row.customer?.name || "お客様"}様のメモ編集`;
+              document.getElementById("memoInput").value = stripOperationalMetadata(row.memo || "");
+              document.getElementById("memoModal").classList.add("active");
+              setTimeout(() => document.getElementById("memoInput")?.focus(), 80);
+            };
+
+            saveMemoModal = async function() {
+              const row = findReservation(editingMemoReservationId);
+              if (!row) {
+                showError("対象の入庫予定が見つかりません。");
+                return;
+              }
+              const plain = document.getElementById("memoInput").value.trim();
+              const combined = [memoMetadataPrefix, plain].filter(Boolean).join("\n");
+              await patchReservation(row, { memo: combined });
+              memoMetadataPrefix = "";
+              closeMemoModal();
+            };
+
+            const originalResetIntakeForm = resetIntakeForm;
+            resetIntakeForm = function() {
+              const result = originalResetIntakeForm();
+              const select = document.getElementById("intakeReceptionChannel");
+              if (select) select.value = "電話";
+              return result;
+            };
+
+            const originalResetIntakeFormWithoutToast = resetIntakeFormWithoutToast;
+            resetIntakeFormWithoutToast = function() {
+              const result = originalResetIntakeFormWithoutToast();
+              const select = document.getElementById("intakeReceptionChannel");
+              if (select) select.value = "電話";
+              return result;
+            };
+
+            window.KSH_NEXT_6_IPAD = {
+              inferProgressStage,
+              inferReceptionChannel,
+              laneFor,
+              applyProgress,
+              parseEstimate,
+              estimateResponse
+            };
+          })();
+          '''
+
+          ipad_js_path.write_text(ipad_js, encoding="utf-8")
+          ipad_path.write_text(text, encoding="utf-8")
+
+          plan = plan_path.read_text(encoding="utf-8")
+          plan = replace_once(
+              plan,
+              '  current_step: "STEP KSH-NEXT-5"',
+              '  current_step: "STEP KSH-NEXT-6"',
+              "plan current step",
+          )
+          plan = replace_once(
+              plan,
+              '''  - id: "KSH-NEXT-6"
+              title: "受付iPad最適化"
+              status: "next"''',
+              '''  - id: "KSH-NEXT-6"
+              title: "受付iPad最適化"
+              status: "completed_after_workflow_success"''',
+              "plan step 6",
+          )
+          plan = replace_once(
+              plan,
+              '''  - id: "KSH-NEXT-7"
+              title: "マイカーページ・整備履歴"
+              status: "pending"''',
+              '''  - id: "KSH-NEXT-7"
+              title: "マイカーページ・整備履歴"
+              status: "next"''',
+              "plan step 7",
+          )
+          plan_path.write_text(plan, encoding="utf-8")
+
+          result_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-6-RESULT"',
+              '  step: "STEP KSH-NEXT-6"',
+              '  title: "受付iPad最適化"',
+              f"  generated_at_utc: {quote(datetime.now(timezone.utc).isoformat())}",
+              "targets:",
+              '  - "owner-ipad.html"',
+              '  - "ksh-next-6-ipad-operations.js"',
+              "hashes:",
+              f"  ipad_before: {quote(sha256_text(original))}",
+              f"  ipad_after: {quote(sha256_text(text))}",
+              "changes:",
+              '  - "初期画面を受付フォームから今日の現場へ変更"',
+              '  - "到着待ち・作業中・引渡し待ちの3列ボードへ整理"',
+              '  - "電話受付・店頭受付・顧客検索・PC管理のクイック操作を追加"',
+              '  - "仮入庫と未対応相談を折りたたみ表示"',
+              '  - "受付フォームへ受付経路を追加"',
+              '  - "受付経路と作業進捗をDPRO NEXT管理情報として保存"',
+              '  - "一覧から次の作業進捗へ進める操作を追加"',
+              '  - "見積承認前の作業開始をiPadでも禁止"',
+              '  - "管理メタデータを現場メモから分離"',
+              '  - "引渡し完了・売上化はPC管理画面へ分離"',
+              "operation_policy:",
+              "  first_screen_primary_cards: 4",
+              "  reservation_primary_actions_max: 3",
+              "  daily_board_lanes: 3",
+              "  settings_visible_on_ipad: false",
+              "safety:",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  existing_api_changed: false",
+              "  actual_sales_edit_on_ipad: false",
+              "  estimate_approval_guard_preserved: true",
+              "  backup_tag_created: true",
+              "next_step:",
+              '  id: "KSH-NEXT-7"',
+              '  title: "マイカーページ・整備履歴"',
+          ]
+          result_path.write_text("\n".join(result_lines) + "\n", encoding="utf-8")
+
+          print("KSH-NEXT-6 files generated")
+          print("owner-ipad bytes:", len(text.encode("utf-8")))
+          print("iPad JS bytes:", len(ipad_js.encode("utf-8")))
+          PY
+
+      - name: Validate iPad HTML and JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f owner-ipad.html
+          test -f ksh-next-6-ipad-operations.js
+          test -f .dpro/ksh-next/ksh-next-6-result.yml
+
+          grep -q 'STEP KSH-NEXT-6: IPAD OPERATIONS' owner-ipad.html
+          grep -q 'id="tab-today" class="tab-btn active"' owner-ipad.html
+          grep -q 'id="section-today" class="section active"' owner-ipad.html
+          grep -q 'id="intakeReceptionChannel"' owner-ipad.html
+          grep -q 'id="arrivalReservationList"' owner-ipad.html
+          grep -q 'id="workingReservationList"' owner-ipad.html
+          grep -q 'id="readyReservationList"' owner-ipad.html
+          grep -q 'ksh-next-6-ipad-operations.js' owner-ipad.html
+          grep -q 'advanceIpadProgress' ksh-next-6-ipad-operations.js
+          grep -q 'estimate_approval_guard_preserved: true' .dpro/ksh-next/ksh-next-6-result.yml
+          grep -q 'current_step: "STEP KSH-NEXT-6"' .dpro/ksh-next/plan.yml
+          grep -A2 'id: "KSH-NEXT-7"' .dpro/ksh-next/plan.yml | grep -q 'status: "next"'
+
+          node --check ksh-next-6-ipad-operations.js
+
+          python3 <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from collections import Counter
+          import re
+          import subprocess
+          import tempfile
+
+          text = Path("owner-ipad.html").read_text(encoding="utf-8")
+
+          class Parser(HTMLParser):
+              pass
+
+          parser = Parser()
+          parser.feed(text)
+          parser.close()
+
+          ids = re.findall(r'\bid=["\']([^"\']+)["\']', text)
+          duplicates = sorted(key for key, count in Counter(ids).items() if count > 1)
+          if duplicates:
+              raise SystemExit("owner-ipad.html duplicate IDs: " + ", ".join(duplicates))
+
+          required_ids = [
+              "countArrivalWaiting",
+              "countWorking",
+              "countReady",
+              "countOpenTasks",
+              "arrivalReservationList",
+              "workingReservationList",
+              "readyReservationList",
+              "provisionalReservationList",
+              "todayTaskList",
+          ]
+          for required_id in required_ids:
+              if ids.count(required_id) != 1:
+                  raise SystemExit(f"required ID count invalid: {required_id}")
+
+          inline_scripts = []
+          for attrs, body in re.findall(
+              r"<script\b([^>]*)>(.*?)</script>",
+              text,
+              flags=re.I | re.S,
+          ):
+              if re.search(r"\bsrc\s*=", attrs, flags=re.I):
+                  continue
+              if body.strip():
+                  inline_scripts.append(body)
+
+          for index, script in enumerate(inline_scripts, start=1):
+              temp = Path(tempfile.gettempdir()) / f"ksh-next-6-owner-ipad-{index}.js"
+              temp.write_text(script, encoding="utf-8")
+              subprocess.run(["node", "--check", str(temp)], check=True)
+
+          print("owner-ipad HTML and inline JS OK")
+          print("unique IDs:", len(ids))
+          PY
+
+      - name: Test iPad lane and metadata logic
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'JS'
+          const receptionPattern = /^【受付経路：(LINE|電話|店頭|管理者代理)】\s*/m;
+          const progressPattern = /^【進捗：([^】]+)】\s*/m;
+          const estimateVersionPattern = /^【見積版：(\d+)】\s*/m;
+          const estimateAmountPattern = /^【見積金額：(\d+)】\s*/m;
+
+          function inferProgress(memo, status) {
+            const explicit = String(memo || "").match(progressPattern)?.[1] || "";
+            if (explicit) return explicit;
+            if (String(status).includes("作業中")) return "作業中";
+            if (String(status).includes("入庫済み")) return "受付・入庫済み";
+            return "入庫予定";
+          }
+
+          function lane(stage) {
+            if (stage === "引渡し可能") return "ready";
+            if (["受付・入庫済み", "点検中", "見積作成中", "お客様確認待ち", "作業中", "最終確認"].includes(stage)) return "working";
+            return "arrival";
+          }
+
+          const cases = {
+            "入庫予定": "arrival",
+            "受付・入庫済み": "working",
+            "点検中": "working",
+            "見積作成中": "working",
+            "お客様確認待ち": "working",
+            "作業中": "working",
+            "最終確認": "working",
+            "引渡し可能": "ready"
+          };
+
+          for (const [stage, expected] of Object.entries(cases)) {
+            if (lane(stage) !== expected) throw new Error(`lane mapping failed: ${stage}`);
+          }
+
+          const memo = [
+            "【受付経路：電話】",
+            "【進捗：点検中】",
+            "【見積版：2】",
+            "【見積金額：132000】",
+            "代車希望"
+          ].join("\n");
+
+          if (memo.match(receptionPattern)?.[1] !== "電話") throw new Error("reception marker failed");
+          if (inferProgress(memo, "作業中") !== "点検中") throw new Error("progress marker failed");
+          if (Number(memo.match(estimateVersionPattern)?.[1]) !== 2) throw new Error("estimate version failed");
+          if (Number(memo.match(estimateAmountPattern)?.[1]) !== 132000) throw new Error("estimate amount failed");
+
+          console.log("iPad lane and metadata logic OK");
+          JS
+
+          echo "KSH-NEXT-6 logic checks passed."
+
+      - name: Commit KSH-NEXT-6
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f ".github/workflows/step-ksh-next-5-estimate-approval.yml"
+          rm -f ".github/workflows/step-ksh-next-6-ipad-operations.yml"
+
+          git config user.name "DPRO STEP KSH-NEXT-6"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 1
+          fi
+
+          git commit -m "STEP KSH-NEXT-6 optimize iPad operations"
+          git push origin HEAD:main
