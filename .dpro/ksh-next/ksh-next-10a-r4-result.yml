@@ -1,0 +1,61 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-10A-R4-RESULT"
+  step: "STEP KSH-NEXT-10A-R4"
+  title: "DPRO標準 A4縦1枚 操作体験シート修正"
+  generated_at_utc: "2026-07-23T05:12:45.260221+00:00"
+correction:
+  previous_version: "A4 portrait 2 pages"
+  corrected_version: "A4 portrait exactly 1 page"
+  corrected_from_two_page_version: true
+  internal_sales_page_removed: true
+completion_state:
+  core_system: "completed"
+  system_check: "18/18 OK"
+  operation_sheet: "completed - DPRO standard A4 one page"
+  qr_reading: "PASS from final rendered one-page PDF"
+  product_site: "pending STEP KSH-NEXT-10B"
+  final_judgment: "pending product-site publication"
+deliverables:
+  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
+    bytes: 681589
+    sha256: "05cecdc0b621701c36cc16f0577581a35a0cbd647009a09209017a893c74071f"
+  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png"
+    bytes: 691212
+    sha256: "4b4674d98dce5538714c83d59e19af68cda8b98024d89d7c37a0153b68f17a5a"
+  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PDF_PNG_20260723.zip"
+    bytes: 1248774
+    sha256: "74145ab7be0f9b976ea1abd33df0ece3a5420fdcbee1bfcff2af805514de0dfe"
+  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_sheet_A4_1PAGE_PNG_ONLY_20260723.zip"
+    bytes: 673739
+    sha256: "8d4e345e19b5b674fc9d26dd44bb6fd0075be2526d65e40bbf0d46b47c20fad8"
+  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt"
+    bytes: 626
+    sha256: "e31d098dde1b673e30af341451dcdc4c8a76f4932bc6cfa33d9ef82bb2ec70da"
+public_urls:
+  operation_sheet_pdf: "https://dpromstk2000-lab.github.io/line-shaken-liff/deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
+  product: "https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems/car-service.html"
+  customer: "https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10"
+  dashboard: "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8"
+  ipad: "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6"
+  member: "https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7"
+  official_line: "https://lin.ee/YxJGXv6D"
+standard:
+  dpro_owner_operation_sheet: true
+  a4_portrait: true
+  page_count: 1
+  top_qr_count: 5
+  official_line_qr_included: true
+  screenshots_included: true
+  five_minute_route_included: true
+  effects_included: true
+  full_urls_included: true
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  qr_decoded_from_final_pdf_render: true
+  backup_tag_created: true
+next_action:
+  id: "KSH-NEXT-10B"
+  title: "DPRO製品サイト更新・最終完成判定"

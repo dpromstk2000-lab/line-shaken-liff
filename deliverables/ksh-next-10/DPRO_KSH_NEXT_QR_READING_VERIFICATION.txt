@@ -1,8 +1,11 @@
-DPRO KSH NEXT QR READING VERIFICATION
+DPRO KSH NEXT A4 ONE-PAGE QR READING VERIFICATION
 Result: PASS
-Source: rendered PDF page 1 at 200 dpi
+PDF pages: 1
+Source: final rendered PDF at 240 dpi
 
+PASS: https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems/car-service.html
 PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8
 PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10
 PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7
 PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6
+PASS: https://lin.ee/YxJGXv6D

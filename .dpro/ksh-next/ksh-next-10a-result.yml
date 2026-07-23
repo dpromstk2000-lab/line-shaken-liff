@@ -1,50 +1,25 @@
 schema_version: "1.0"
 document:
   id: "DPRO-KSH-NEXT-10A-RESULT"
-  step: "STEP KSH-NEXT-10A"
-  title: "操作体験シート・QR検査・完成候補パッケージ"
-  generated_at_utc: "2026-07-23T04:42:05.698362+00:00"
+  step: "STEP KSH-NEXT-10A-R4"
+  title: "操作体験シート・QR検査・完成候補パッケージ（A4縦1枚修正版）"
+  generated_at_utc: "2026-07-23T05:12:45.264510+00:00"
 completion_state:
   core_system: "completed"
   system_check: "18/18 OK"
-  operation_sheet: "completed"
-  qr_reading: "PASS from rendered PDF"
+  operation_sheet: "completed - A4 portrait exactly 1 page"
+  qr_reading: "PASS from final rendered PDF"
   product_site: "pending STEP KSH-NEXT-10B"
   final_judgment: "pending product-site publication"
-deliverables:
-  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
-    bytes: 1094194
-    sha256: "d234a12d5baa0adc86df5785a0c1616d13a35175e6f5e4dd3efda86dfc079e51"
-  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_owner_operation_sheet_page1.png"
-    bytes: 283378
-    sha256: "e0514cf11a6909c27dda2a9b8d7af3c44277adc925fb14f64d5e27dc1e3a457f"
-  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_internal_sales_sheet_page2.png"
-    bytes: 748448
-    sha256: "e3f2712c920985eed6e1455a623bc8d68b203acb3a4cbd241fc7dd89e6bc93e9"
-  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_sheet_PDF_PNG_20260723.zip"
-    bytes: 1972864
-    sha256: "aa83f906dee96dcb06509dc62d678acf347be395cb480a4d7833df1ac8b1748c"
-  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_sheet_PNG_ONLY_20260723.zip"
-    bytes: 1004159
-    sha256: "e132589aa15c09469b81b0e9a007ae72c6dbdcf5f4fba005317df2d72c625108"
-  - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt"
-    bytes: 483
-    sha256: "8ed37819fa5068f0e22036e347f2aee5fca7f6bfc235cf032f5c098825d3635f"
-public_urls:
-  operation_sheet_pdf: "https://dpromstk2000-lab.github.io/line-shaken-liff/deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
-  customer: "https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10"
-  member: "https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7"
-  ipad: "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6"
-  dashboard: "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8"
-  system_check: "https://dpromstk2000-lab.github.io/line-shaken-liff/system-check.html?v=step-ksh-next-9"
 safety:
   database_changed: false
   worker_changed: false
   existing_api_changed: false
   qr_decoded_from_pdf_render: true
-  pdf_page_count: 2
+  pdf_page_count: 1
   pdf_a4_portrait: true
-  backup_tag_created: true
+  dpro_standard_a4_one_page: true
+  internal_sales_sheet_included: false
 next_action:
   id: "KSH-NEXT-10B"
   title: "DPRO製品サイト更新・最終完成判定"
