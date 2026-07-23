@@ -1,0 +1,1231 @@
+name: STEP KSH-NEXT-9 Performance Security Check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-9-performance-security-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-9-performance-security-check
+  cancel-in-progress: false
+
+jobs:
+  performance-security-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Verify KSH-NEXT-8 completion
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f index.html
+          test -f dashboard.html
+          test -f owner-ipad.html
+          test -f member.html
+          test -f system-check.html
+          test -f ksh-next-5-owner-estimate.js
+          test -f ksh-next-5-member-estimate.js
+          test -f ksh-next-6-ipad-operations.js
+          test -f ksh-next-7-member-history.js
+          test -f ksh-next-8-followup-cockpit.js
+          test -f .dpro/ksh-next/plan.yml
+          test -f .dpro/ksh-next/ksh-next-8-result.yml
+
+          grep -q 'STEP KSH-NEXT-8</title>' dashboard.html
+          grep -q 'STEP KSH-NEXT-6' owner-ipad.html
+          grep -q 'STEP KSH-NEXT-7' member.html
+          grep -q 'STEP KSH-BRUSH-9' system-check.html
+          grep -q 'ksh-next-8-followup-cockpit.js' dashboard.html
+          grep -q 'ksh-next-6-ipad-operations.js' owner-ipad.html
+          grep -q 'ksh-next-7-member-history.js' member.html
+          grep -q 'current_step: "STEP KSH-NEXT-8"' .dpro/ksh-next/plan.yml
+          grep -A2 'id: "KSH-NEXT-9"' .dpro/ksh-next/plan.yml | grep -q 'status: "next"'
+
+          if grep -q 'STEP KSH-NEXT-9: SYSTEM AUDIT' system-check.html; then
+            echo "STEP KSH-NEXT-9 is already applied."
+            exit 1
+          fi
+
+          if [ -f ksh-next-9-system-audit.js ]; then
+            echo "KSH-NEXT-9 JavaScript already exists. Stop to prevent duplicate application."
+            exit 1
+          fi
+
+          echo "KSH-NEXT-8 completion verified."
+
+      - name: Create safety tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKUP_TAG="ksh-next-9-before-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+          echo "BACKUP_TAG=$BACKUP_TAG" >> "$GITHUB_ENV"
+
+      - name: Apply system audit enhancement
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+
+          check_path = Path("system-check.html")
+          plan_path = Path(".dpro/ksh-next/plan.yml")
+          result_path = Path(".dpro/ksh-next/ksh-next-9-result.yml")
+          audit_js_path = Path("ksh-next-9-system-audit.js")
+
+          original = check_path.read_text(encoding="utf-8")
+          text = original
+
+          def replace_once(source, old, new, label):
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return source.replace(old, new, 1)
+
+          def quote(value):
+              return json.dumps(str(value), ensure_ascii=False)
+
+          def sha256_text(value):
+              return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+          text = replace_once(
+              text,
+              '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+              '''<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <meta name="robots" content="noindex,nofollow,noarchive" />
+            <meta name="referrer" content="no-referrer" />''',
+              "internal page meta",
+          )
+
+          text = replace_once(
+              text,
+              "<title>DPRO CAR LINE｜営業前システム確認 STEP KSH-BRUSH-9</title>",
+              "<title>DPRO 車検・整備工場 LINE｜性能・セキュリティ確認 STEP KSH-NEXT-9</title>",
+              "system check title",
+          )
+
+          text = replace_once(
+              text,
+              "      grid-template-columns: 170px minmax(0, 1fr) auto;",
+              "      grid-template-columns: 170px minmax(0, 1fr) auto auto;",
+              "token input grid",
+          )
+
+          audit_css = r'''
+              /* STEP KSH-NEXT-9: SYSTEM AUDIT */
+              .audit-metrics {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 10px;
+                margin-bottom: 14px;
+              }
+
+              .audit-metric {
+                border: 1px solid var(--line);
+                border-radius: 15px;
+                padding: 13px;
+                background: #f9fafb;
+              }
+
+              .audit-metric span {
+                display: block;
+                color: var(--muted);
+                font-size: 11px;
+                font-weight: 900;
+              }
+
+              .audit-metric strong {
+                display: block;
+                margin-top: 5px;
+                color: #111827;
+                font-size: 23px;
+                line-height: 1;
+              }
+
+              .audit-metric small {
+                display: block;
+                margin-top: 6px;
+                color: var(--muted);
+                font-size: 10px;
+                line-height: 1.4;
+              }
+
+              .status-pill.attention {
+                background: #fff7ed;
+                color: #9a3412;
+                border-color: #fdba74;
+              }
+
+              .security-note {
+                margin-top: 12px;
+                border: 1px solid #bfdbfe;
+                border-radius: 14px;
+                padding: 12px 14px;
+                background: #eff6ff;
+                color: #1e3a8a;
+                font-size: 12px;
+                line-height: 1.65;
+              }
+
+              .audit-result-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-top: 12px;
+              }
+
+              @media (max-width: 980px) {
+                .audit-metrics {
+                  grid-template-columns: 1fr 1fr;
+                }
+
+                .input-row {
+                  grid-template-columns: 1fr;
+                }
+              }
+          '''
+          text = replace_once(
+              text,
+              "  </style>",
+              audit_css + "\n  </style>",
+              "audit CSS",
+          )
+
+          text = replace_once(
+              text,
+              '<span class="badge">STEP KSH-BRUSH-9 / INTERNAL CHECK</span>',
+              '<span class="badge">STEP KSH-NEXT-9 / INTERNAL AUDIT</span>',
+              "audit badge",
+          )
+
+          text = replace_once(
+              text,
+              '''            商談前に、Worker・店舗設定・管理API・営業前DEMO準備・主要画面URLを一括確認する内部用ページです。<br>
+                      お客様・商談先オーナーにそのまま渡すページではありません。''',
+              '''            Worker・管理API・公開画面・追加JavaScript・読込時間・管理ガードを一括確認する内部監査ページです。<br>
+                      お客様・商談先オーナーにそのまま渡すページではありません。''',
+              "audit lead",
+          )
+
+          text = replace_once(
+              text,
+              '''          <button class="btn btn-green" onclick="runAllChecks()">全チェック実行</button>
+                    <button class="btn btn-orange" onclick="runDemoReset()">営業前DEMO準備</button>
+                    <button class="btn btn-light" onclick="copyAllUrls()">URL一覧コピー</button>''',
+              '''          <button class="btn btn-green" onclick="runAllChecks()">全チェック実行</button>
+                    <button class="btn btn-orange" onclick="runDemoReset()">営業前DEMO準備</button>
+                    <button class="btn btn-purple" onclick="copyCheckReport()">検査結果コピー</button>
+                    <button class="btn btn-light" onclick="copyAllUrls()">URL一覧コピー</button>''',
+              "hero audit actions",
+          )
+
+          text = replace_once(
+              text,
+              '''          <label for="adminTokenInput">管理コード</label>
+                    <input id="adminTokenInput" type="password" value="1234" inputmode="numeric" autocomplete="off" />
+                    <button class="btn btn-blue" onclick="saveToken()">保存</button>''',
+              '''          <label for="adminTokenInput">管理コード</label>
+                    <input id="adminTokenInput" type="password" value="1234" inputmode="numeric" autocomplete="new-password" />
+                    <button class="btn btn-blue" onclick="saveToken()">一時保存</button>
+                    <button class="btn btn-red" onclick="clearToken()">削除</button>''',
+              "session token controls",
+          )
+
+          text = replace_once(
+              text,
+              '''          このページはブラウザ内に管理コードを保存します。共有PCで使った後は、ブラウザの履歴・保存情報に注意してください。''',
+              '''          管理コードはこのタブを閉じるまでの一時保存です。以前の永続保存値が残っている場合は自動削除します。共有PCでは確認後に「削除」を押してください。''',
+              "session storage notice",
+          )
+
+          text = replace_once(
+              text,
+              '''      <div class="panel-body">
+                  <div id="checkList" class="check-list"></div>
+                </div>''',
+              '''      <div class="panel-body">
+                  <div class="audit-metrics">
+                    <div class="audit-metric"><span>OK</span><strong id="auditOkCount">0</strong><small>正常に完了した検査</small></div>
+                    <div class="audit-metric"><span>注意</span><strong id="auditWarnCount">0</strong><small>動作するが速度・容量を確認</small></div>
+                    <div class="audit-metric"><span>NG</span><strong id="auditNgCount">0</strong><small>営業前に修正が必要</small></div>
+                    <div class="audit-metric"><span>検査時間</span><strong id="auditDuration">-</strong><small>全チェックの実行時間</small></div>
+                  </div>
+                  <div class="security-note">
+                    無効な管理コードが管理APIで拒否されること、公開画面へ管理用ヘッダーやReset秘密情報が混入していないことも検査します。
+                  </div>
+                  <div class="audit-result-actions">
+                    <button class="btn btn-green" onclick="runAllChecks()">全検査を再実行</button>
+                    <button class="btn btn-purple" onclick="copyCheckReport()">検査結果をコピー</button>
+                  </div>
+                  <div id="checkList" class="check-list" style="margin-top:14px"></div>
+                </div>''',
+              "audit metrics panel",
+          )
+
+          text = replace_once(
+              text,
+              '<div class="route-text">電話予約・店頭予約・本日の入庫確認を見せます。</div>',
+              '<div class="route-text">到着待ち・作業中・引渡し待ちの3列現場ボードを見せます。</div>',
+              "iPad route text",
+          )
+
+          text = replace_once(
+              text,
+              '<div class="route-text">今日やること、入庫予定、LINE文面、店舗設定を見せます。</div>',
+              '<div class="route-text">今日やること、進捗、見積承認、次回フォローを見せます。</div>',
+              "dashboard route text",
+          )
+
+          text = replace_once(
+              text,
+              '<div class="route-text">登録車両、入庫予定、相談文面コピーを見せます。</div>',
+              '<div class="route-text">現在進捗、見積承認、車両別整備履歴、次回目安を見せます。</div>',
+              "member route text",
+          )
+
+          old_manual = '''        <div class="manual-grid">
+                    <label class="manual-item"><input type="checkbox"> <span>PC管理画面の店舗名が設定した店舗名で表示されている</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>今日やることに未対応相談・入庫予定・フォロー候補が表示されている</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>売上金額がトップに大きく出ず、オーナー確認側に分離されている</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>臨時休み・特別営業日の過去日登録ができない</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>iPad画面で電話予約・店頭予約が登録できる</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>お客様フォームで初回・再訪、登録済み車両・新しい車両の流れが分かる</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>会員ページで登録車両・入庫予定・LINE文面コピーが見える</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>営業前DEMO準備後、今日基準のデモデータに戻っている</span></label>
+                  </div>'''
+
+          new_manual = '''        <div class="manual-grid">
+                    <label class="manual-item"><input type="checkbox"> <span>PC管理画面の最初に「今日の業務」と主要クイック操作が表示される</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>電話・店頭・LINE・管理者代理の受付経路が一覧で区別できる</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>受付から引渡しまでの作業進捗を一覧から更新できる</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>見積提示後、会員ページで承認または変更相談ができる</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>見積承認前はPC・iPadとも作業開始へ進めない</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>iPadの初期画面が到着待ち・作業中・引渡し待ちの3列になっている</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>会員ページに車両別の整備履歴と次回目安が表示される</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>次回フォローが期限超過・本日・7日以内・30日以内に整理される</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>通常メモや会員画面に【受付経路】【進捗】【見積版】などの管理情報が露出しない</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>各画面で文字切れ・横はみ出し・ボタン重なりがない</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>共有PCで確認後、管理コードの「削除」が動作する</span></label>
+                    <label class="manual-item"><input type="checkbox"> <span>営業前DEMO準備後、今日基準のデモデータに戻っている</span></label>
+                  </div>'''
+
+          text = replace_once(
+              text,
+              old_manual,
+              new_manual,
+              "DPRO NEXT manual checks",
+          )
+
+          text = replace_once(
+              text,
+              '<div class="footer">DPRO CAR LINE / STEP KSH-BRUSH-9 / 営業前システム確認</div>',
+              '<div class="footer">DPRO 車検・整備工場 LINE / STEP KSH-NEXT-9 / 性能・セキュリティ確認</div>',
+              "audit footer",
+          )
+
+          text = replace_once(
+              text,
+              'const STEP = "STEP KSH-BRUSH-9";',
+              'const STEP = "STEP KSH-NEXT-9";',
+              "audit step constant",
+          )
+
+          text = replace_once(
+              text,
+              '''      { name: "システム確認", key: "systemCheck", url: `${FRONT_BASE}/system-check.html?v=step-ksh-brush-9` },
+                { name: "お客様フォーム", key: "index", url: `${FRONT_BASE}/index.html?v=step-ksh-brush-5` },
+                { name: "店頭iPad画面", key: "ipad", url: `${FRONT_BASE}/owner-ipad.html?v=step-ksh-brush-4` },
+                { name: "PC管理画面", key: "dashboard", url: `${FRONT_BASE}/dashboard.html?v=step-ksh-brush-7` },
+                { name: "マイカー会員ページ", key: "member", url: `${FRONT_BASE}/member.html?v=step-ksh-brush-6&demo=1` },''',
+              '''      { name: "システム確認", key: "systemCheck", url: `${FRONT_BASE}/system-check.html?v=step-ksh-next-9` },
+                { name: "お客様フォーム", key: "index", url: `${FRONT_BASE}/index.html?v=step-ksh-next-9` },
+                { name: "店頭iPad画面", key: "ipad", url: `${FRONT_BASE}/owner-ipad.html?v=step-ksh-next-6` },
+                { name: "PC管理画面", key: "dashboard", url: `${FRONT_BASE}/dashboard.html?v=step-ksh-next-8` },
+                { name: "マイカー会員ページ", key: "member", url: `${FRONT_BASE}/member.html?v=step-ksh-next-7&demo=1` },''',
+              "current URL versions",
+          )
+
+          text = replace_once(
+              text,
+              '''    document.addEventListener("DOMContentLoaded", () => {
+                document.getElementById("adminTokenInput").value = localStorage.getItem("ksh_dashboard_token") || DEFAULT_TOKEN;
+                renderChecks();''',
+              '''    document.addEventListener("DOMContentLoaded", () => {
+                const legacyToken = localStorage.getItem("ksh_dashboard_token") || "";
+                if (legacyToken && !sessionStorage.getItem("ksh_system_check_token")) {
+                  sessionStorage.setItem("ksh_system_check_token", legacyToken);
+                }
+                localStorage.removeItem("ksh_dashboard_token");
+                document.getElementById("adminTokenInput").value = sessionStorage.getItem("ksh_system_check_token") || DEFAULT_TOKEN;
+                renderChecks();''',
+              "session token initialization",
+          )
+
+          text = replace_once(
+              text,
+              '''    function saveToken() {
+                const token = getToken();
+                localStorage.setItem("ksh_dashboard_token", token);
+                showOverall("管理コードを保存しました。", "ok");
+              }''',
+              '''    function saveToken() {
+                const token = getToken();
+                sessionStorage.setItem("ksh_system_check_token", token);
+                localStorage.removeItem("ksh_dashboard_token");
+                showOverall("管理コードをこのタブに一時保存しました。", "ok");
+              }
+
+              function clearToken() {
+                sessionStorage.removeItem("ksh_system_check_token");
+                localStorage.removeItem("ksh_dashboard_token");
+                document.getElementById("adminTokenInput").value = "";
+                showOverall("管理コードを削除しました。", "ok");
+              }''',
+              "session token functions",
+          )
+
+          text = replace_once(
+              text,
+              '''  </script>
+          </body>''',
+              '''  </script>
+            <script src="ksh-next-9-system-audit.js?v=20260723"></script>
+          </body>''',
+              "audit runtime script",
+          )
+
+          audit_js = r'''(() => {
+            "use strict";
+
+            const auditStartedAt = { value: 0 };
+            const auditTimings = new Map();
+
+            const extraChecks = [
+              {
+                id: "frontIndex",
+                kind: "front",
+                title: "お客様フォーム公開確認",
+                desc: "公開フォームが読み込め、管理用ヘッダーやReset秘密情報を含まないことを確認します。",
+                url: `${FRONT_BASE}/index.html?v=step-ksh-next-9-audit`,
+                expectedMarkers: ["/api/inquiries"],
+                forbiddenMarkers: ["X-Dashboard-Token", "x-ksh-demo-reset-secret", "RESET_WORKER_BASE", "ksh_dashboard_token"],
+                warnMs: 3000,
+                warnBytes: 700000,
+                hardBytes: 1400000
+              },
+              {
+                id: "frontDashboard",
+                kind: "front",
+                title: "PC管理画面・追加機能確認",
+                desc: "進捗、見積承認、次回フォローのJavaScriptが読み込まれる構成か確認します。",
+                url: `${FRONT_BASE}/dashboard.html?v=step-ksh-next-9-audit`,
+                expectedMarkers: [
+                  "STEP KSH-NEXT-8",
+                  "ksh-next-5-owner-estimate.js",
+                  "ksh-next-8-followup-cockpit.js"
+                ],
+                warnMs: 3500,
+                warnBytes: 1100000,
+                hardBytes: 1900000
+              },
+              {
+                id: "frontIpad",
+                kind: "front",
+                title: "受付iPad画面確認",
+                desc: "3列現場ボードとiPad最適化JavaScriptの公開状態を確認します。",
+                url: `${FRONT_BASE}/owner-ipad.html?v=step-ksh-next-9-audit`,
+                expectedMarkers: ["STEP KSH-NEXT-6", "ksh-next-6-ipad-operations.js"],
+                warnMs: 3000,
+                warnBytes: 850000,
+                hardBytes: 1500000
+              },
+              {
+                id: "frontMember",
+                kind: "front",
+                title: "マイカーページ・公開情報確認",
+                desc: "見積承認と車両別履歴が読み込まれ、管理用情報が公開HTMLへ混入していないことを確認します。",
+                url: `${FRONT_BASE}/member.html?v=step-ksh-next-9-audit&demo=1`,
+                expectedMarkers: [
+                  "STEP KSH-NEXT-7",
+                  "ksh-next-5-member-estimate.js",
+                  "ksh-next-7-member-history.js"
+                ],
+                forbiddenMarkers: ["X-Dashboard-Token", "x-ksh-demo-reset-secret", "RESET_WORKER_BASE", "ksh_dashboard_token"],
+                warnMs: 3000,
+                warnBytes: 700000,
+                hardBytes: 1300000
+              },
+              {
+                id: "frontSystemCheck",
+                kind: "front",
+                title: "内部監査ページ公開確認",
+                desc: "system-checkがNEXT-9版で、検索除外設定を持つことを確認します。",
+                url: `${FRONT_BASE}/system-check.html?v=step-ksh-next-9-audit`,
+                expectedMarkers: [
+                  "STEP KSH-NEXT-9",
+                  'name="robots" content="noindex,nofollow,noarchive"',
+                  "ksh-next-9-system-audit.js"
+                ],
+                warnMs: 3000,
+                warnBytes: 650000,
+                hardBytes: 1100000
+              },
+              {
+                id: "ownerEstimateAsset",
+                kind: "front",
+                title: "見積承認JavaScript",
+                desc: "オーナー側の見積承認処理ファイルを確認します。",
+                url: `${FRONT_BASE}/ksh-next-5-owner-estimate.js?v=step-ksh-next-9-audit`,
+                expectedMarkers: ["KSH_NEXT_5_ESTIMATE_OWNER", "publishEstimateForCustomer"],
+                warnMs: 2500,
+                warnBytes: 180000,
+                hardBytes: 350000
+              },
+              {
+                id: "ipadAsset",
+                kind: "front",
+                title: "iPad最適化JavaScript",
+                desc: "iPadの進捗分類・見積承認ガード処理ファイルを確認します。",
+                url: `${FRONT_BASE}/ksh-next-6-ipad-operations.js?v=step-ksh-next-9-audit`,
+                expectedMarkers: ["KSH_NEXT_6_IPAD", "advanceIpadProgress"],
+                warnMs: 2500,
+                warnBytes: 200000,
+                hardBytes: 380000
+              },
+              {
+                id: "memberHistoryAsset",
+                kind: "front",
+                title: "会員整備履歴JavaScript",
+                desc: "車両別の現在進捗・整備履歴処理ファイルを確認します。",
+                url: `${FRONT_BASE}/ksh-next-7-member-history.js?v=step-ksh-next-9-audit`,
+                expectedMarkers: ["KSH_NEXT_7_MEMBER_HISTORY", "renderMaintenanceHistory"],
+                forbiddenMarkers: ["X-Dashboard-Token", "x-ksh-demo-reset-secret", "RESET_WORKER_BASE"],
+                warnMs: 2500,
+                warnBytes: 220000,
+                hardBytes: 400000
+              },
+              {
+                id: "followupAsset",
+                kind: "front",
+                title: "次回フォローJavaScript",
+                desc: "期限分類・候補カード・対応履歴処理ファイルを確認します。",
+                url: `${FRONT_BASE}/ksh-next-8-followup-cockpit.js?v=step-ksh-next-9-audit`,
+                expectedMarkers: ["KSH_NEXT_8_FOLLOWUP", "candidateTiming"],
+                warnMs: 2500,
+                warnBytes: 220000,
+                hardBytes: 400000
+              },
+              {
+                id: "invalidAdminGuard",
+                kind: "security",
+                title: "無効な管理コード拒否",
+                desc: "誤った管理コードで管理ダッシュボードAPIを取得できないことを確認します。",
+                path: "/api/dashboard",
+                expectedStatuses: [401, 403]
+              }
+            ];
+
+            for (const item of extraChecks) {
+              if (!checks.some(check => check.id === item.id)) {
+                checks.push(item);
+                state[item.id] = { status: "未確認", detail: "" };
+              }
+            }
+
+            const originalSetCheck = setCheck;
+            const originalSummarizeResult = summarizeResult;
+
+            statusClass = function(status) {
+              if (status === "OK") return "ok";
+              if (status === "NG") return "ng";
+              if (status === "注意") return "attention";
+              if (status === "確認中") return "checking";
+              return "warn";
+            };
+
+            setCheck = function(id, status, detail) {
+              originalSetCheck(id, status, detail);
+              renderAuditMetrics();
+            };
+
+            updateOverallFromState = function() {
+              const values = Object.values(state).map(row => row.status);
+              const okCount = values.filter(value => value === "OK").length;
+              const warnCount = values.filter(value => value === "注意").length;
+              const ngCount = values.filter(value => value === "NG").length;
+              const checking = values.some(value => value === "確認中");
+
+              if (checking) {
+                showOverall(`確認中：OK ${okCount} / 注意 ${warnCount} / 全${values.length}件`, "checking");
+              } else if (ngCount > 0) {
+                showOverall(`要修正：NG ${ngCount}件 / 注意 ${warnCount}件 / OK ${okCount}件`, "ng");
+              } else if (okCount + warnCount === values.length && warnCount > 0) {
+                showOverall(`動作OK・注意 ${warnCount}件 / OK ${okCount}件`, "attention");
+              } else if (okCount === values.length) {
+                showOverall(`すべてOK ${okCount}/${values.length}`, "ok");
+              } else {
+                showOverall(`未確認：OK ${okCount} / 注意 ${warnCount} / 全${values.length}件`, "warn");
+              }
+
+              renderAuditMetrics();
+            };
+
+            function renderAuditMetrics() {
+              const values = Object.values(state).map(row => row.status);
+              setTextSafe("auditOkCount", values.filter(value => value === "OK").length);
+              setTextSafe("auditWarnCount", values.filter(value => value === "注意").length);
+              setTextSafe("auditNgCount", values.filter(value => value === "NG").length);
+
+              if (auditStartedAt.value > 0) {
+                const finished = !values.some(value => value === "確認中");
+                const elapsed = performance.now() - auditStartedAt.value;
+                setTextSafe("auditDuration", finished ? `${(elapsed / 1000).toFixed(1)}秒` : "実行中");
+              }
+            }
+
+            function setTextSafe(id, value) {
+              const element = document.getElementById(id);
+              if (element) element.textContent = String(value);
+            }
+
+            async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+              const controller = new AbortController();
+              const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+              const started = performance.now();
+
+              try {
+                const response = await fetch(url, {
+                  ...options,
+                  cache: "no-store",
+                  signal: controller.signal
+                });
+                const body = await response.text();
+                return {
+                  response,
+                  body,
+                  elapsedMs: Math.round(performance.now() - started)
+                };
+              } finally {
+                window.clearTimeout(timer);
+              }
+            }
+
+            function parseJson(body) {
+              try {
+                return body ? JSON.parse(body) : null;
+              } catch {
+                return { raw: body };
+              }
+            }
+
+            function frontDetail(item, result, status) {
+              const bytes = new Blob([result.body]).size;
+              return [
+                `状態: ${status}`,
+                `HTTP: ${result.response.status}`,
+                `読込時間: ${result.elapsedMs}ms`,
+                `転送後サイズ: ${(bytes / 1024).toFixed(1)}KB`,
+                `URL: ${item.url}`
+              ].join("\n");
+            }
+
+            runCheck = async function(id) {
+              const item = checks.find(row => row.id === id);
+              if (!item) return;
+
+              setCheck(id, "確認中", "");
+
+              try {
+                if (item.kind === "front") {
+                  const result = await fetchWithTimeout(item.url, {
+                    headers: { Accept: "text/html,application/javascript,text/plain,*/*" }
+                  });
+
+                  if (!result.response.ok) {
+                    throw new Error(`HTTP ${result.response.status}`);
+                  }
+
+                  for (const marker of item.expectedMarkers || []) {
+                    if (!result.body.includes(marker)) {
+                      throw new Error(`必須マーカーがありません: ${marker}`);
+                    }
+                  }
+
+                  for (const marker of item.forbiddenMarkers || []) {
+                    if (result.body.includes(marker)) {
+                      throw new Error(`公開してはいけない管理用マーカーを検出: ${marker}`);
+                    }
+                  }
+
+                  const bytes = new Blob([result.body]).size;
+                  if (item.hardBytes && bytes > item.hardBytes) {
+                    throw new Error(`容量上限超過: ${(bytes / 1024).toFixed(1)}KB`);
+                  }
+
+                  const attention =
+                    (item.warnMs && result.elapsedMs > item.warnMs) ||
+                    (item.warnBytes && bytes > item.warnBytes);
+
+                  auditTimings.set(id, result.elapsedMs);
+                  setCheck(
+                    id,
+                    attention ? "注意" : "OK",
+                    frontDetail(item, result, attention ? "速度・容量を確認" : "正常")
+                  );
+                  return;
+                }
+
+                if (item.kind === "security") {
+                  const result = await fetchWithTimeout(`${WORKER_API_BASE}${item.path}`, {
+                    method: "GET",
+                    headers: {
+                      Accept: "application/json",
+                      "X-Dashboard-Token": "__invalid_ksh_next_9__"
+                    }
+                  });
+
+                  if (!(item.expectedStatuses || []).includes(result.response.status)) {
+                    throw new Error(`無効コードが拒否されませんでした: HTTP ${result.response.status}`);
+                  }
+
+                  auditTimings.set(id, result.elapsedMs);
+                  setCheck(
+                    id,
+                    "OK",
+                    [
+                      `無効管理コードを拒否: HTTP ${result.response.status}`,
+                      `応答時間: ${result.elapsedMs}ms`,
+                      "管理APIの認証ガードは有効です。"
+                    ].join("\n")
+                  );
+                  return;
+                }
+
+                const path = typeof item.path === "function" ? item.path() : item.path;
+                const base = item.reset ? RESET_WORKER_BASE : WORKER_API_BASE;
+                const headers = { Accept: "application/json" };
+                if (item.auth) headers["X-Dashboard-Token"] = getToken();
+
+                const result = await fetchWithTimeout(`${base}${path}`, {
+                  method: "GET",
+                  headers
+                });
+                const data = parseJson(result.body);
+
+                if (!result.response.ok || !item.expect(data)) {
+                  const message =
+                    data && (data.message || data.error)
+                      ? data.message || data.error
+                      : `HTTP ${result.response.status}`;
+                  throw new Error(message);
+                }
+
+                auditTimings.set(id, result.elapsedMs);
+                const summary = originalSummarizeResult(id, data);
+                const attention = result.elapsedMs > 3000;
+                setCheck(
+                  id,
+                  attention ? "注意" : "OK",
+                  [
+                    summary || pretty(data),
+                    `応答時間: ${result.elapsedMs}ms`
+                  ].filter(Boolean).join("\n")
+                );
+
+                if (id === "publicShopSettings" || id === "adminShopSettings") {
+                  applyShopNameFromResult(data);
+                }
+              } catch (error) {
+                const message = error?.name === "AbortError"
+                  ? "12秒以内に応答しませんでした。"
+                  : error?.message || String(error);
+                setCheck(id, "NG", message);
+              }
+            };
+
+            runAllChecks = async function() {
+              saveToken();
+              auditStartedAt.value = performance.now();
+              auditTimings.clear();
+              showOverall("全検査を実行中です...", "checking");
+
+              const batchSize = 4;
+              for (let index = 0; index < checks.length; index += batchSize) {
+                const batch = checks.slice(index, index + batchSize);
+                await Promise.all(batch.map(item => runCheck(item.id)));
+              }
+
+              updateOverallFromState();
+            };
+
+            window.copyCheckReport = async function() {
+              const lines = [
+                `${getShopNameFromPage()} / ${STEP}`,
+                `実行日時: ${new Date().toLocaleString("ja-JP")}`,
+                `総合結果: ${document.getElementById("overallStatus")?.textContent || "-"}`,
+                ""
+              ];
+
+              checks.forEach((item, index) => {
+                const result = state[item.id] || {};
+                lines.push(`${index + 1}. ${item.title}: ${result.status || "未確認"}`);
+                if (result.detail) lines.push(result.detail);
+                lines.push("");
+              });
+
+              await copyText(lines.join("\n"));
+              showOverall("検査結果をコピーしました。", "ok");
+            };
+
+            function getShopNameFromPage() {
+              return String(document.getElementById("pageTitle")?.textContent || "DPRO 車検・整備工場 LINE")
+                .replace(" 営業前システム確認", "")
+                .trim();
+            }
+
+            window.addEventListener("DOMContentLoaded", () => {
+              renderChecks();
+              renderAuditMetrics();
+            });
+
+            window.KSH_NEXT_9_SYSTEM_AUDIT = {
+              candidateChecks: extraChecks.map(item => item.id),
+              fetchWithTimeout
+            };
+          })();
+          '''
+
+          audit_js_path.write_text(audit_js, encoding="utf-8")
+          check_path.write_text(text, encoding="utf-8")
+
+          plan = plan_path.read_text(encoding="utf-8")
+          plan = replace_once(
+              plan,
+              '  current_step: "STEP KSH-NEXT-8"',
+              '  current_step: "STEP KSH-NEXT-9"',
+              "plan current step",
+          )
+          plan = replace_once(
+              plan,
+              '''  - id: "KSH-NEXT-9"
+              title: "性能・セキュリティ・system-check"
+              status: "next"''',
+              '''  - id: "KSH-NEXT-9"
+              title: "性能・セキュリティ・system-check"
+              status: "completed_after_workflow_success"''',
+              "plan step 9",
+          )
+          plan = replace_once(
+              plan,
+              '''  - id: "KSH-NEXT-10"
+              title: "製品サイト・操作体験シート・完成判定"
+              status: "pending"''',
+              '''  - id: "KSH-NEXT-10"
+              title: "製品サイト・操作体験シート・完成判定"
+              status: "next"''',
+              "plan step 10",
+          )
+          plan_path.write_text(plan, encoding="utf-8")
+
+          result_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-9-RESULT"',
+              '  step: "STEP KSH-NEXT-9"',
+              '  title: "性能・セキュリティ・system-check"',
+              f"  generated_at_utc: {quote(datetime.now(timezone.utc).isoformat())}",
+              "targets:",
+              '  - "system-check.html"',
+              '  - "ksh-next-9-system-audit.js"',
+              '  - ".dpro/ksh-next/frontend-audit.yml"',
+              "hashes:",
+              f"  system_check_before: {quote(sha256_text(original))}",
+              f"  system_check_after: {quote(sha256_text(text))}",
+              "changes:",
+              '  - "公開画面・追加JavaScriptの存在・容量・読込時間を検査"',
+              '  - "無効な管理コードが管理APIで拒否されることを検査"',
+              '  - "公開画面への管理用ヘッダー・Reset秘密情報の混入を検査"',
+              '  - "管理コードを永続保存からタブ単位の一時保存へ変更"',
+              '  - "管理コード削除ボタンを追加"',
+              '  - "全検査を4件ずつ並列実行し待ち時間を短縮"',
+              '  - "OK・注意・NG・検査時間を表示"',
+              '  - "検査結果をコピー可能に変更"',
+              '  - "DPRO NEXTの目視確認項目へ更新"',
+              '  - "検索エンジン除外とreferrer抑制を追加"',
+              "performance_policy:",
+              "  concurrent_check_batch: 4",
+              "  request_timeout_seconds: 12",
+              "  page_hard_size_limits_enabled: true",
+              "  all_records_loaded_on_start: false",
+              "security_policy:",
+              "  system_check_admin_token_persistent_storage: false",
+              "  invalid_admin_token_rejection_check: true",
+              "  public_admin_marker_scan: true",
+              "  system_check_noindex: true",
+              "safety:",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  existing_api_changed: false",
+              "  automatic_line_send_added: false",
+              "  demo_reset_behavior_changed: false",
+              "  backup_tag_created: true",
+              "next_step:",
+              '  id: "KSH-NEXT-10"',
+              '  title: "製品サイト・操作体験シート・完成判定"',
+          ]
+          result_path.write_text("\n".join(result_lines) + "\n", encoding="utf-8")
+
+          print("KSH-NEXT-9 files generated")
+          print("system-check bytes:", len(text.encode("utf-8")))
+          print("audit JS bytes:", len(audit_js.encode("utf-8")))
+          PY
+
+      - name: Run static frontend audit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          from collections import Counter
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import re
+          import subprocess
+          import tempfile
+
+          root = Path(".")
+          report_path = Path(".dpro/ksh-next/frontend-audit.yml")
+          report_path.parent.mkdir(parents=True, exist_ok=True)
+
+          html_files = [
+              Path("index.html"),
+              Path("dashboard.html"),
+              Path("owner-ipad.html"),
+              Path("member.html"),
+              Path("system-check.html"),
+          ]
+
+          required_js = [
+              Path("ksh-next-5-owner-estimate.js"),
+              Path("ksh-next-5-member-estimate.js"),
+              Path("ksh-next-6-ipad-operations.js"),
+              Path("ksh-next-7-member-history.js"),
+              Path("ksh-next-8-followup-cockpit.js"),
+              Path("ksh-next-9-system-audit.js"),
+          ]
+
+          required_markers = {
+              "dashboard.html": [
+                  "STEP KSH-NEXT-8",
+                  "ksh-next-5-owner-estimate.js",
+                  "ksh-next-8-followup-cockpit.js",
+                  "reservationProgressStage",
+                  "nextFollowupCockpit",
+              ],
+              "owner-ipad.html": [
+                  "STEP KSH-NEXT-6",
+                  "ksh-next-6-ipad-operations.js",
+                  "arrivalReservationList",
+                  "workingReservationList",
+                  "readyReservationList",
+              ],
+              "member.html": [
+                  "STEP KSH-NEXT-7",
+                  "ksh-next-5-member-estimate.js",
+                  "ksh-next-7-member-history.js",
+              ],
+              "system-check.html": [
+                  "STEP KSH-NEXT-9",
+                  "ksh-next-9-system-audit.js",
+                  'name="robots" content="noindex,nofollow,noarchive"',
+                  'name="referrer" content="no-referrer"',
+              ],
+          }
+
+          size_limits = {
+              "index.html": 1400000,
+              "dashboard.html": 1900000,
+              "owner-ipad.html": 1500000,
+              "member.html": 1300000,
+              "system-check.html": 1100000,
+              "ksh-next-5-owner-estimate.js": 350000,
+              "ksh-next-5-member-estimate.js": 350000,
+              "ksh-next-6-ipad-operations.js": 380000,
+              "ksh-next-7-member-history.js": 400000,
+              "ksh-next-8-followup-cockpit.js": 400000,
+              "ksh-next-9-system-audit.js": 450000,
+          }
+
+          for path in html_files + required_js:
+              if not path.is_file():
+                  raise SystemExit(f"required file missing: {path}")
+
+          for path in html_files + required_js:
+              if path.stat().st_size > size_limits[path.name]:
+                  raise SystemExit(
+                      f"size budget exceeded: {path} "
+                      f"{path.stat().st_size} > {size_limits[path.name]}"
+                  )
+
+          total_bytes = sum(path.stat().st_size for path in html_files + required_js)
+          if total_bytes > 6500000:
+              raise SystemExit(f"total frontend budget exceeded: {total_bytes}")
+
+          class Parser(HTMLParser):
+              pass
+
+          local_script_references = []
+          html_results = []
+
+          for path in html_files:
+              text = path.read_text(encoding="utf-8")
+              parser = Parser()
+              parser.feed(text)
+              parser.close()
+
+              ids = re.findall(r'\bid=["\']([^"\']+)["\']', text)
+              duplicates = sorted(key for key, count in Counter(ids).items() if count > 1)
+              if duplicates:
+                  raise SystemExit(f"{path} duplicate IDs: {', '.join(duplicates)}")
+
+              if "http://" in text:
+                  raise SystemExit(f"insecure http URL detected: {path}")
+
+              for marker in required_markers.get(path.name, []):
+                  if marker not in text:
+                      raise SystemExit(f"{path} missing marker: {marker}")
+
+              srcs = re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', text, flags=re.I)
+              duplicate_srcs = sorted(key for key, count in Counter(srcs).items() if count > 1)
+              if duplicate_srcs:
+                  raise SystemExit(f"{path} duplicate script refs: {', '.join(duplicate_srcs)}")
+
+              for src in srcs:
+                  if re.match(r"^(?:https?:)?//", src):
+                      continue
+                  local_path = Path(src.split("?", 1)[0])
+                  if not local_path.is_file():
+                      raise SystemExit(f"{path} references missing script: {local_path}")
+                  local_script_references.append((path.name, str(local_path)))
+
+              inline_scripts = []
+              for attrs, body in re.findall(
+                  r"<script\b([^>]*)>(.*?)</script>",
+                  text,
+                  flags=re.I | re.S,
+              ):
+                  if re.search(r"\bsrc\s*=", attrs, flags=re.I):
+                      continue
+                  if body.strip():
+                      inline_scripts.append(body)
+
+              for index, script in enumerate(inline_scripts, start=1):
+                  temp = Path(tempfile.gettempdir()) / f"ksh-next-9-{path.stem}-{index}.js"
+                  temp.write_text(script, encoding="utf-8")
+                  subprocess.run(["node", "--check", str(temp)], check=True)
+
+              html_results.append({
+                  "path": path.name,
+                  "bytes": path.stat().st_size,
+                  "ids": len(ids),
+                  "inline_scripts": len(inline_scripts),
+                  "local_scripts": len([src for src in srcs if not re.match(r"^(?:https?:)?//", src)]),
+              })
+
+          for path in required_js:
+              subprocess.run(["node", "--check", str(path)], check=True)
+
+          def assert_script_order(html_name, first, second):
+              text = Path(html_name).read_text(encoding="utf-8")
+              first_index = text.find(first)
+              second_index = text.find(second)
+              if first_index < 0 or second_index < 0 or first_index >= second_index:
+                  raise SystemExit(f"script order invalid in {html_name}: {first} -> {second}")
+
+          assert_script_order(
+              "dashboard.html",
+              "ksh-next-5-owner-estimate.js",
+              "ksh-next-8-followup-cockpit.js",
+          )
+          assert_script_order(
+              "member.html",
+              "ksh-next-5-member-estimate.js",
+              "ksh-next-7-member-history.js",
+          )
+
+          public_files = [
+              Path("index.html"),
+              Path("member.html"),
+              Path("ksh-next-5-member-estimate.js"),
+              Path("ksh-next-7-member-history.js"),
+          ]
+
+          public_forbidden = [
+              "X-Dashboard-Token",
+              "x-ksh-demo-reset-secret",
+              "RESET_WORKER_BASE",
+              "ksh_dashboard_token",
+          ]
+
+          for path in public_files:
+              text = path.read_text(encoding="utf-8")
+              for marker in public_forbidden:
+                  if marker in text:
+                      raise SystemExit(f"public admin marker detected: {path}: {marker}")
+
+          member_sources = (
+              Path("ksh-next-5-member-estimate.js").read_text(encoding="utf-8") +
+              "\n" +
+              Path("ksh-next-7-member-history.js").read_text(encoding="utf-8")
+          )
+          for marker in [
+              "RECEPTION_PATTERN",
+              "PROGRESS_PATTERN",
+              "ESTIMATE_VERSION_PATTERN",
+              "stripMemberMetadata",
+          ]:
+              if marker not in member_sources:
+                  raise SystemExit(f"member metadata hiding marker missing: {marker}")
+
+          system_check = Path("system-check.html").read_text(encoding="utf-8")
+          for marker in [
+              'name="robots" content="noindex,nofollow,noarchive"',
+              'name="referrer" content="no-referrer"',
+              "sessionStorage",
+              "clearToken()",
+          ]:
+              if marker not in system_check:
+                  raise SystemExit(f"system-check security marker missing: {marker}")
+
+          def sha256(path):
+              digest = hashlib.sha256()
+              digest.update(path.read_bytes())
+              return digest.hexdigest()
+
+          lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-9-FRONTEND-AUDIT"',
+              '  step: "STEP KSH-NEXT-9"',
+              f'  generated_at_utc: {json.dumps(datetime.now(timezone.utc).isoformat())}',
+              "summary:",
+              "  html_parse_ok: true",
+              "  duplicate_html_ids: false",
+              "  javascript_syntax_ok: true",
+              "  missing_local_scripts: false",
+              "  duplicate_script_references: false",
+              "  script_order_ok: true",
+              "  public_admin_markers_detected: false",
+              "  member_metadata_hiding_present: true",
+              "  system_check_noindex: true",
+              f"  audited_total_bytes: {total_bytes}",
+              "files:",
+          ]
+
+          for path in html_files + required_js:
+              lines.extend([
+                  f'  - path: {json.dumps(path.as_posix())}',
+                  f"    bytes: {path.stat().st_size}",
+                  f'    sha256: {json.dumps(sha256(path))}',
+                  f"    hard_limit_bytes: {size_limits[path.name]}",
+              ])
+
+          lines.append("html_details:")
+          for result in html_results:
+              lines.extend([
+                  f'  - path: {json.dumps(result["path"])}',
+                  f'    bytes: {result["bytes"]}',
+                  f'    ids: {result["ids"]}',
+                  f'    inline_scripts: {result["inline_scripts"]}',
+                  f'    local_scripts: {result["local_scripts"]}',
+              ])
+
+          lines.append("local_script_references:")
+          for html_name, script_name in local_script_references:
+              lines.extend([
+                  f'  - html: {json.dumps(html_name)}',
+                  f'    script: {json.dumps(script_name)}',
+              ])
+
+          report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          print("Static frontend audit OK")
+          print("Audited total bytes:", total_bytes)
+          print("Report:", report_path)
+          PY
+
+      - name: Validate audit policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f .dpro/ksh-next/ksh-next-9-result.yml
+          test -f .dpro/ksh-next/frontend-audit.yml
+
+          grep -q 'step: "STEP KSH-NEXT-9"' .dpro/ksh-next/ksh-next-9-result.yml
+          grep -q 'database_changed: false' .dpro/ksh-next/ksh-next-9-result.yml
+          grep -q 'worker_changed: false' .dpro/ksh-next/ksh-next-9-result.yml
+          grep -q 'system_check_admin_token_persistent_storage: false' .dpro/ksh-next/ksh-next-9-result.yml
+          grep -q 'invalid_admin_token_rejection_check: true' .dpro/ksh-next/ksh-next-9-result.yml
+          grep -q 'public_admin_marker_scan: true' .dpro/ksh-next/ksh-next-9-result.yml
+
+          grep -q 'html_parse_ok: true' .dpro/ksh-next/frontend-audit.yml
+          grep -q 'duplicate_html_ids: false' .dpro/ksh-next/frontend-audit.yml
+          grep -q 'javascript_syntax_ok: true' .dpro/ksh-next/frontend-audit.yml
+          grep -q 'public_admin_markers_detected: false' .dpro/ksh-next/frontend-audit.yml
+          grep -q 'member_metadata_hiding_present: true' .dpro/ksh-next/frontend-audit.yml
+
+          grep -q 'current_step: "STEP KSH-NEXT-9"' .dpro/ksh-next/plan.yml
+          grep -A2 'id: "KSH-NEXT-10"' .dpro/ksh-next/plan.yml | grep -q 'status: "next"'
+
+          echo "KSH-NEXT-9 policy checks passed."
+
+      - name: Commit KSH-NEXT-9
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f ".github/workflows/step-ksh-next-8-maintenance-followup.yml"
+          rm -f ".github/workflows/step-ksh-next-9-performance-security-check.yml"
+
+          git config user.name "DPRO STEP KSH-NEXT-9"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 1
+          fi
+
+          git commit -m "STEP KSH-NEXT-9 strengthen performance and security audit"
+          git push origin HEAD:main
