@@ -1,0 +1,407 @@
+name: STEP KSH-NEXT-10B Final Completion Sync
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-10b-final-completion-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-final-completion-sync
+  cancel-in-progress: false
+
+jobs:
+  final-completion-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout vehicle service main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install final PDF verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check "pypdf>=5,<7"
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Verify local completion prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f .dpro/ksh-next/plan.yml
+          test -f .dpro/ksh-next/ksh-next-9-result.yml
+          test -f .dpro/ksh-next/ksh-next-10a-result.yml
+          test -f .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          test -f .dpro/ksh-next/frontend-audit.yml
+          test -f deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf
+          test -f deliverables/ksh-next-10/DPRO_KSH_NEXT_owner_operation_sheet_A4_1page_preview.png
+          test -f deliverables/ksh-next-10/DPRO_KSH_NEXT_QR_READING_VERIFICATION.txt
+          test -f system-check.html
+
+          grep -q 'current_step: "STEP KSH-NEXT-10A-R4"' .dpro/ksh-next/plan.yml
+          grep -q 'operation_sheet_a4_one_page_completed_product_site_pending' .dpro/ksh-next/plan.yml
+          grep -q 'system_check: "18/18 OK"' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          grep -q 'page_count: 1' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          grep -q 'qr_decoded_from_final_pdf_render: true' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          grep -q 'html_parse_ok: true' .dpro/ksh-next/frontend-audit.yml
+          grep -q 'javascript_syntax_ok: true' .dpro/ksh-next/frontend-audit.yml
+          grep -q 'public_admin_markers_detected: false' .dpro/ksh-next/frontend-audit.yml
+
+          if [ -f .dpro/ksh-next/ksh-next-final-completion.yml ]; then
+            echo "Final completion record already exists. Stop to prevent duplicate finalization."
+            exit 1
+          fi
+
+          echo "Local KSH-NEXT completion prerequisites verified."
+
+      - name: Create final safety tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKUP_TAG="ksh-next-final-before-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+          echo "BACKUP_TAG=$BACKUP_TAG" >> "$GITHUB_ENV"
+
+      - name: Verify published product site and public URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PRODUCT_URL="https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems/car-service.html?v=ksh-next-final-${{ github.run_id }}"
+          CATALOG_URL="https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems.html?v=ksh-next-final-${{ github.run_id }}"
+          SITE_RESULT_URL="https://raw.githubusercontent.com/dpromstk2000-lab/dpro-line-systems-site/main/.dpro/ksh-next/ksh-next-10b-site-result.yml"
+          PDF_URL="https://dpromstk2000-lab.github.io/line-shaken-liff/deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
+          SYSTEM_CHECK_URL="https://dpromstk2000-lab.github.io/line-shaken-liff/system-check.html?v=step-ksh-next-9"
+          CUSTOMER_URL="https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10"
+          MEMBER_URL="https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7"
+          DASHBOARD_URL="https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8"
+          IPAD_URL="https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6"
+
+          PRODUCT_BODY="$(curl -L --silent --show-error --fail --max-time 30 "$PRODUCT_URL")"
+          CATALOG_BODY="$(curl -L --silent --show-error --fail --max-time 30 "$CATALOG_URL")"
+          SITE_RESULT="$(curl -L --silent --show-error --fail --max-time 30 "$SITE_RESULT_URL")"
+
+          echo "$PRODUCT_BODY" | grep -q 'STEP KSH-NEXT-10B / DPRO NEXT PRODUCT SITE'
+          echo "$PRODUCT_BODY" | grep -q 'DPRO 車検・整備工場 LINE'
+          echo "$PRODUCT_BODY" | grep -q 'DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf'
+          echo "$PRODUCT_BODY" | grep -q 'step-ksh-next-8'
+          echo "$PRODUCT_BODY" | grep -q 'step-ksh-next-6'
+          echo "$PRODUCT_BODY" | grep -q 'step-ksh-next-7'
+          echo "$PRODUCT_BODY" | grep -q 'step-ksh-next-9'
+
+          echo "$CATALOG_BODY" | grep -q 'STEP KSH-NEXT-10B / DPRO NEXT CATALOG'
+          echo "$CATALOG_BODY" | grep -q 'KSH-NEXT完成版'
+          echo "$CATALOG_BODY" | grep -q 'DPRO NEXT完成版を見る'
+
+          echo "$SITE_RESULT" | grep -q 'status: "completed_public_check_passed"'
+          echo "$SITE_RESULT" | grep -q 'product_site_publication: "completed"'
+          echo "$SITE_RESULT" | grep -q 'product_page_http_200: true'
+          echo "$SITE_RESULT" | grep -q 'catalog_http_200: true'
+          echo "$SITE_RESULT" | grep -q 'operation_sheet_pdf_http_200: true'
+
+          URLS=(
+            "$PDF_URL"
+            "$SYSTEM_CHECK_URL"
+            "$CUSTOMER_URL"
+            "$MEMBER_URL"
+            "$DASHBOARD_URL"
+            "$IPAD_URL"
+          )
+
+          for URL in "${URLS[@]}"; do
+            CODE="$(curl -L --silent --show-error --output /tmp/ksh-next-final-body --write-out '%{http_code}' --max-time 30 "$URL")"
+            if [ "$CODE" != "200" ]; then
+              echo "Final public URL verification failed: HTTP $CODE $URL"
+              exit 1
+            fi
+
+            BYTES="$(wc -c < /tmp/ksh-next-final-body)"
+            if [ "$BYTES" -lt 1000 ]; then
+              echo "Final public URL response is too small: $BYTES bytes $URL"
+              exit 1
+            fi
+
+            echo "OK $CODE / $BYTES bytes / $URL"
+          done
+
+          PDF_TYPE="$(curl -L --silent --show-error --head --max-time 30 "$PDF_URL" \
+            | tr -d '\r' | grep -i '^content-type:' | tail -1 || true)"
+
+          if ! echo "$PDF_TYPE" | grep -qi 'application/pdf'; then
+            echo "Final operation sheet content type is not PDF: $PDF_TYPE"
+            exit 1
+          fi
+
+          echo "Product site publication and all final public URLs verified."
+
+      - name: Write final completion records
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          from pypdf import PdfReader
+          import hashlib
+          import json
+          import re
+
+          plan_path = Path(".dpro/ksh-next/plan.yml")
+          result10a_path = Path(".dpro/ksh-next/ksh-next-10a-result.yml")
+          result10a_r4_path = Path(".dpro/ksh-next/ksh-next-10a-r4-result.yml")
+          final_path = Path(".dpro/ksh-next/ksh-next-final-completion.yml")
+          check_path = Path("system-check.html")
+          pdf_path = Path("deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf")
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return text.replace(old, new, 1)
+
+          def sha256(path):
+              digest = hashlib.sha256()
+              digest.update(path.read_bytes())
+              return digest.hexdigest()
+
+          completed_at = datetime.now(timezone.utc).isoformat()
+
+          reader = PdfReader(str(pdf_path))
+          if len(reader.pages) != 1:
+              raise SystemExit(f"Final operation sheet must remain exactly one page, found {len(reader.pages)}")
+
+          plan = plan_path.read_text(encoding="utf-8")
+          plan = replace_once(
+              plan,
+              '  current_step: "STEP KSH-NEXT-10A-R4"',
+              '  current_step: "COMPLETE"',
+              "plan current step",
+          )
+          plan = replace_once(
+              plan,
+              '    status: "operation_sheet_a4_one_page_completed_product_site_pending"',
+              '    status: "completed_after_publication_and_final_sync"',
+              "KSH-NEXT-10 completion status",
+          )
+
+          if "\ncompletion:\n" not in plan:
+              plan += (
+                  "\ncompletion:\n"
+                  '  status: "completed"\n'
+                  '  final_version: "KSH-NEXT-COMPLETE-20260723"\n'
+                  f"  completed_at_utc: {json.dumps(completed_at)}\n"
+                  '  product_site: "published_and_verified"\n'
+                  '  system_check: "18/18 OK"\n'
+                  '  operation_sheet: "DPRO standard A4 portrait one page"\n'
+                  '  qr_reading: "PASS from final rendered PDF"\n'
+                  '  worker_change_in_next_project: false\n'
+                  '  database_change_in_next_project: false\n'
+              )
+
+          plan_path.write_text(plan, encoding="utf-8")
+
+          result10a = result10a_path.read_text(encoding="utf-8")
+          result10a = result10a.replace(
+              '  product_site: "pending STEP KSH-NEXT-10B"',
+              '  product_site: "completed and publicly verified"',
+              1,
+          )
+          result10a = result10a.replace(
+              '  final_judgment: "pending product-site publication"',
+              '  final_judgment: "completed"',
+              1,
+          )
+          result10a = result10a.replace(
+              '  id: "KSH-NEXT-10B"\n  title: "DPRO製品サイト更新・最終完成判定"',
+              '  id: "COMPLETE"\n  title: "全STEP完了"',
+              1,
+          )
+          result10a_path.write_text(result10a, encoding="utf-8")
+
+          result10a_r4 = result10a_r4_path.read_text(encoding="utf-8")
+          result10a_r4 = result10a_r4.replace(
+              '  product_site: "pending STEP KSH-NEXT-10B"',
+              '  product_site: "completed and publicly verified"',
+              1,
+          )
+          result10a_r4 = result10a_r4.replace(
+              '  final_judgment: "pending product-site publication"',
+              '  final_judgment: "completed"',
+              1,
+          )
+          result10a_r4 = result10a_r4.replace(
+              '  id: "KSH-NEXT-10B"\n  title: "DPRO製品サイト更新・最終完成判定"',
+              '  id: "COMPLETE"\n  title: "全STEP完了"',
+              1,
+          )
+          result10a_r4_path.write_text(result10a_r4, encoding="utf-8")
+
+          check = check_path.read_text(encoding="utf-8")
+          completion_marker = '<!-- STEP KSH-NEXT COMPLETE / 20260723 -->'
+          if completion_marker not in check:
+              check = check.replace(
+                  "<body>",
+                  f"<body>\n  {completion_marker}",
+                  1,
+              )
+
+          old_badge = '<span class="badge">STEP KSH-NEXT-9 / INTERNAL AUDIT</span>'
+          new_badge = '<span class="badge">DPRO NEXT完成 / SYSTEM AUDIT 18/18 OK</span>'
+          if old_badge in check:
+              check = check.replace(old_badge, new_badge, 1)
+
+          check_path.write_text(check, encoding="utf-8")
+
+          final_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-FINAL-COMPLETION"',
+              '  step: "COMPLETE"',
+              '  title: "DPRO 車検・整備工場 LINE DPRO NEXT 最終完成判定"',
+              f"  completed_at_utc: {json.dumps(completed_at)}",
+              '  final_version: "KSH-NEXT-COMPLETE-20260723"',
+              "judgment:",
+              '  result: "completed"',
+              '  sales_ready: true',
+              '  public_demo_ready: true',
+              '  owner_operation_ready: true',
+              '  product_site_published: true',
+              '  operation_sheet_completed: true',
+              '  system_check_result: "18/18 OK"',
+              '  qr_reading_result: "PASS"',
+              "completed_steps:",
+          ]
+
+          for number in range(1, 11):
+              final_lines.extend([
+                  f'  - id: "KSH-NEXT-{number}"',
+                  '    status: "completed"',
+              ])
+
+          final_lines.extend([
+              "public_urls:",
+              '  product_page: "https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems/car-service.html"',
+              '  catalog: "https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems.html"',
+              '  customer: "https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10"',
+              '  dashboard: "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8"',
+              '  ipad: "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6"',
+              '  member: "https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7"',
+              '  system_check: "https://dpromstk2000-lab.github.io/line-shaken-liff/system-check.html?v=step-ksh-next-9"',
+              '  operation_sheet: "https://dpromstk2000-lab.github.io/line-shaken-liff/deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"',
+              "deliverables:",
+              '  operation_sheet_format: "A4 portrait exactly one page"',
+              f'  operation_sheet_sha256: {json.dumps(sha256(pdf_path))}',
+              f"  operation_sheet_bytes: {pdf_path.stat().st_size}",
+              "safety:",
+              "  worker_changed_in_final_sync: false",
+              "  database_changed_in_final_sync: false",
+              "  existing_api_changed_in_final_sync: false",
+              "  product_count_changed: false",
+              "  public_product_page_verified: true",
+              "  public_catalog_verified: true",
+              "  final_public_urls_verified: true",
+              "  backup_tag_created: true",
+              "maintenance:",
+              '  future_changes: "new STEP or maintenance release only"',
+              '  normal_operation: "ready"',
+          ])
+
+          final_path.write_text("\n".join(final_lines) + "\n", encoding="utf-8")
+          print("Final KSH-NEXT completion records generated")
+          PY
+
+      - name: Validate final DPRO NEXT completion
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f .dpro/ksh-next/ksh-next-final-completion.yml
+
+          grep -q 'current_step: "COMPLETE"' .dpro/ksh-next/plan.yml
+          grep -q 'completed_after_publication_and_final_sync' .dpro/ksh-next/plan.yml
+          grep -q 'status: "completed"' .dpro/ksh-next/plan.yml
+          grep -q 'final_version: "KSH-NEXT-COMPLETE-20260723"' .dpro/ksh-next/plan.yml
+          grep -q 'product_site: "published_and_verified"' .dpro/ksh-next/plan.yml
+
+          grep -q 'product_site: "completed and publicly verified"' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'final_judgment: "completed"' .dpro/ksh-next/ksh-next-10a-result.yml
+          grep -q 'product_site: "completed and publicly verified"' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+          grep -q 'final_judgment: "completed"' .dpro/ksh-next/ksh-next-10a-r4-result.yml
+
+          grep -q 'result: "completed"' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'sales_ready: true' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'product_site_published: true' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'operation_sheet_completed: true' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'system_check_result: "18/18 OK"' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'qr_reading_result: "PASS"' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'worker_changed_in_final_sync: false' .dpro/ksh-next/ksh-next-final-completion.yml
+          grep -q 'database_changed_in_final_sync: false' .dpro/ksh-next/ksh-next-final-completion.yml
+
+          grep -q 'STEP KSH-NEXT COMPLETE / 20260723' system-check.html
+          grep -q 'DPRO NEXT完成 / SYSTEM AUDIT 18/18 OK' system-check.html
+
+          python3 <<'PY'
+          from pathlib import Path
+          from pypdf import PdfReader
+          import re
+
+          plan = Path(".dpro/ksh-next/plan.yml").read_text(encoding="utf-8")
+          final = Path(".dpro/ksh-next/ksh-next-final-completion.yml").read_text(encoding="utf-8")
+          check = Path("system-check.html").read_text(encoding="utf-8")
+          pdf = Path("deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf")
+
+          if plan.count('status: "completed_after_workflow_success"') != 9:
+              raise SystemExit("KSH-NEXT-1 through 9 completion count is invalid")
+
+          if final.count('    status: "completed"') != 10:
+              raise SystemExit("Final completion manifest must list exactly 10 completed steps")
+
+          if len(PdfReader(str(pdf)).pages) != 1:
+              raise SystemExit("Operation sheet is no longer one page")
+
+          if check.count("STEP KSH-NEXT COMPLETE / 20260723") != 1:
+              raise SystemExit("system-check final completion marker count is invalid")
+
+          print("Final completion manifest, plan and one-page PDF validation OK")
+          PY
+
+          echo "KSH-NEXT final completion validation passed."
+
+      - name: Commit final completion
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f ".github/workflows/step-ksh-next-10b-final-completion-sync.yml"
+
+          git config user.name "DPRO KSH-NEXT FINAL COMPLETION"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No final completion changes to commit."
+            exit 1
+          fi
+
+          git commit -m "STEP KSH-NEXT-10B finalize DPRO NEXT completion"
+          git push origin HEAD:main
