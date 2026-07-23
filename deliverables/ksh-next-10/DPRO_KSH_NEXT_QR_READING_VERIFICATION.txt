@@ -1,0 +1,8 @@
+DPRO KSH NEXT QR READING VERIFICATION
+Result: PASS
+Source: rendered PDF page 1 at 200 dpi
+
+PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8
+PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10
+PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7
+PASS: https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6
