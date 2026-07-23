@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-5</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-8</title>
 
   <style>
     :root {
@@ -1961,6 +1961,306 @@
       font-size: 11px;
     }
 
+
+    /* STEP KSH-NEXT-8: MAINTENANCE FOLLOWUP */
+    .next-followup-board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .next-followup-summary {
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--blue);
+      border-radius: 16px;
+      padding: 14px;
+      background: #ffffff;
+      box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .next-followup-summary.overdue { border-left-color: var(--red); }
+    .next-followup-summary.today { border-left-color: var(--orange); }
+    .next-followup-summary.week { border-left-color: var(--amber); }
+    .next-followup-summary.month { border-left-color: var(--blue); }
+
+    .next-followup-summary span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .next-followup-summary strong {
+      display: block;
+      margin-top: 5px;
+      color: #0f172a;
+      font-size: 27px;
+      line-height: 1;
+    }
+
+    .next-followup-summary small {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .next-followup-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 14px 0;
+      padding: 12px;
+      border: 1px solid #dbeafe;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+    }
+
+    .next-followup-timing {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .next-followup-timing button {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      border-radius: 999px;
+      padding: 8px 11px;
+      font-size: 11px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .next-followup-timing button.active {
+      border-color: #1e3a8a;
+      background: #1e3a8a;
+      color: #ffffff;
+    }
+
+    .next-followup-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .next-followup-card {
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--blue);
+      border-radius: 17px;
+      background: #ffffff;
+      padding: 15px;
+      box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+    }
+
+    .next-followup-card.overdue { border-left-color: var(--red); }
+    .next-followup-card.today { border-left-color: var(--orange); }
+    .next-followup-card.week { border-left-color: var(--amber); }
+    .next-followup-card.month { border-left-color: var(--blue); }
+    .next-followup-card.later { border-left-color: var(--slate); }
+    .next-followup-card.handled { opacity: 0.68; }
+
+    .next-followup-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .next-followup-name {
+      font-size: 16px;
+      font-weight: 950;
+      color: #0f172a;
+    }
+
+    .next-followup-vehicle {
+      margin-top: 4px;
+      color: #475569;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .next-followup-date {
+      text-align: right;
+    }
+
+    .next-followup-date strong {
+      display: block;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .next-followup-date span {
+      display: inline-flex;
+      margin-top: 5px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 950;
+      background: #eff6ff;
+      color: #1e40af;
+    }
+
+    .next-followup-date span.overdue {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .next-followup-date span.today {
+      background: #ffedd5;
+      color: #c2410c;
+    }
+
+    .next-followup-reason {
+      margin-top: 11px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+      gap: 10px;
+    }
+
+    .next-followup-reason-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px 11px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .next-followup-reason-box strong {
+      display: block;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .next-followup-primary-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 11px;
+    }
+
+    .next-followup-details {
+      margin-top: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 13px;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    .next-followup-details > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .next-followup-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .next-followup-details > summary::after {
+      content: "＋";
+      color: #1e3a8a;
+      font-size: 17px;
+    }
+
+    .next-followup-details[open] > summary::after {
+      content: "－";
+    }
+
+    .next-followup-details-body {
+      padding: 0 11px 11px;
+    }
+
+    .next-followup-message {
+      width: 100%;
+      min-height: 116px;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.65;
+      resize: vertical;
+    }
+
+    .next-followup-record-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 9px;
+      padding-top: 9px;
+      border-top: 1px dashed #cbd5e1;
+    }
+
+    .next-followup-empty {
+      padding: 24px 15px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 15px;
+      background: #f8fafc;
+      color: #64748b;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .next-followup-visible-count {
+      color: #1e3a8a;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .next-followup-legacy-table {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .next-followup-board {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .next-followup-head,
+      .next-followup-reason {
+        grid-template-columns: 1fr;
+      }
+
+      .next-followup-date {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .next-followup-board {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .next-followup-toolbar {
+        align-items: stretch;
+      }
+
+      .next-followup-toolbar select {
+        width: 100%;
+      }
+
+      .next-followup-primary-actions .btn {
+        flex: 1 1 calc(50% - 8px);
+      }
+    }
+
   </style>
 </head>
 
@@ -1976,7 +2276,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-5</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-8</p>
           </div>
         </div>
       </div>
@@ -2832,7 +3132,53 @@
               <button id="ff-line_unlinked" class="followup-filter-btn" onclick="setFollowupFilter('line_unlinked')">LINE未連携</button>
             </div>
 
-            <div class="table-wrap">
+            <div class="next-followup-board" aria-label="次回フォロー件数">
+              <button class="next-followup-summary overdue" type="button" onclick="setNextFollowupTiming('overdue')">
+                <span>期限超過</span>
+                <strong id="nextFollowupOverdueCount">-</strong>
+                <small>目安日を過ぎています</small>
+              </button>
+              <button class="next-followup-summary today" type="button" onclick="setNextFollowupTiming('today')">
+                <span>本日</span>
+                <strong id="nextFollowupTodayCount">-</strong>
+                <small>今日連絡する候補</small>
+              </button>
+              <button class="next-followup-summary week" type="button" onclick="setNextFollowupTiming('week')">
+                <span>7日以内</span>
+                <strong id="nextFollowupWeekCount">-</strong>
+                <small>今週のフォロー候補</small>
+              </button>
+              <button class="next-followup-summary month" type="button" onclick="setNextFollowupTiming('month')">
+                <span>30日以内</span>
+                <strong id="nextFollowupMonthCount">-</strong>
+                <small>早めに案内する候補</small>
+              </button>
+            </div>
+
+            <div class="next-followup-toolbar">
+              <div class="next-followup-timing" aria-label="時期で絞り込み">
+                <button id="nft-urgent" class="active" type="button" onclick="setNextFollowupTiming('urgent')">今すぐ・7日以内</button>
+                <button id="nft-overdue" type="button" onclick="setNextFollowupTiming('overdue')">期限超過</button>
+                <button id="nft-today" type="button" onclick="setNextFollowupTiming('today')">本日</button>
+                <button id="nft-week" type="button" onclick="setNextFollowupTiming('week')">7日以内</button>
+                <button id="nft-month" type="button" onclick="setNextFollowupTiming('month')">30日以内</button>
+                <button id="nft-no_date" type="button" onclick="setNextFollowupTiming('no_date')">日付未設定</button>
+                <button id="nft-all" type="button" onclick="setNextFollowupTiming('all')">すべて</button>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <span id="nextFollowupVisibleCount" class="next-followup-visible-count">-</span>
+                <select id="nextFollowupSort" onchange="setNextFollowupSort(this.value)" aria-label="フォロー候補の並び順">
+                  <option value="due" selected>目安日が近い順</option>
+                  <option value="priority">優先度順</option>
+                  <option value="type">種別順</option>
+                  <option value="name">お名前順</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="nextFollowupCockpit" class="next-followup-list"></div>
+
+            <div class="table-wrap next-followup-legacy-table">
               <table>
                 <thead>
                   <tr>
@@ -3349,7 +3695,7 @@
     function applyShopSettingsToDashboard() {
       const shopName = getShopName();
       const serviceName = getServiceName();
-      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-PHONE-2`;
+      document.title = `${shopName}｜オーナーダッシュボード STEP KSH-NEXT-8`;
       setText("dashboardLogoText", getShopInitials(shopName));
       setText("dashboardShopName", shopName);
       setText("dashboardServiceName", serviceName);
@@ -8933,5 +9279,6 @@ ${shopName}です。
     }
   </script>
   <script src="ksh-next-5-owner-estimate.js?v=20260723"></script>
+  <script src="ksh-next-8-followup-cockpit.js?v=20260723"></script>
 </body>
 </html>

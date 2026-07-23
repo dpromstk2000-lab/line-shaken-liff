@@ -1,0 +1,38 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-8-RESULT"
+  step: "STEP KSH-NEXT-8"
+  title: "次回整備・車検フォロー"
+  generated_at_utc: "2026-07-23T01:50:36.105625+00:00"
+targets:
+  - "dashboard.html"
+  - "ksh-next-8-followup-cockpit.js"
+hashes:
+  dashboard_before: "d1b811841219997aab15358728e2ac328c264546ff6d8759af18ae3521386fc7"
+  dashboard_after: "51559b5783544b9c4060e52bfb99036a0d53b1a688ec894b658ca4751c5b6fd1"
+changes:
+  - "期限超過・本日・7日以内・30日以内の件数を表示"
+  - "時期・種別・並び順でフォロー候補を絞り込み"
+  - "車検・オイル交換・次回提案・見積再連絡・LINE未連携を同一画面で管理"
+  - "候補をカード型へ変更し主要操作を3個へ整理"
+  - "LINE文面を個別に確認・編集できる"
+  - "送信済み・電話済み・見送り・3日後・7日後・30日後を記録"
+  - "入庫予定がある候補へ重複案内注意を表示"
+  - "LINE未連携は電話番号コピーを主要操作へ表示"
+  - "既存followup-candidatesとfollowup-actionsを継続利用"
+operation_policy:
+  default_filter: "今すぐ・7日以内"
+  primary_actions_max: 3
+  bulk_line_send: false
+  individual_message_review_required: true
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  automatic_line_send_added: false
+  existing_followup_action_history_preserved: true
+  future_reservation_warning_added: true
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-9"
+  title: "性能・セキュリティ・system-check"
