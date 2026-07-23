@@ -1,0 +1,62 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-FINAL-COMPLETION"
+  step: "COMPLETE"
+  title: "DPRO 車検・整備工場 LINE DPRO NEXT 最終完成判定"
+  completed_at_utc: "2026-07-23T05:45:08.347939+00:00"
+  final_version: "KSH-NEXT-COMPLETE-20260723"
+judgment:
+  result: "completed"
+  sales_ready: true
+  public_demo_ready: true
+  owner_operation_ready: true
+  product_site_published: true
+  operation_sheet_completed: true
+  system_check_result: "18/18 OK"
+  qr_reading_result: "PASS"
+completed_steps:
+  - id: "KSH-NEXT-1"
+    status: "completed"
+  - id: "KSH-NEXT-2"
+    status: "completed"
+  - id: "KSH-NEXT-3"
+    status: "completed"
+  - id: "KSH-NEXT-4"
+    status: "completed"
+  - id: "KSH-NEXT-5"
+    status: "completed"
+  - id: "KSH-NEXT-6"
+    status: "completed"
+  - id: "KSH-NEXT-7"
+    status: "completed"
+  - id: "KSH-NEXT-8"
+    status: "completed"
+  - id: "KSH-NEXT-9"
+    status: "completed"
+  - id: "KSH-NEXT-10"
+    status: "completed"
+public_urls:
+  product_page: "https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems/car-service.html"
+  catalog: "https://dpromstk2000-lab.github.io/dpro-line-systems-site/systems.html"
+  customer: "https://dpromstk2000-lab.github.io/line-shaken-liff/index.html?v=step-ksh-next-10"
+  dashboard: "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&v=step-ksh-next-8"
+  ipad: "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&v=step-ksh-next-6"
+  member: "https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1&v=step-ksh-next-7"
+  system_check: "https://dpromstk2000-lab.github.io/line-shaken-liff/system-check.html?v=step-ksh-next-9"
+  operation_sheet: "https://dpromstk2000-lab.github.io/line-shaken-liff/deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
+deliverables:
+  operation_sheet_format: "A4 portrait exactly one page"
+  operation_sheet_sha256: "05cecdc0b621701c36cc16f0577581a35a0cbd647009a09209017a893c74071f"
+  operation_sheet_bytes: 681589
+safety:
+  worker_changed_in_final_sync: false
+  database_changed_in_final_sync: false
+  existing_api_changed_in_final_sync: false
+  product_count_changed: false
+  public_product_page_verified: true
+  public_catalog_verified: true
+  final_public_urls_verified: true
+  backup_tag_created: true
+maintenance:
+  future_changes: "new STEP or maintenance release only"
+  normal_operation: "ready"

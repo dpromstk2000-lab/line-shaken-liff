@@ -9,8 +9,8 @@ completion_state:
   system_check: "18/18 OK"
   operation_sheet: "completed - A4 portrait exactly 1 page"
   qr_reading: "PASS from final rendered PDF"
-  product_site: "pending STEP KSH-NEXT-10B"
-  final_judgment: "pending product-site publication"
+  product_site: "completed and publicly verified"
+  final_judgment: "completed"
 safety:
   database_changed: false
   worker_changed: false
@@ -21,5 +21,5 @@ safety:
   dpro_standard_a4_one_page: true
   internal_sales_sheet_included: false
 next_action:
-  id: "KSH-NEXT-10B"
-  title: "DPRO製品サイト更新・最終完成判定"
+  id: "COMPLETE"
+  title: "全STEP完了"

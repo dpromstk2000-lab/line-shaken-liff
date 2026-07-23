@@ -2,7 +2,7 @@ schema_version: "1.0"
 document:
   id: "DPRO-KSH-NEXT-PLAN"
   title: "DPRO 車検・整備工場 LINE DPRO NEXT実装計画"
-  current_step: "STEP KSH-NEXT-10A-R4"
+  current_step: "COMPLETE"
 principles:
   - "既存機能を壊さず追加型で進める"
   - "オーナーの毎日の主要操作は3操作以内"
@@ -40,4 +40,15 @@ steps:
     status: "completed_after_workflow_success"
   - id: "KSH-NEXT-10"
     title: "製品サイト・操作体験シート・完成判定"
-    status: "operation_sheet_a4_one_page_completed_product_site_pending"
+    status: "completed_after_publication_and_final_sync"
+
+completion:
+  status: "completed"
+  final_version: "KSH-NEXT-COMPLETE-20260723"
+  completed_at_utc: "2026-07-23T05:45:08.347939+00:00"
+  product_site: "published_and_verified"
+  system_check: "18/18 OK"
+  operation_sheet: "DPRO standard A4 portrait one page"
+  qr_reading: "PASS from final rendered PDF"
+  worker_change_in_next_project: false
+  database_change_in_next_project: false

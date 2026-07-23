@@ -14,8 +14,8 @@ completion_state:
   system_check: "18/18 OK"
   operation_sheet: "completed - DPRO standard A4 one page"
   qr_reading: "PASS from final rendered one-page PDF"
-  product_site: "pending STEP KSH-NEXT-10B"
-  final_judgment: "pending product-site publication"
+  product_site: "completed and publicly verified"
+  final_judgment: "completed"
 deliverables:
   - path: "deliverables/ksh-next-10/DPRO_KSH_NEXT_operation_experience_sheet_20260723.pdf"
     bytes: 681589
@@ -57,5 +57,5 @@ safety:
   qr_decoded_from_final_pdf_render: true
   backup_tag_created: true
 next_action:
-  id: "KSH-NEXT-10B"
-  title: "DPRO製品サイト更新・最終完成判定"
+  id: "COMPLETE"
+  title: "全STEP完了"
