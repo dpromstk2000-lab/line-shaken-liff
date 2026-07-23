@@ -1,0 +1,778 @@
+name: STEP KSH-NEXT-3 Reception Unify
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/step-ksh-next-3-reception-unify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: step-ksh-next-3-reception-unify
+  cancel-in-progress: false
+
+jobs:
+  reception-unify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Save pre-change commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Verify KSH-NEXT-2 completion
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f dashboard.html
+          test -f .dpro/ksh-next/baseline.yml
+          test -f .dpro/ksh-next/plan.yml
+          test -f .dpro/ksh-next/ksh-next-2-result.yml
+
+          grep -q 'STEP KSH-NEXT-2: OWNER TODAY UI' dashboard.html
+          grep -q 'openNextQuickReservation' dashboard.html
+          grep -q 'id="reservationListFilter"' dashboard.html
+          grep -q 'id="reservationFormBox"' dashboard.html
+          grep -q 'function renderReservations(rows)' dashboard.html
+          grep -q 'function buildReservationPayloadFromForm()' dashboard.html
+          grep -q 'function openReservationFromInquiry(inquiryId)' dashboard.html
+          grep -q 'current_step: "STEP KSH-NEXT-2"' .dpro/ksh-next/plan.yml
+          grep -q 'id: "KSH-NEXT-3"' .dpro/ksh-next/plan.yml
+          grep -q 'status: "next"' .dpro/ksh-next/plan.yml
+
+          if grep -q 'STEP KSH-NEXT-3: RECEPTION UNIFY' dashboard.html; then
+            echo "STEP KSH-NEXT-3 is already applied."
+            exit 1
+          fi
+
+      - name: Create safety tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKUP_TAG="ksh-next-3-before-${{ github.run_id }}"
+          git tag "$BACKUP_TAG" "$BEFORE_SHA"
+          git push origin "$BACKUP_TAG"
+          echo "BACKUP_TAG=$BACKUP_TAG" >> "$GITHUB_ENV"
+
+      - name: Apply reception unification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import re
+
+          dashboard_path = Path("dashboard.html")
+          plan_path = Path(".dpro/ksh-next/plan.yml")
+          result_path = Path(".dpro/ksh-next/ksh-next-3-result.yml")
+
+          original = dashboard_path.read_text(encoding="utf-8")
+          text = original
+
+          def replace_once(source, old, new, label):
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return source.replace(old, new, 1)
+
+          def replace_regex_once(source, pattern, replacement, label, flags=0):
+              updated, count = re.subn(pattern, replacement, source, count=1, flags=flags)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {count}")
+              return updated
+
+          def quote(value):
+              return json.dumps(str(value), ensure_ascii=False)
+
+          def sha256_text(value):
+              return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+          text = replace_once(
+              text,
+              "<title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-2</title>",
+              "<title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-3</title>",
+              "title step",
+          )
+
+          text = replace_once(
+              text,
+              '<p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-2</p>',
+              '<p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-3</p>',
+              "brand step",
+          )
+
+          css = r'''
+              /* STEP KSH-NEXT-3: RECEPTION UNIFY */
+              .reception-channel-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 72px;
+                min-height: 28px;
+                padding: 5px 9px;
+                border-radius: 999px;
+                border: 1px solid #cbd5e1;
+                background: #f8fafc;
+                color: #334155;
+                font-size: 11px;
+                font-weight: 900;
+                white-space: nowrap;
+              }
+
+              .reception-channel-badge.line {
+                border-color: #86efac;
+                background: #f0fdf4;
+                color: #166534;
+              }
+
+              .reception-channel-badge.phone {
+                border-color: #93c5fd;
+                background: #eff6ff;
+                color: #1e40af;
+              }
+
+              .reception-channel-badge.counter {
+                border-color: #fdba74;
+                background: #fff7ed;
+                color: #9a3412;
+              }
+
+              .reception-channel-badge.owner {
+                border-color: #c4b5fd;
+                background: #f5f3ff;
+                color: #5b21b6;
+              }
+
+              .reception-channel-badge.unknown {
+                border-color: #cbd5e1;
+                background: #f8fafc;
+                color: #64748b;
+              }
+
+              .reception-channel-note {
+                grid-column: 1 / -1;
+                border: 1px solid #dbeafe;
+                background: #eff6ff;
+                color: #1e3a8a;
+                border-radius: 13px;
+                padding: 10px 12px;
+                font-size: 12px;
+                line-height: 1.6;
+                font-weight: 700;
+              }
+
+              .reception-toolbar-group {
+                display: inline-flex;
+                flex-wrap: wrap;
+                gap: 7px;
+              }
+
+              @media (max-width: 720px) {
+                .reception-toolbar-group {
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  width: 100%;
+                }
+
+                .reception-toolbar-group .btn {
+                  width: 100%;
+                }
+              }
+          '''
+          text = replace_once(text, "  </style>", css + "\n  </style>", "CSS insert")
+
+          old_toolbar = '''                <option value="all">すべて表示</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadReservations()">表示</button>
+                        <button class="btn btn-green" onclick="openNewReservationForm()">＋ 入庫予定を追加</button>'''
+          new_toolbar = '''                <option value="all">すべて表示</option>
+                        </select>
+                        <select id="reservationChannelFilter" onchange="renderReservations(reservationsCache)" aria-label="受付経路で絞り込み">
+                          <option value="all" selected>全受付経路</option>
+                          <option value="LINE">LINE</option>
+                          <option value="電話">電話</option>
+                          <option value="店頭">店頭</option>
+                          <option value="管理者代理">管理者代理</option>
+                          <option value="未記録">未記録</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadReservations()">表示</button>
+                        <span class="reception-toolbar-group">
+                          <button class="btn btn-primary" onclick="openNewReservationFormWithChannel('電話')">＋ 電話受付</button>
+                          <button class="btn btn-orange" onclick="openNewReservationFormWithChannel('店頭')">＋ 店頭受付</button>
+                          <button class="btn btn-green" onclick="openNewReservationFormWithChannel('管理者代理')">＋ 代理登録</button>
+                        </span>'''
+          text = replace_once(text, old_toolbar, new_toolbar, "reservation toolbar")
+
+          form_anchor = '''            <div class="add-grid">
+                        <div class="form-field form-wide">
+                          <label>車両</label>'''
+          form_replacement = '''            <div class="add-grid">
+                        <div class="reception-channel-note">
+                          LINE・電話・店頭・管理者代理の受付を同じ入庫予定として管理します。受付経路は一覧表示用の管理情報で、お客様向けメモには表示しません。
+                        </div>
+
+                        <div class="form-field">
+                          <label>受付経路 必須</label>
+                          <select id="reservationReceptionChannel">
+                            <option value="LINE">LINE</option>
+                            <option value="電話">電話</option>
+                            <option value="店頭">店頭</option>
+                            <option value="管理者代理" selected>管理者代理</option>
+                          </select>
+                        </div>
+
+                        <div class="form-field form-wide">
+                          <label>車両</label>'''
+          text = replace_once(text, form_anchor, form_replacement, "reception channel form")
+
+          text = replace_once(
+              text,
+              '''                    <th>作業内容</th>
+                              <th>状態</th>''',
+              '''                    <th>作業内容</th>
+                              <th>受付経路</th>
+                              <th>状態</th>''',
+              "reservation table header",
+          )
+
+          text = replace_once(
+              text,
+              '<tr><td colspan="9" class="muted">この条件の入庫予定はありません。</td></tr>',
+              '<tr><td colspan="10" class="muted">この条件の入庫予定はありません。</td></tr>',
+              "empty reservation colspan",
+          )
+
+          old_render_filter = '''      const allRows = Array.isArray(rows) ? rows : [];
+                const filter = document.getElementById("reservationListFilter")?.value || "active";
+                const visibleRows = allRows.filter(row => reservationMatchesListFilter(row, filter));
+                updateReservationFilterSummary(allRows, visibleRows, filter);'''
+          new_render_filter = '''      const allRows = Array.isArray(rows) ? rows : [];
+                const filter = document.getElementById("reservationListFilter")?.value || "active";
+                const channelFilter = document.getElementById("reservationChannelFilter")?.value || "all";
+                const visibleRows = allRows.filter(row =>
+                  reservationMatchesListFilter(row, filter) &&
+                  reservationMatchesChannelFilter(row, channelFilter)
+                );
+                updateReservationFilterSummary(allRows, visibleRows, filter, channelFilter);'''
+          text = replace_once(text, old_render_filter, new_render_filter, "reservation combined filter")
+
+          old_row = '''          <td>${escapeHtml(row.work_type || "")}</td>
+                    <td>${badgeStatus(row.status)}</td>
+                    <td>${renderReservationAmount(row)}</td>
+                    <td>${escapeHtml(row.memo || "")}</td>'''
+          new_row = '''          <td>${escapeHtml(row.work_type || "")}</td>
+                    <td>${badgeReceptionChannel(row)}</td>
+                    <td>${badgeStatus(row.status)}</td>
+                    <td>${renderReservationAmount(row)}</td>
+                    <td>${escapeHtml(stripReceptionChannelMarker(row.memo || ""))}</td>'''
+          text = replace_once(text, old_row, new_row, "reservation row reception display")
+
+          helper_anchor = "    function renderReservations(rows) {"
+          helpers = r'''    const RECEPTION_CHANNELS = ["LINE", "電話", "店頭", "管理者代理"];
+              const RECEPTION_CHANNEL_MARKER_PATTERN = /^【受付経路：(LINE|電話|店頭|管理者代理)】\s*/;
+
+              function normalizeReceptionChannel(value, fallback = "管理者代理") {
+                const normalized = String(value || "").trim();
+                return RECEPTION_CHANNELS.includes(normalized) ? normalized : fallback;
+              }
+
+              function extractReceptionChannelFromMemo(memo) {
+                const match = String(memo || "").match(RECEPTION_CHANNEL_MARKER_PATTERN);
+                return match ? match[1] : "";
+              }
+
+              function stripReceptionChannelMarker(memo) {
+                return String(memo || "").replace(RECEPTION_CHANNEL_MARKER_PATTERN, "").trim();
+              }
+
+              function applyReceptionChannelMarker(memo, channel) {
+                const normalized = normalizeReceptionChannel(channel);
+                const plainMemo = stripReceptionChannelMarker(memo);
+                return `【受付経路：${normalized}】${plainMemo ? `\n${plainMemo}` : ""}`;
+              }
+
+              function inferReservationReceptionChannel(row) {
+                const explicit = extractReceptionChannelFromMemo(row?.memo || "");
+                if (explicit) return explicit;
+                if (row?.inquiry_id) return "LINE";
+                return "未記録";
+              }
+
+              function receptionChannelClass(channel) {
+                return {
+                  LINE: "line",
+                  電話: "phone",
+                  店頭: "counter",
+                  管理者代理: "owner",
+                  未記録: "unknown"
+                }[channel] || "unknown";
+              }
+
+              function badgeReceptionChannel(row) {
+                const channel = inferReservationReceptionChannel(row);
+                return `<span class="reception-channel-badge ${receptionChannelClass(channel)}">${escapeHtml(channel)}</span>`;
+              }
+
+              function reservationMatchesChannelFilter(row, filter) {
+                if (!filter || filter === "all") return true;
+                return inferReservationReceptionChannel(row) === filter;
+              }
+
+              function setReservationReceptionChannel(channel) {
+                const select = document.getElementById("reservationReceptionChannel");
+                if (!select) return;
+                select.value = normalizeReceptionChannel(channel);
+              }
+
+              async function openNewReservationFormWithChannel(channel) {
+                await openNewReservationForm();
+                setReservationReceptionChannel(channel);
+                const label = normalizeReceptionChannel(channel);
+                document.getElementById("reservationFormTitle").textContent = `${label}受付から入庫予定を追加`;
+                document.getElementById("reservationFormHelp").textContent = `${label}で受け付けた内容を、既存顧客・車両と関連づけて登録します。`;
+              }
+
+          '''
+          text = replace_once(text, helper_anchor, helpers + helper_anchor, "reception helpers")
+
+          old_summary = '''    function updateReservationFilterSummary(allRows, visibleRows, filter) {
+                const el = document.getElementById("reservationFilterSummary");
+                if (!el) return;
+
+                const total = allRows.length;
+                const visible = visibleRows.length;
+                const hidden = Math.max(0, total - visible);
+                const active = allRows.filter(row => reservationMatchesListFilter(row, "active")).length;
+                const today = allRows.filter(row => reservationMatchesListFilter(row, "today")).length;
+                const next7 = allRows.filter(row => reservationMatchesListFilter(row, "next7")).length;
+                const provisional = allRows.filter(row => reservationMatchesListFilter(row, "provisional")).length;
+                const completed = allRows.filter(row => reservationMatchesListFilter(row, "completed")).length;
+                const hiddenClosed = allRows.filter(row => reservationMatchesListFilter(row, "hidden")).length;
+
+                const filterName = {
+                  active: "対応中のみ",
+                  today: "本日",
+                  next7: "今後7日",
+                  provisional: "仮入庫のみ",
+                  confirmed: "入庫予定・作業中",
+                  completed: "作業完了",
+                  hidden: "キャンセル・削除済み",
+                  all: "すべて表示"
+                }[filter] || "対応中のみ";
+
+                el.textContent = `${filterName}：${visible}件 / 取得範囲：${total}件 / 非表示：${hidden}件　｜　本日 ${today}件・今後7日 ${next7}件・仮入庫 ${provisional}件・対応中 ${active}件・作業完了 ${completed}件・キャンセル/削除 ${hiddenClosed}件`;
+              }'''
+          new_summary = '''    function updateReservationFilterSummary(allRows, visibleRows, filter, channelFilter = "all") {
+                const el = document.getElementById("reservationFilterSummary");
+                if (!el) return;
+
+                const total = allRows.length;
+                const visible = visibleRows.length;
+                const hidden = Math.max(0, total - visible);
+                const active = allRows.filter(row => reservationMatchesListFilter(row, "active")).length;
+                const today = allRows.filter(row => reservationMatchesListFilter(row, "today")).length;
+                const next7 = allRows.filter(row => reservationMatchesListFilter(row, "next7")).length;
+                const provisional = allRows.filter(row => reservationMatchesListFilter(row, "provisional")).length;
+                const completed = allRows.filter(row => reservationMatchesListFilter(row, "completed")).length;
+                const hiddenClosed = allRows.filter(row => reservationMatchesListFilter(row, "hidden")).length;
+
+                const channelCounts = {
+                  LINE: allRows.filter(row => inferReservationReceptionChannel(row) === "LINE").length,
+                  電話: allRows.filter(row => inferReservationReceptionChannel(row) === "電話").length,
+                  店頭: allRows.filter(row => inferReservationReceptionChannel(row) === "店頭").length,
+                  管理者代理: allRows.filter(row => inferReservationReceptionChannel(row) === "管理者代理").length,
+                  未記録: allRows.filter(row => inferReservationReceptionChannel(row) === "未記録").length
+                };
+
+                const filterName = {
+                  active: "対応中のみ",
+                  today: "本日",
+                  next7: "今後7日",
+                  provisional: "仮入庫のみ",
+                  confirmed: "入庫予定・作業中",
+                  completed: "作業完了",
+                  hidden: "キャンセル・削除済み",
+                  all: "すべて表示"
+                }[filter] || "対応中のみ";
+
+                const channelName = channelFilter === "all" ? "全受付経路" : channelFilter;
+                el.textContent = `${filterName}・${channelName}：${visible}件 / 取得範囲：${total}件 / 非表示：${hidden}件　｜　LINE ${channelCounts.LINE}件・電話 ${channelCounts.電話}件・店頭 ${channelCounts.店頭}件・代理 ${channelCounts.管理者代理}件・未記録 ${channelCounts.未記録}件　｜　本日 ${today}件・今後7日 ${next7}件・仮入庫 ${provisional}件・対応中 ${active}件・作業完了 ${completed}件・キャンセル/削除 ${hiddenClosed}件`;
+              }'''
+          text = replace_once(text, old_summary, new_summary, "reservation summary")
+
+          old_new_form = '''      editingReservationId = "";
+                selectedReservationCustomerId = "";
+                clearReservationForm(false);
+
+                document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";'''
+          new_new_form = '''      editingReservationId = "";
+                selectedReservationCustomerId = "";
+                clearReservationForm(false);
+                setReservationReceptionChannel("管理者代理");
+
+                document.getElementById("reservationFormTitle").textContent = "入庫予定を追加";'''
+          text = replace_once(text, old_new_form, new_new_form, "new form default channel")
+
+          old_inquiry_form = '''        editingReservationId = "";
+                  selectedReservationCustomerId = "";
+                  clearReservationForm(false);
+
+                  document.getElementById("reservationFormTitle").textContent = "相談から入庫予定を作成";'''
+          new_inquiry_form = '''        editingReservationId = "";
+                  selectedReservationCustomerId = "";
+                  clearReservationForm(false);
+                  setReservationReceptionChannel("LINE");
+
+                  document.getElementById("reservationFormTitle").textContent = "LINE相談から入庫予定を作成";'''
+          text = replace_once(text, old_inquiry_form, new_inquiry_form, "inquiry channel")
+
+          old_edit_values = '''      document.getElementById("reservationWorkType").value = normalizeWorkType(reservation.work_type || "その他");
+                document.getElementById("reservationStatus").value = normalizeReservationStatus(reservation.status || "入庫予定");
+                document.getElementById("reservationEstimatedAmount").value = reservation.estimated_amount || "";
+                document.getElementById("reservationMemo").value = reservation.memo || "";'''
+          new_edit_values = '''      document.getElementById("reservationWorkType").value = normalizeWorkType(reservation.work_type || "その他");
+                document.getElementById("reservationStatus").value = normalizeReservationStatus(reservation.status || "入庫予定");
+                document.getElementById("reservationEstimatedAmount").value = reservation.estimated_amount || "";
+                setReservationReceptionChannel(
+                  inferReservationReceptionChannel(reservation) === "未記録"
+                    ? "管理者代理"
+                    : inferReservationReceptionChannel(reservation)
+                );
+                document.getElementById("reservationMemo").value = stripReceptionChannelMarker(reservation.memo || "");'''
+          text = replace_once(text, old_edit_values, new_edit_values, "edit channel values")
+
+          old_clear_defaults = '''      document.getElementById("reservationWorkType").value = "車検";
+                document.getElementById("reservationStatus").value = "入庫予定";
+                document.getElementById("reservationFormBox").dataset.inquiryId = "";'''
+          new_clear_defaults = '''      document.getElementById("reservationWorkType").value = "車検";
+                document.getElementById("reservationStatus").value = "入庫予定";
+                setReservationReceptionChannel("管理者代理");
+                document.getElementById("reservationFormBox").dataset.inquiryId = "";'''
+          text = replace_once(text, old_clear_defaults, new_clear_defaults, "clear channel default")
+
+          old_payload_head = '''      const workType = document.getElementById("reservationWorkType").value;
+                const status = document.getElementById("reservationStatus").value;
+                const estimatedAmount = document.getElementById("reservationEstimatedAmount").value;
+                const memo = document.getElementById("reservationMemo").value.trim();'''
+          new_payload_head = '''      const workType = document.getElementById("reservationWorkType").value;
+                const status = document.getElementById("reservationStatus").value;
+                const receptionChannel = normalizeReceptionChannel(
+                  document.getElementById("reservationReceptionChannel")?.value
+                );
+                const estimatedAmount = document.getElementById("reservationEstimatedAmount").value;
+                const memo = document.getElementById("reservationMemo").value.trim();'''
+          text = replace_once(text, old_payload_head, new_payload_head, "payload reception channel")
+
+          text = replace_once(
+              text,
+              '''        estimatedAmount: estimatedAmount === "" ? null : Number(estimatedAmount),
+                  memo,''',
+              '''        estimatedAmount: estimatedAmount === "" ? null : Number(estimatedAmount),
+                  memo: applyReceptionChannelMarker(memo, receptionChannel),''',
+              "payload memo marker",
+          )
+
+          text = replace_once(
+              text,
+              '''          <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
+                    <dt>状態</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>''',
+              '''          <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
+                    <dt>受付経路</dt><dd>${escapeHtml(extractReceptionChannelFromMemo(payload.memo) || (payload.inquiryId ? "LINE" : "管理者代理"))}</dd>
+                    <dt>状態</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>''',
+              "confirm reception channel",
+          )
+
+          text = replace_once(
+              text,
+              '<dt>メモ</dt><dd>${escapeHtml(payload.memo || "未入力")}</dd>',
+              '<dt>メモ</dt><dd>${escapeHtml(stripReceptionChannelMarker(payload.memo) || "未入力")}</dd>',
+              "confirm plain memo",
+          )
+
+          old_quick = r'''    function openNextQuickReservation() {
+                switchTab("reservations");
+                window.setTimeout(() => {
+                  Promise.resolve(openNewReservationForm()).catch(error => {
+                    showError(error && error.message ? error.message : "受付画面を開けませんでした。");
+                  });
+                }, 420);
+              }'''
+          new_quick = r'''    function openNextQuickReservation() {
+                switchTab("reservations");
+                window.setTimeout(() => {
+                  Promise.resolve(openNewReservationFormWithChannel("電話")).catch(error => {
+                    showError(error && error.message ? error.message : "受付画面を開けませんでした。");
+                  });
+                }, 420);
+              }'''
+          text = replace_once(text, old_quick, new_quick, "top quick reception")
+
+          text = replace_once(
+              text,
+              '''              ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""} / ${escapeHtml(row.work_type || "入庫予定")}
+                      </div>''',
+              '''              ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""} / ${escapeHtml(row.work_type || "入庫予定")}
+                        <span style="margin-left:6px">${badgeReceptionChannel(row)}</span>
+                      </div>''',
+              "today reception badge",
+          )
+
+          before_bytes = len(original.encode("utf-8"))
+          after_bytes = len(text.encode("utf-8"))
+          added_bytes = after_bytes - before_bytes
+
+          if added_bytes <= 0 or added_bytes > 40000:
+              raise SystemExit(f"unexpected dashboard size change: {added_bytes} bytes")
+
+          dashboard_path.write_text(text, encoding="utf-8")
+
+          plan = plan_path.read_text(encoding="utf-8")
+          plan = replace_once(
+              plan,
+              '  current_step: "STEP KSH-NEXT-2"',
+              '  current_step: "STEP KSH-NEXT-3"',
+              "plan current step",
+          )
+          plan = replace_once(
+              plan,
+              '''  - id: "KSH-NEXT-3"
+              title: "受付・予約・入庫データ統合"
+              status: "next"''',
+              '''  - id: "KSH-NEXT-3"
+              title: "受付・予約・入庫データ統合"
+              status: "completed_after_workflow_success"''',
+              "plan step 3",
+          )
+          plan = replace_once(
+              plan,
+              '''  - id: "KSH-NEXT-4"
+              title: "整備案件・進捗タイムライン"
+              status: "pending"''',
+              '''  - id: "KSH-NEXT-4"
+              title: "整備案件・進捗タイムライン"
+              status: "next"''',
+              "plan step 4",
+          )
+          plan_path.write_text(plan, encoding="utf-8")
+
+          result_lines = [
+              'schema_version: "1.0"',
+              "document:",
+              '  id: "DPRO-KSH-NEXT-3-RESULT"',
+              '  step: "STEP KSH-NEXT-3"',
+              '  title: "受付・予約・入庫データ統合"',
+              f"  generated_at_utc: {quote(datetime.now(timezone.utc).isoformat())}",
+              "target:",
+              '  file: "dashboard.html"',
+              f"  before_sha256: {quote(sha256_text(original))}",
+              f"  after_sha256: {quote(sha256_text(text))}",
+              f"  before_bytes: {before_bytes}",
+              f"  after_bytes: {after_bytes}",
+              f"  added_bytes: {added_bytes}",
+              "reception_channels:",
+              '  - "LINE"',
+              '  - "電話"',
+              '  - "店頭"',
+              '  - "管理者代理"',
+              "changes:",
+              '  - "入庫予定登録へ受付経路を追加"',
+              '  - "電話・店頭・代理登録のクイックボタンを追加"',
+              '  - "LINE相談から作成した入庫予定をLINEとして判定"',
+              '  - "入庫一覧へ受付経路列と絞り込みを追加"',
+              '  - "過去の経路不明データは未記録と表示"',
+              '  - "管理マーカーを通常メモ表示から分離"',
+              "storage:",
+              '  method: "reservation memo marker"',
+              '  format: "【受付経路：種別】"',
+              '  reason: "既存Worker・DBを変更せず安全に統合するため"',
+              "safety:",
+              "  database_changed: false",
+              "  worker_changed: false",
+              "  existing_api_changed: false",
+              "  customer_data_changed: false",
+              "  historical_data_reclassified_automatically: false",
+              "  backup_tag_created: true",
+              "next_step:",
+              '  id: "KSH-NEXT-4"',
+              '  title: "整備案件・進捗タイムライン"',
+          ]
+          result_path.write_text("\n".join(result_lines) + "\n", encoding="utf-8")
+
+          print("KSH-NEXT-3 dashboard update complete")
+          print("before bytes:", before_bytes)
+          print("after bytes:", after_bytes)
+          print("added bytes:", added_bytes)
+          PY
+
+      - name: Validate HTML and JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from collections import Counter
+          import re
+          import subprocess
+          import tempfile
+
+          text = Path("dashboard.html").read_text(encoding="utf-8")
+
+          class Parser(HTMLParser):
+              pass
+
+          parser = Parser()
+          parser.feed(text)
+          parser.close()
+
+          ids = re.findall(r'\bid=["\']([^"\']+)["\']', text)
+          duplicates = sorted(key for key, count in Counter(ids).items() if count > 1)
+          if duplicates:
+              raise SystemExit("duplicate IDs: " + ", ".join(duplicates))
+
+          required = [
+              "STEP KSH-NEXT-3: RECEPTION UNIFY",
+              'id="reservationReceptionChannel"',
+              'id="reservationChannelFilter"',
+              "openNewReservationFormWithChannel",
+              "inferReservationReceptionChannel",
+              "applyReceptionChannelMarker",
+              "stripReceptionChannelMarker",
+              "badgeReceptionChannel",
+              "【受付経路：",
+              "<th>受付経路</th>",
+              'colspan="10"',
+              "STEP KSH-NEXT-3",
+          ]
+          for marker in required:
+              if marker not in text:
+                  raise SystemExit("missing marker: " + marker)
+
+          if text.count('id="reservationReceptionChannel"') != 1:
+              raise SystemExit("reservationReceptionChannel ID count is not 1")
+
+          if text.count('id="reservationChannelFilter"') != 1:
+              raise SystemExit("reservationChannelFilter ID count is not 1")
+
+          inline_scripts = []
+          for attrs, body in re.findall(
+              r"<script\b([^>]*)>(.*?)</script>",
+              text,
+              flags=re.I | re.S,
+          ):
+              if re.search(r"\bsrc\s*=", attrs, flags=re.I):
+                  continue
+              if body.strip():
+                  inline_scripts.append(body)
+
+          if not inline_scripts:
+              raise SystemExit("inline JavaScript was not found")
+
+          for index, script in enumerate(inline_scripts, start=1):
+              temp = Path(tempfile.gettempdir()) / f"ksh-next-3-script-{index}.js"
+              temp.write_text(script, encoding="utf-8")
+              subprocess.run(["node", "--check", str(temp)], check=True)
+              print("JavaScript syntax OK:", index)
+
+          print("HTML parser OK")
+          print("ID uniqueness OK:", len(ids), "IDs")
+          PY
+
+      - name: Test reception marker logic
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'JS'
+          const pattern = /^【受付経路：(LINE|電話|店頭|管理者代理)】\s*/;
+
+          function extract(memo) {
+            const match = String(memo || "").match(pattern);
+            return match ? match[1] : "";
+          }
+
+          function strip(memo) {
+            return String(memo || "").replace(pattern, "").trim();
+          }
+
+          function apply(memo, channel) {
+            const normalized = ["LINE", "電話", "店頭", "管理者代理"].includes(channel)
+              ? channel
+              : "管理者代理";
+            const plain = strip(memo);
+            return `【受付経路：${normalized}】${plain ? `\n${plain}` : ""}`;
+          }
+
+          const cases = [
+            ["電話", "代車希望"],
+            ["店頭", ""],
+            ["LINE", "車検相談"],
+            ["管理者代理", "既存客"]
+          ];
+
+          for (const [channel, memo] of cases) {
+            const saved = apply(memo, channel);
+            if (extract(saved) !== channel) throw new Error(`extract failed: ${channel}`);
+            if (strip(saved) !== memo) throw new Error(`strip failed: ${channel}`);
+            if ((saved.match(/【受付経路：/g) || []).length !== 1) {
+              throw new Error(`duplicate marker: ${channel}`);
+            }
+          }
+
+          const replaced = apply("【受付経路：電話】\n古いメモ", "店頭");
+          if (extract(replaced) !== "店頭") throw new Error("marker replacement failed");
+          if (strip(replaced) !== "古いメモ") throw new Error("memo preservation failed");
+
+          console.log("Reception marker logic OK");
+          JS
+
+          test -f .dpro/ksh-next/ksh-next-3-result.yml
+          grep -q 'step: "STEP KSH-NEXT-3"' .dpro/ksh-next/ksh-next-3-result.yml
+          grep -q 'database_changed: false' .dpro/ksh-next/ksh-next-3-result.yml
+          grep -q 'worker_changed: false' .dpro/ksh-next/ksh-next-3-result.yml
+          grep -q 'historical_data_reclassified_automatically: false' .dpro/ksh-next/ksh-next-3-result.yml
+          grep -q 'current_step: "STEP KSH-NEXT-3"' .dpro/ksh-next/plan.yml
+          grep -A2 'id: "KSH-NEXT-4"' .dpro/ksh-next/plan.yml | grep -q 'status: "next"'
+
+          echo "KSH-NEXT-3 policy checks passed."
+
+      - name: Commit KSH-NEXT-3
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f ".github/workflows/step-ksh-next-2-owner-today-ui.yml"
+          rm -f ".github/workflows/step-ksh-next-3-reception-unify.yml"
+
+          git config user.name "DPRO STEP KSH-NEXT-3"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 1
+          fi
+
+          git commit -m "STEP KSH-NEXT-3 unify reception channels"
+          git push origin HEAD:main
