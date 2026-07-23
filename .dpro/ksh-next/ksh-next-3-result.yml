@@ -1,0 +1,39 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-3-RESULT"
+  step: "STEP KSH-NEXT-3"
+  title: "受付・予約・入庫データ統合"
+  generated_at_utc: "2026-07-23T00:22:33.201091+00:00"
+target:
+  file: "dashboard.html"
+  before_sha256: "7e0495872a0e415db58bd80670f756f0a50a8e844b4cb1a1aebcc0135aa962b4"
+  after_sha256: "1e105d0f9b983af0e2cd47ea2f41eac771bd3c42011b03427f4bf50abad8bcd8"
+  before_bytes: 310868
+  after_bytes: 318778
+  added_bytes: 7910
+reception_channels:
+  - "LINE"
+  - "電話"
+  - "店頭"
+  - "管理者代理"
+changes:
+  - "入庫予定登録へ受付経路を追加"
+  - "電話・店頭・代理登録のクイックボタンを追加"
+  - "LINE相談から作成した入庫予定をLINEとして判定"
+  - "入庫一覧へ受付経路列と絞り込みを追加"
+  - "過去の経路不明データは未記録と表示"
+  - "管理マーカーを通常メモ表示から分離"
+storage:
+  method: "reservation memo marker"
+  format: "【受付経路：種別】"
+  reason: "既存Worker・DBを変更せず安全に統合するため"
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  customer_data_changed: false
+  historical_data_reclassified_automatically: false
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-4"
+  title: "整備案件・進捗タイムライン"
