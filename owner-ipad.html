@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DPRO CAR LINE｜現場受付専用iPad STEP KSH-PHONE-3</title>
+  <title>DPRO 車検・整備工場 LINE｜受付iPad STEP KSH-NEXT-6</title>
 
   <style>
     :root {
@@ -850,6 +850,207 @@
       .customer-head { display: block; }
     }
   </style>
+
+  <style>
+    /* STEP KSH-NEXT-6: IPAD OPERATIONS */
+    .ipad-quick-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 9px;
+      margin-bottom: 14px;
+      padding: 12px;
+      border: 1px solid #dbeafe;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+      box-shadow: var(--shadow);
+    }
+
+    .ipad-quick-bar .btn {
+      min-height: 52px;
+      width: 100%;
+    }
+
+    .ipad-next-summary {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .ipad-board-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 13px;
+      align-items: start;
+      margin-bottom: 14px;
+    }
+
+    .ipad-lane {
+      min-width: 0;
+    }
+
+    .arrival-lane { border-top: 5px solid #2563eb; }
+    .working-lane { border-top: 5px solid #7c3aed; }
+    .ready-lane { border-top: 5px solid #16a34a; }
+
+    .ipad-lane .panel-head {
+      padding: 14px 14px 0;
+    }
+
+    .ipad-lane .panel-body {
+      padding: 12px 14px 14px;
+    }
+
+    .ipad-collapsible-panel {
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .ipad-collapsible-panel > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 54px;
+      padding: 12px 15px;
+      color: #0f172a;
+      font-size: 15px;
+      font-weight: 950;
+      background: #f8fafc;
+    }
+
+    .ipad-collapsible-panel > summary::-webkit-details-marker,
+    .ipad-guide-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .ipad-collapsible-panel > summary::before,
+    .ipad-guide-details > summary::before {
+      content: "＋";
+      color: #1e3a8a;
+      font-size: 18px;
+    }
+
+    .ipad-collapsible-panel[open] > summary::before,
+    .ipad-guide-details[open] > summary::before {
+      content: "－";
+    }
+
+    .ipad-guide-details {
+      margin-bottom: 14px;
+      border: 1px solid #dbeafe;
+      border-radius: 16px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .ipad-guide-details > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      color: #1e3a8a;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .ipad-guide-details .workflow-guide {
+      margin: 0;
+      padding: 0 12px 12px;
+    }
+
+    .ipad-next-progress {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(8px, 1fr));
+      gap: 3px;
+      margin-top: 8px;
+    }
+
+    .ipad-next-progress span {
+      height: 6px;
+      border-radius: 999px;
+      background: #e2e8f0;
+    }
+
+    .ipad-next-progress span.done { background: #2563eb; }
+    .ipad-next-progress span.current { background: #f59e0b; }
+    .ipad-next-progress span.complete { background: #16a34a; }
+
+    .ipad-stage-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid #c4b5fd;
+      background: #f5f3ff;
+      color: #5b21b6;
+      font-size: 11px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .ipad-stage-badge.waiting {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      color: #1e40af;
+    }
+
+    .ipad-stage-badge.ready {
+      border-color: #86efac;
+      background: #f0fdf4;
+      color: #166534;
+    }
+
+    .ipad-stage-badge.attention {
+      border-color: #fdba74;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    .ipad-estimate-note {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 11px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      font-size: 11px;
+      line-height: 1.55;
+      font-weight: 850;
+    }
+
+    .ipad-empty-lane {
+      padding: 16px 10px;
+      color: #64748b;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    @media (max-width: 1050px) {
+      .ipad-board-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .ipad-quick-bar {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .ipad-next-summary {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .ipad-quick-bar {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+
 </head>
 
 <body>
@@ -877,9 +1078,9 @@
         </div>
 
         <nav class="tabs">
-          <button id="tab-intake" class="tab-btn active" onclick="switchTab('intake')">受付</button>
-          <button id="tab-today" class="tab-btn" onclick="switchTab('today')">今日</button>
-          <button id="tab-reservations" class="tab-btn" onclick="switchTab('reservations')">入庫予定</button>
+          <button id="tab-today" class="tab-btn active" onclick="switchTab('today')">今日の現場</button>
+          <button id="tab-intake" class="tab-btn" onclick="switchTab('intake')">電話・店頭受付</button>
+          <button id="tab-reservations" class="tab-btn" onclick="switchTab('reservations')">今後の予定</button>
           <button id="tab-customers" class="tab-btn" onclick="switchTab('customers')">顧客検索</button>
         </nav>
       </div>
@@ -897,7 +1098,7 @@
       </div>
 
 
-      <section id="section-intake" class="section active">
+      <section id="section-intake" class="section">
         <div class="toolbar">
           <div>
             <h2>電話・店頭受付</h2>
@@ -906,11 +1107,14 @@
           <button class="btn btn-primary" onclick="resetIntakeForm()">入力をリセット</button>
         </div>
 
-        <div class="workflow-guide">
-          <div class="guide-card"><strong><b>1</b>顧客・車両を入力</strong><p>電話番号が同じ場合は既存顧客として更新し、重複登録を減らします。</p></div>
-          <div class="guide-card"><strong><b>2</b>入庫日時を選択</strong><p>今日以降の日付、営業時間内の30分単位だけを選びます。</p></div>
-          <div class="guide-card"><strong><b>3</b>保存してLINE連絡</strong><p>保存後、確認文面をコピーしてLINE公式・電話対応に使います。</p></div>
-        </div>
+        <details class="ipad-guide-details">
+          <summary>受付手順を確認する</summary>
+          <div class="workflow-guide">
+            <div class="guide-card"><strong><b>1</b>顧客・車両を入力</strong><p>電話番号が同じ場合は既存顧客として更新し、重複登録を減らします。</p></div>
+            <div class="guide-card"><strong><b>2</b>入庫日時を選択</strong><p>今日以降の日付、営業時間内の30分単位だけを選びます。</p></div>
+            <div class="guide-card"><strong><b>3</b>保存してLINE連絡</strong><p>保存後、確認文面をコピーしてLINE公式・電話対応に使います。</p></div>
+          </div>
+        </details>
 
         <div class="panel">
           <div class="panel-head">
@@ -945,6 +1149,14 @@
               <div class="form-field">
                 <label>次回車検日</label>
                 <input id="intakeNextShakenDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label>受付経路</label>
+                <select id="intakeReceptionChannel">
+                  <option value="電話" selected>電話</option>
+                  <option value="店頭">店頭</option>
+                  <option value="管理者代理">管理者代理</option>
+                </select>
               </div>
               <div class="form-field">
                 <label>作業内容</label>
@@ -989,74 +1201,96 @@
         </div>
       </section>
 
-      <section id="section-today" class="section">
+      <section id="section-today" class="section active">
         <div class="toolbar">
           <div>
             <h2>今日の現場ボード</h2>
-            <p>本日の入庫・仮入庫確認・未対応相談だけを表示します。売上は表示しません。</p>
+            <p>到着待ち・作業中・引渡し待ちを最初に確認します。設定と売上はPC管理画面に分けています。</p>
           </div>
-          <button class="btn btn-primary" onclick="loadToday()">今日を更新</button>
+          <button class="btn btn-primary" onclick="loadToday()">最新状態に更新</button>
         </div>
 
-        <div class="summary-grid">
-          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayReservationPanel')" onkeydown="summaryCardKey(event, 'todayReservationPanel')">
-            <span>本日の入庫</span>
-            <strong id="countTodayReservations">-</strong>
-            <small>今日の来店・作業予定</small>
-            <em class="tap-hint">押すと表示</em>
+        <div class="ipad-quick-bar" aria-label="iPadクイック操作">
+          <button class="btn btn-primary" onclick="openIpadIntake('電話')">＋ 電話受付</button>
+          <button class="btn btn-orange" onclick="openIpadIntake('店頭')">＋ 店頭受付</button>
+          <button class="btn btn-slate" onclick="switchTab('customers')">顧客・車両検索</button>
+          <button class="btn btn-dark" onclick="goBackToPc()">PC管理画面</button>
+        </div>
+
+        <div class="summary-grid ipad-next-summary">
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('arrivalPanel')" onkeydown="summaryCardKey(event, 'arrivalPanel')">
+            <span>到着待ち</span>
+            <strong id="countArrivalWaiting">-</strong>
+            <small>本日まだ受付前</small>
+            <em class="tap-hint">一覧へ</em>
           </div>
-          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('provisionalPanel')" onkeydown="summaryCardKey(event, 'provisionalPanel')">
-            <span>仮入庫確認</span>
-            <strong id="countProvisional">-</strong>
-            <small>日時確認が必要</small>
-            <em class="tap-hint">押すと表示</em>
-          </div>
-          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayTaskPanel')" onkeydown="summaryCardKey(event, 'todayTaskPanel')">
-            <span>未対応相談</span>
-            <strong id="countOpenTasks">-</strong>
-            <small>返信・電話が必要</small>
-            <em class="tap-hint">押すと表示</em>
-          </div>
-          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayReservationPanel')" onkeydown="summaryCardKey(event, 'todayReservationPanel')">
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('workingPanel')" onkeydown="summaryCardKey(event, 'workingPanel')">
             <span>作業中</span>
             <strong id="countWorking">-</strong>
-            <small>現場で進行中</small>
-            <em class="tap-hint">押すと表示</em>
+            <small>点検・見積・整備中</small>
+            <em class="tap-hint">一覧へ</em>
           </div>
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('readyPanel')" onkeydown="summaryCardKey(event, 'readyPanel')">
+            <span>引渡し待ち</span>
+            <strong id="countReady">-</strong>
+            <small>お客様へ連絡・引渡し</small>
+            <em class="tap-hint">一覧へ</em>
+          </div>
+          <div class="summary-card action-card" role="button" tabindex="0" onclick="jumpToday('todayTaskPanel')" onkeydown="summaryCardKey(event, 'todayTaskPanel')">
+            <span>未対応・連絡</span>
+            <strong id="countOpenTasks">-</strong>
+            <small>相談・再連絡・仮入庫</small>
+            <em class="tap-hint">確認する</em>
+          </div>
+          <strong id="countTodayReservations" hidden>-</strong>
+          <strong id="countProvisional" hidden>-</strong>
         </div>
 
-        <div id="provisionalPanel" class="panel priority-panel section-anchor" style="margin-bottom:16px;">
-          <div class="panel-head">
-            <div>
-              <h3>仮入庫確認</h3>
-              <p>お客様の希望日時です。問題なければ「この日時で入庫予定にする」を押します。</p>
-            </div>
-            <button class="btn btn-orange" onclick="switchTab('reservations'); setReservationFilter('provisional')">仮入庫だけ見る</button>
+        <details id="provisionalPanel" class="ipad-collapsible-panel section-anchor">
+          <summary>
+            <span>仮入庫・日時確認</span>
+            <span id="provisionalSummaryCount" class="badge badge-orange">0件</span>
+          </summary>
+          <div class="panel-body">
+            <p class="compact-mini-help">お客様の希望日時です。問題なければ入庫予定へ変更します。</p>
+            <div id="provisionalReservationList" class="card-list"></div>
           </div>
-          <div id="provisionalReservationList" class="panel-body card-list"></div>
-        </div>
+        </details>
 
-        <div class="grid2">
-          <div id="todayReservationPanel" class="panel section-anchor">
+        <div class="ipad-board-grid">
+          <div id="arrivalPanel" class="panel section-anchor ipad-lane arrival-lane">
             <div class="panel-head">
-              <div>
-                <h3>本日の入庫・作業</h3>
-                <p>状態変更とメモをここで行います。</p>
-              </div>
+              <div><h3>到着待ち</h3><p>来店したら「受付・入庫済み」へ進めます。</p></div>
             </div>
-            <div id="todayReservationList" class="panel-body card-list"></div>
+            <div id="arrivalReservationList" class="panel-body card-list"></div>
           </div>
 
-          <div id="todayTaskPanel" class="panel section-anchor">
+          <div id="workingPanel" class="panel section-anchor ipad-lane working-lane">
             <div class="panel-head">
-              <div>
-                <h3>今日やること</h3>
-                <p>新規相談・仮入庫・再連絡・LINE候補。</p>
-              </div>
+              <div><h3>作業中</h3><p>点検・見積・確認・作業・最終確認。</p></div>
             </div>
-            <div id="todayTaskList" class="panel-body card-list"></div>
+            <div id="workingReservationList" class="panel-body card-list"></div>
+          </div>
+
+          <div id="readyPanel" class="panel section-anchor ipad-lane ready-lane">
+            <div class="panel-head">
+              <div><h3>引渡し待ち</h3><p>LINE連絡後、完了処理はPC管理画面で行います。</p></div>
+            </div>
+            <div id="readyReservationList" class="panel-body card-list"></div>
           </div>
         </div>
+
+        <div id="todayReservationPanel" hidden>
+          <div id="todayReservationList"></div>
+        </div>
+
+        <details id="todayTaskPanel" class="ipad-collapsible-panel section-anchor">
+          <summary>
+            <span>未対応相談・再連絡</span>
+            <span id="todayTaskSummaryCount" class="badge badge-red">0件</span>
+          </summary>
+          <div id="todayTaskList" class="panel-body card-list"></div>
+        </details>
       </section>
 
       <section id="section-reservations" class="section">
@@ -1238,7 +1472,7 @@
 
     function applyShopSettingsToIpad() {
       const shopName = getShopName();
-      document.title = `${shopName}｜現場受付専用iPad STEP KSH-PHONE-3`;
+      document.title = `${shopName}｜受付iPad STEP KSH-NEXT-6`;
       setText("ipadLogoText", getShopInitials(shopName));
       setText("ipadShopName", shopName);
       const today = dateYmd(new Date());
@@ -1260,7 +1494,7 @@
     }
 
     let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
-    let currentTab = "intake";
+    let currentTab = "today";
     let reservationFilter = "today";
     let returnUrl = "dashboard.html";
 
@@ -1543,6 +1777,7 @@
       const carName = getIntakeValue("intakeCarName");
       const plateLast4 = getIntakeValue("intakePlateLast4");
       const nextShakenDate = getIntakeValue("intakeNextShakenDate");
+      const receptionChannel = getIntakeValue("intakeReceptionChannel") || "電話";
       const workType = getIntakeValue("intakeWorkType") || "車検";
       const status = getIntakeValue("intakeStatus") || "入庫予定";
       const reservationDate = getIntakeValue("intakeReservationDate");
@@ -1612,7 +1847,9 @@
             workType,
             status,
             memo: [
-              "iPad電話・店頭受付から登録",
+              `【受付経路：${receptionChannel}】`,
+              `【進捗：${status === "仮入庫" ? "仮入庫" : "入庫予定"}】`,
+              "iPad受付から登録",
               memo
             ].filter(Boolean).join("\n")
           })
@@ -3292,5 +3529,6 @@ ${escapeHtml(task.message || "")}
     }
   </script>
 
+  <script src="ksh-next-6-ipad-operations.js?v=20260723"></script>
 </body>
 </html>

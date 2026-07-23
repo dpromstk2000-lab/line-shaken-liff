@@ -1,0 +1,38 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-6-RESULT"
+  step: "STEP KSH-NEXT-6"
+  title: "受付iPad最適化"
+  generated_at_utc: "2026-07-23T01:13:33.890665+00:00"
+targets:
+  - "owner-ipad.html"
+  - "ksh-next-6-ipad-operations.js"
+hashes:
+  ipad_before: "1495dfdcf1cf380e2951a9ffbf97ca06a0d7f4cf0d566fb9fdc922f1e7884499"
+  ipad_after: "b80833423a5cb0af3a9511c573500a81ef4301be75d0703a59c623e3e4ba6219"
+changes:
+  - "初期画面を受付フォームから今日の現場へ変更"
+  - "到着待ち・作業中・引渡し待ちの3列ボードへ整理"
+  - "電話受付・店頭受付・顧客検索・PC管理のクイック操作を追加"
+  - "仮入庫と未対応相談を折りたたみ表示"
+  - "受付フォームへ受付経路を追加"
+  - "受付経路と作業進捗をDPRO NEXT管理情報として保存"
+  - "一覧から次の作業進捗へ進める操作を追加"
+  - "見積承認前の作業開始をiPadでも禁止"
+  - "管理メタデータを現場メモから分離"
+  - "引渡し完了・売上化はPC管理画面へ分離"
+operation_policy:
+  first_screen_primary_cards: 4
+  reservation_primary_actions_max: 3
+  daily_board_lanes: 3
+  settings_visible_on_ipad: false
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  actual_sales_edit_on_ipad: false
+  estimate_approval_guard_preserved: true
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-7"
+  title: "マイカーページ・整備履歴"
