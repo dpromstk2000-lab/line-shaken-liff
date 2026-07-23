@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-3</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-4</title>
 
   <style>
     :root {
@@ -1725,6 +1725,148 @@
       }
     }
 
+
+    /* STEP KSH-NEXT-4: WORK PROGRESS */
+    .work-progress-cell {
+      min-width: 250px;
+    }
+
+    .work-progress-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .work-progress-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1e40af;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .work-progress-badge.waiting {
+      border-color: #fdba74;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    .work-progress-badge.working {
+      border-color: #c4b5fd;
+      background: #f5f3ff;
+      color: #5b21b6;
+    }
+
+    .work-progress-badge.ready {
+      border-color: #86efac;
+      background: #f0fdf4;
+      color: #166534;
+    }
+
+    .work-progress-badge.completed {
+      border-color: #4ade80;
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .work-progress-badge.cancelled {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+
+    .work-progress-track {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(12px, 1fr));
+      gap: 3px;
+      align-items: center;
+    }
+
+    .work-progress-segment {
+      height: 7px;
+      border-radius: 999px;
+      background: #e2e8f0;
+    }
+
+    .work-progress-segment.done {
+      background: #2563eb;
+    }
+
+    .work-progress-segment.current {
+      background: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
+    }
+
+    .work-progress-segment.complete {
+      background: #16a34a;
+    }
+
+    .work-progress-meta {
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 10px;
+      line-height: 1.45;
+      font-weight: 800;
+    }
+
+    .work-progress-help {
+      grid-column: 1 / -1;
+      border: 1px solid #ddd6fe;
+      background: #faf5ff;
+      color: #5b21b6;
+      border-radius: 13px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.65;
+      font-weight: 700;
+    }
+
+    .work-progress-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 0 18px 14px;
+    }
+
+    .work-progress-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .work-progress-legend i {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #2563eb;
+    }
+
+    @media (max-width: 720px) {
+      .work-progress-cell {
+        min-width: 220px;
+      }
+
+      .work-progress-track {
+        gap: 2px;
+      }
+    }
+
   </style>
 </head>
 
@@ -1740,7 +1882,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-3</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-4</p>
           </div>
         </div>
       </div>
@@ -2169,16 +2311,27 @@
                 </select>
               </div>
 
+              <div class="work-progress-help">
+                入庫後の進み具合を「受付・点検・見積・お客様確認・作業・最終確認・引渡し」で管理します。進捗を選ぶと、既存Workerが使用する状態へ自動変換されます。
+              </div>
+
               <div class="form-field">
-                <label>状態</label>
-                <select id="reservationStatus" onchange="toggleReservationCompletionFields()">
+                <label>作業進捗</label>
+                <select id="reservationProgressStage" onchange="syncReservationStatusFromProgress()">
                   <option value="仮入庫">仮入庫（お客様希望・確認待ち）</option>
                   <option value="入庫予定">入庫予定（店舗確認済み）</option>
-                  <option value="入庫済み">入庫済み</option>
+                  <option value="受付・入庫済み">受付・入庫済み</option>
+                  <option value="点検中">点検中</option>
+                  <option value="見積作成中">見積作成中</option>
+                  <option value="お客様確認待ち">お客様確認待ち</option>
                   <option value="作業中">作業中</option>
-                  <option value="作業完了">作業完了</option>
+                  <option value="最終確認">最終確認</option>
+                  <option value="引渡し可能">引渡し可能</option>
+                  <option value="引渡し完了">引渡し完了・売上化</option>
                   <option value="キャンセル">キャンセル</option>
                 </select>
+                <input id="reservationStatus" type="hidden" value="入庫予定" />
+                <div class="small muted" style="margin-top:6px">引渡し完了を選ぶと、実売上・完了日・次回提案の入力欄が開きます。</div>
               </div>
 
               <div class="form-field">
@@ -2246,6 +2399,15 @@
                 <p id="reservationFilterSummary" class="muted small">-</p>
               </div>
             </div>
+            <div class="work-progress-legend" aria-label="作業進捗の流れ">
+              <span><i></i>受付</span>
+              <span><i></i>点検</span>
+              <span><i></i>見積</span>
+              <span><i></i>お客様確認</span>
+              <span><i></i>作業</span>
+              <span><i></i>最終確認</span>
+              <span><i></i>引渡し</span>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -2256,7 +2418,7 @@
                     <th>車両</th>
                     <th>作業内容</th>
                     <th>受付経路</th>
-                    <th>状態</th>
+                    <th>作業進捗</th>
                     <th>見込み金額</th>
                     <th>メモ</th>
                     <th>操作</th>
@@ -4350,13 +4512,14 @@
           <div class="list-item compact-reservation-item">
             <div class="compact-reservation-line">
               <strong>${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "時間未定")}　${escapeHtml(customerName)}</strong>
-              ${badgeStatus(row.status)}
+              ${badgeReservationProgressStage(row)}
             </div>
             <div class="compact-reservation-meta">
               ${escapeHtml(vehicleName)}${plate ? ` / No.${escapeHtml(plate)}` : ""} / ${escapeHtml(row.work_type || "入庫予定")}
               <span style="margin-left:6px">${badgeReceptionChannel(row)}</span>
             </div>
             <div class="reservation-actions compact-actions">
+              ${renderReservationProgressAction(row, true)}
               ${row.id ? `<button class="btn btn-slate" onclick="copyReservationMessage('${reservationId}')">文面確認</button>` : ""}
               ${isProvisionalReservationStatus(row.status) && row.id ? `<button class="btn btn-green" onclick="confirmReservationQuick('${reservationId}')">確定</button>` : ""}
               <button class="btn btn-slate" onclick="openDashboardShortcut('todayReservations')">一覧</button>
@@ -4564,6 +4727,19 @@
 
     const RECEPTION_CHANNELS = ["LINE", "電話", "店頭", "管理者代理"];
     const RECEPTION_CHANNEL_MARKER_PATTERN = /^【受付経路：(LINE|電話|店頭|管理者代理)】\s*/;
+    const RESERVATION_PROGRESS_STAGES = [
+      "仮入庫",
+      "入庫予定",
+      "受付・入庫済み",
+      "点検中",
+      "見積作成中",
+      "お客様確認待ち",
+      "作業中",
+      "最終確認",
+      "引渡し可能",
+      "引渡し完了"
+    ];
+    const RESERVATION_PROGRESS_MARKER_PATTERN = /^【進捗：(仮入庫|入庫予定|受付・入庫済み|点検中|見積作成中|お客様確認待ち|作業中|最終確認|引渡し可能|引渡し完了|キャンセル)】\s*/m;
 
     function normalizeReceptionChannel(value, fallback = "管理者代理") {
       const normalized = String(value || "").trim();
@@ -4591,6 +4767,210 @@
       if (row?.inquiry_id) return "LINE";
       return "未記録";
     }
+
+    function extractReservationProgressStage(memo) {
+      const match = String(memo || "").match(RESERVATION_PROGRESS_MARKER_PATTERN);
+      return match ? match[1] : "";
+    }
+
+    function stripReservationProgressMarker(memo) {
+      return String(memo || "").replace(RESERVATION_PROGRESS_MARKER_PATTERN, "").trim();
+    }
+
+    function stripReservationMetadataMarkers(memo) {
+      return stripReservationProgressMarker(stripReceptionChannelMarker(memo)).trim();
+    }
+
+    function normalizeReservationProgressStage(value, fallback = "入庫予定") {
+      const normalized = String(value || "").trim();
+      if (normalized === "キャンセル") return normalized;
+      return RESERVATION_PROGRESS_STAGES.includes(normalized) ? normalized : fallback;
+    }
+
+    function applyReservationMetadataMarkers(memo, channel, progressStage) {
+      const normalizedChannel = normalizeReceptionChannel(channel);
+      const normalizedStage = normalizeReservationProgressStage(progressStage);
+      const plainMemo = stripReservationMetadataMarkers(memo);
+      return [
+        `【受付経路：${normalizedChannel}】`,
+        `【進捗：${normalizedStage}】`,
+        plainMemo
+      ].filter(Boolean).join("\n");
+    }
+
+    function inferReservationProgressStage(row) {
+      const explicit = extractReservationProgressStage(row?.memo || "");
+      if (explicit) return explicit;
+
+      const status = String(row?.status || "").trim();
+      if (status.includes("キャンセル") || status.includes("削除")) return "キャンセル";
+      if (status.includes("作業完了")) return "引渡し完了";
+      if (status.includes("作業中")) return "作業中";
+      if (status.includes("入庫済み")) return "受付・入庫済み";
+      if (status.includes("仮入庫") || status.includes("確認待ち")) return "仮入庫";
+      return "入庫予定";
+    }
+
+    function progressStageToReservationStatus(progressStage) {
+      const stage = normalizeReservationProgressStage(progressStage);
+      if (stage === "仮入庫") return "仮入庫";
+      if (stage === "入庫予定") return "入庫予定";
+      if (stage === "受付・入庫済み") return "入庫済み";
+      if (stage === "引渡し完了") return "作業完了";
+      if (stage === "キャンセル") return "キャンセル";
+      return "作業中";
+    }
+
+    function setReservationProgressStage(progressStage) {
+      const select = document.getElementById("reservationProgressStage");
+      const statusInput = document.getElementById("reservationStatus");
+      const stage = normalizeReservationProgressStage(progressStage);
+
+      if (select) select.value = stage;
+      if (statusInput) statusInput.value = progressStageToReservationStatus(stage);
+      toggleReservationCompletionFields();
+    }
+
+    function syncReservationStatusFromProgress() {
+      const stage = document.getElementById("reservationProgressStage")?.value || "入庫予定";
+      setReservationProgressStage(stage);
+    }
+
+    function reservationProgressClass(stage) {
+      if (stage === "キャンセル") return "cancelled";
+      if (stage === "引渡し完了") return "completed";
+      if (stage === "引渡し可能") return "ready";
+      if (["点検中", "見積作成中", "お客様確認待ち", "作業中", "最終確認"].includes(stage)) return "working";
+      return "waiting";
+    }
+
+    function badgeReservationProgressStage(row) {
+      const stage = inferReservationProgressStage(row);
+      return `<span class="work-progress-badge ${reservationProgressClass(stage)}">${escapeHtml(stage)}</span>`;
+    }
+
+    function renderReservationProgress(row) {
+      const stage = inferReservationProgressStage(row);
+      if (stage === "キャンセル") {
+        return `<div class="work-progress-cell">${badgeReservationProgressStage(row)}<div class="work-progress-meta">進捗対象外</div></div>`;
+      }
+
+      const currentIndex = Math.max(0, RESERVATION_PROGRESS_STAGES.indexOf(stage));
+      const completed = stage === "引渡し完了";
+
+      const segments = RESERVATION_PROGRESS_STAGES.slice(1).map((_, index) => {
+        const stageIndex = index + 1;
+        let cls = "";
+        if (completed) cls = "complete";
+        else if (stageIndex < currentIndex) cls = "done";
+        else if (stageIndex === currentIndex) cls = "current";
+        return `<span class="work-progress-segment ${cls}"></span>`;
+      }).join("");
+
+      const progressNumber = Math.min(currentIndex + 1, RESERVATION_PROGRESS_STAGES.length);
+      const updated = row?.updated_at ? ` / 更新 ${formatDateTime(row.updated_at)}` : "";
+
+      return `
+        <div class="work-progress-cell">
+          <div class="work-progress-head">
+            ${badgeReservationProgressStage(row)}
+            <span class="small muted">${progressNumber}/${RESERVATION_PROGRESS_STAGES.length}</span>
+          </div>
+          <div class="work-progress-track" aria-label="${escapeHtml(stage)}">${segments}</div>
+          <div class="work-progress-meta">受付から引渡しまでの現在位置${escapeHtml(updated)}</div>
+        </div>
+      `;
+    }
+
+    function getNextReservationProgressStage(row) {
+      const current = inferReservationProgressStage(row);
+      if (["キャンセル", "引渡し可能", "引渡し完了"].includes(current)) return "";
+      const index = RESERVATION_PROGRESS_STAGES.indexOf(current);
+      if (index < 0) return "受付・入庫済み";
+      const next = RESERVATION_PROGRESS_STAGES[index + 1] || "";
+      return next === "引渡し完了" ? "" : next;
+    }
+
+    function renderReservationProgressAction(row, compact = false) {
+      const stage = inferReservationProgressStage(row);
+      const next = getNextReservationProgressStage(row);
+      const id = escapeHtml(row?.id || "");
+
+      if (!id || stage === "キャンセル" || stage === "引渡し完了") return "";
+
+      if (stage === "引渡し可能") {
+        return `<button class="btn btn-green" onclick="openEditReservationForm('${id}')">${compact ? "完了入力" : "引渡し完了・売上入力"}</button>`;
+      }
+
+      return next
+        ? `<button class="btn btn-orange" onclick="advanceReservationProgress('${id}')">${compact ? "次へ" : `次へ：${escapeHtml(next)}`}</button>`
+        : "";
+    }
+
+    function advanceReservationProgress(reservationId) {
+      const reservation = reservationsCache.find(row => String(row.id) === String(reservationId));
+      if (!reservation) {
+        showError("対象の入庫予定が見つかりません。");
+        return;
+      }
+
+      const current = inferReservationProgressStage(reservation);
+      const next = getNextReservationProgressStage(reservation);
+      if (!next) {
+        showError(current === "引渡し可能"
+          ? "引渡し完了は、編集画面で実売上と完了日を入力してください。"
+          : "次の進捗はありません。");
+        return;
+      }
+
+      const payload = buildReservationPayloadFromReservationRow(
+        reservation,
+        progressStageToReservationStatus(next)
+      );
+      payload.memo = applyReservationMetadataMarkers(
+        stripReservationMetadataMarkers(reservation.memo || ""),
+        inferReservationReceptionChannel(reservation) === "未記録"
+          ? "管理者代理"
+          : inferReservationReceptionChannel(reservation),
+        next
+      );
+
+      const customerName = reservation.customer?.name || "お客様";
+      const vehicleName = reservation.vehicle?.car_name || "車両未入力";
+
+      showConfirm("作業進捗を次へ進めますか？", `
+        <p class="muted" style="margin-top:0">日付・時間・作業内容は変更せず、進捗だけを更新します。</p>
+        <dl>
+          <dt>顧客</dt><dd>${escapeHtml(customerName)}</dd>
+          <dt>車両</dt><dd>${escapeHtml(vehicleName)}</dd>
+          <dt>現在</dt><dd>${escapeHtml(current)}</dd>
+          <dt>変更後</dt><dd>${escapeHtml(next)}</dd>
+        </dl>
+      `, async () => {
+        clearAlert();
+        setLoading(true);
+        try {
+          await api(`/api/reservations/${reservationId}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+          });
+          showOk(`作業進捗を「${next}」へ変更しました。`);
+          await loadReservations();
+          if (document.getElementById("section-today")?.classList.contains("active")) {
+            await loadToday();
+          }
+        } catch (error) {
+          showError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      }, {
+        okText: `${next}へ進める`,
+        danger: false
+      });
+    }
+
+
 
     function receptionChannelClass(channel) {
       return {
@@ -4656,12 +5036,13 @@
           </td>
           <td>${escapeHtml(row.work_type || "")}</td>
           <td>${badgeReceptionChannel(row)}</td>
-          <td>${badgeStatus(row.status)}</td>
+          <td>${renderReservationProgress(row)}</td>
           <td>${renderReservationAmount(row)}</td>
-          <td>${escapeHtml(stripReceptionChannelMarker(row.memo || ""))}</td>
+          <td>${escapeHtml(stripReservationMetadataMarkers(row.memo || ""))}</td>
           <td>
             <div style="display:grid; gap:6px">
               ${isProvisionalReservationStatus(row.status) ? `<button class="btn btn-green" onclick="confirmReservationQuick('${row.id}')">入庫予定にする</button>` : ""}
+              ${renderReservationProgressAction(row)}
               <button class="btn btn-primary" onclick="openEditReservationForm('${row.id}')">編集</button>
               <button class="btn btn-slate" onclick="copyReservationMessage('${row.id}')">文面確認</button>
               <button class="btn btn-red" onclick="confirmDeleteReservation('${row.id}')">削除</button>
@@ -4804,8 +5185,7 @@
 
         document.getElementById("reservationDateInput").value = normalizeDateInput(inquiry.preferred_visit_date || "");
         document.getElementById("reservationWorkType").value = normalizeWorkType(inquiry.consult_type || "その他");
-        document.getElementById("reservationStatus").value = "仮入庫";
-        toggleReservationCompletionFields();
+        setReservationProgressStage("仮入庫");
         document.getElementById("reservationEstimatedAmount").value = inquiry.estimated_amount || "";
         document.getElementById("reservationMemo").value = [
           inquiry.consult_type ? `相談内容：${inquiry.consult_type}` : "",
@@ -4846,14 +5226,14 @@
       document.getElementById("reservationVehicleId").value = reservation.vehicle_id || "";
       document.getElementById("reservationDateInput").value = normalizeDateInput(reservation.reservation_date || "");
       document.getElementById("reservationWorkType").value = normalizeWorkType(reservation.work_type || "その他");
-      document.getElementById("reservationStatus").value = normalizeReservationStatus(reservation.status || "入庫予定");
+      setReservationProgressStage(inferReservationProgressStage(reservation));
       document.getElementById("reservationEstimatedAmount").value = reservation.estimated_amount || "";
       setReservationReceptionChannel(
         inferReservationReceptionChannel(reservation) === "未記録"
           ? "管理者代理"
           : inferReservationReceptionChannel(reservation)
       );
-      document.getElementById("reservationMemo").value = stripReceptionChannelMarker(reservation.memo || "");
+      document.getElementById("reservationMemo").value = stripReservationMetadataMarkers(reservation.memo || "");
       document.getElementById("reservationActualSalesAmount").value = reservation.actual_sales_amount || "";
       document.getElementById("reservationCompletedDate").value = normalizeDateInput(reservation.completed_date || "");
       document.getElementById("reservationCompletionMemo").value = reservation.completion_memo || "";
@@ -4892,7 +5272,7 @@
       });
 
       document.getElementById("reservationWorkType").value = "車検";
-      document.getElementById("reservationStatus").value = "入庫予定";
+      setReservationProgressStage("入庫予定");
       setReservationReceptionChannel("管理者代理");
       document.getElementById("reservationFormBox").dataset.inquiryId = "";
 
@@ -5255,7 +5635,11 @@
       const reservationDate = document.getElementById("reservationDateInput").value;
       const reservationTime = document.getElementById("reservationTimeInput").value;
       const workType = document.getElementById("reservationWorkType").value;
-      const status = document.getElementById("reservationStatus").value;
+      const progressStage = normalizeReservationProgressStage(
+        document.getElementById("reservationProgressStage")?.value
+      );
+      const status = progressStageToReservationStatus(progressStage);
+      document.getElementById("reservationStatus").value = status;
       const receptionChannel = normalizeReceptionChannel(
         document.getElementById("reservationReceptionChannel")?.value
       );
@@ -5316,7 +5700,7 @@
         workType,
         status,
         estimatedAmount: estimatedAmount === "" ? null : Number(estimatedAmount),
-        memo: applyReceptionChannelMarker(memo, receptionChannel),
+        memo: applyReservationMetadataMarkers(memo, receptionChannel, progressStage),
         actualSalesAmount: status === "作業完了" && actualSalesAmount !== "" ? Number(actualSalesAmount) : null,
         completedDate: status === "作業完了" ? completedDate : null,
         completionMemo: status === "作業完了" ? completionMemo : "",
@@ -5342,7 +5726,8 @@
           <dt>入庫時間</dt><dd>${escapeHtml(payload.reservationTime || "未入力")}</dd>
           <dt>作業内容</dt><dd>${escapeHtml(payload.workType || "未入力")}</dd>
           <dt>受付経路</dt><dd>${escapeHtml(extractReceptionChannelFromMemo(payload.memo) || (payload.inquiryId ? "LINE" : "管理者代理"))}</dd>
-          <dt>状態</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>
+          <dt>作業進捗</dt><dd>${escapeHtml(extractReservationProgressStage(payload.memo) || "入庫予定")}</dd>
+          <dt>システム状態</dt><dd>${escapeHtml(payload.status || "未入力")}</dd>
           <dt>見込み金額</dt><dd>${escapeHtml(payload.estimatedAmount ? yen(payload.estimatedAmount) : "未入力")}</dd>
           ${payload.status === "作業完了" ? `
             <dt>実売上金額</dt><dd>${escapeHtml(payload.actualSalesAmount !== null && payload.actualSalesAmount !== undefined ? yen(payload.actualSalesAmount) : "未入力")}</dd>
@@ -5352,7 +5737,7 @@
             <dt>作業完了メモ</dt><dd>${escapeHtml(payload.completionMemo || "未入力")}</dd>
             <dt>次回提案メモ</dt><dd>${escapeHtml(payload.nextProposalMemo || "未入力")}</dd>
           ` : ""}
-          <dt>メモ</dt><dd>${escapeHtml(stripReceptionChannelMarker(payload.memo) || "未入力")}</dd>
+          <dt>メモ</dt><dd>${escapeHtml(stripReservationMetadataMarkers(payload.memo) || "未入力")}</dd>
         </dl>
       `;
     }
@@ -5432,8 +5817,7 @@
         return;
       }
 
-      document.getElementById("reservationStatus").value = "入庫予定";
-      toggleReservationCompletionFields();
+      setReservationProgressStage("入庫予定");
 
       const payload = buildReservationPayloadFromForm();
       if (!payload) return;
@@ -5465,6 +5849,13 @@
       }
 
       const payload = buildReservationPayloadFromReservationRow(reservation, "入庫予定");
+      payload.memo = applyReservationMetadataMarkers(
+        stripReservationMetadataMarkers(reservation.memo || ""),
+        inferReservationReceptionChannel(reservation) === "未記録"
+          ? "管理者代理"
+          : inferReservationReceptionChannel(reservation),
+        "入庫予定"
+      );
       const customerName = reservation.customer?.name || "お客様";
       const vehicleName = reservation.vehicle?.car_name || "車両未入力";
 
@@ -6659,7 +7050,7 @@ ${shopName}です。
           <div class="detail-history-item">
             <strong>${escapeHtml(formatDate(row.reservation_date))} ${escapeHtml(row.reservation_time ? row.reservation_time.slice(0, 5) : "")}</strong>
             ${badgeStatus(row.status)}<br>
-            <span class="small muted">${escapeHtml(row.work_type || "作業内容未入力")} / ${escapeHtml(row.memo || "メモなし")}</span>
+            <span class="small muted">${escapeHtml(row.work_type || "作業内容未入力")} / ${escapeHtml(stripReservationMetadataMarkers(row.memo || "") || "メモなし")}</span>
           </div>
         `).join("")
         : `<div class="detail-history-item muted">入庫予定はありません。</div>`;

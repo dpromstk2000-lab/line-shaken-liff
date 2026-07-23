@@ -1,0 +1,45 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-4-RESULT"
+  step: "STEP KSH-NEXT-4"
+  title: "整備案件・進捗タイムライン"
+  generated_at_utc: "2026-07-23T00:46:50.727145+00:00"
+target:
+  file: "dashboard.html"
+  before_sha256: "1e105d0f9b983af0e2cd47ea2f41eac771bd3c42011b03427f4bf50abad8bcd8"
+  after_sha256: "ec3790309fd9e42237ae3f7a0630b6c2299bfd53604f8044fa5de0fa7da320ec"
+  before_bytes: 318778
+  after_bytes: 332879
+  added_bytes: 14101
+progress_stages:
+  - "仮入庫"
+  - "入庫予定"
+  - "受付・入庫済み"
+  - "点検中"
+  - "見積作成中"
+  - "お客様確認待ち"
+  - "作業中"
+  - "最終確認"
+  - "引渡し可能"
+  - "引渡し完了"
+changes:
+  - "既存状態欄を分かりやすい作業進捗欄へ変更"
+  - "入庫一覧へ現在位置を示すタイムラインを追加"
+  - "次の進捗へ進めるクイック操作を追加"
+  - "引渡し完了は実売上・完了日の入力を必須のまま維持"
+  - "今日の入庫カードへ進捗と次へボタンを追加"
+  - "顧客履歴と通常メモから管理マーカーを除外"
+storage:
+  method: "reservation memo metadata marker"
+  format: "【進捗：段階】"
+  broad_status_mapping: "既存Worker対応の仮入庫・入庫予定・入庫済み・作業中・作業完了へ自動変換"
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  completed_sales_validation_preserved: true
+  historical_data_reclassified_automatically: false
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-5"
+  title: "見積確認・承認"
