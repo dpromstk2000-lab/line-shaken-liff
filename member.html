@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DPRO CAR LINE｜マイカー会員ページ STEP KSH-NEXT-5</title>
+  <title>DPRO 車検・整備工場 LINE｜マイカーページ STEP KSH-NEXT-7</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root {
@@ -234,37 +234,37 @@
     <header class="header">
       <div class="logo">CAR</div>
       <h1 id="pageTitle">マイカー会員ページ</h1>
-      <p id="pageLead">登録済みのお車・入庫予定・相談履歴を確認できます。</p>
-      <div class="version">STEP KSH-NEXT-5 / member.html</div>
+      <p id="pageLead">お車ごとの現在状況・整備履歴・次回目安を確認できます。</p>
+      <div class="version">STEP KSH-NEXT-7 / member.html</div>
     </header>
 
     <div id="alertArea"></div>
 
-    <section class="card">
+    <section class="card member-next-intro">
       <div class="title-row">
-        <h2>会員ページでできること</h2>
-        <span class="badge info">LINE連携</span>
+        <h2>マイカーページ</h2>
+        <span class="badge info">DPRO NEXT</span>
       </div>
       <div class="grid2">
         <div class="stat">
+          <div class="label">現在の整備</div>
+          <div class="value">進捗確認</div>
+          <div class="sub">受付から引渡しまで確認</div>
+        </div>
+        <div class="stat">
           <div class="label">登録車両</div>
-          <div class="value">マイカー管理</div>
-          <div class="sub">車検日・オイル交換日を確認</div>
+          <div class="value">車両別管理</div>
+          <div class="sub">複数台の履歴を分けて表示</div>
         </div>
         <div class="stat">
-          <div class="label">入庫予定</div>
-          <div class="value">予約確認</div>
-          <div class="sub">変更・キャンセル相談文面もコピー</div>
-        </div>
-        <div class="stat">
-          <div class="label">相談履歴</div>
-          <div class="value">前回内容</div>
-          <div class="sub">車検・整備・修理相談を確認</div>
+          <div class="label">整備履歴</div>
+          <div class="value">前回確認</div>
+          <div class="sub">完了日・作業内容・次回提案</div>
         </div>
         <div class="stat">
           <div class="label">次回相談</div>
-          <div class="value">すぐ連絡</div>
-          <div class="sub">LINE送信用文面を自動作成</div>
+          <div class="value">同じ内容</div>
+          <div class="sub">前回作業から相談文面を作成</div>
         </div>
       </div>
     </section>
@@ -286,7 +286,7 @@
     const LIFF_ID = "2010239091-K5EeUmBh";
     const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
     const SHOP_CODE = "street_house_kitsuki";
-    const VERSION = "STEP KSH-NEXT-5";
+    const VERSION = "STEP KSH-NEXT-7";
 
     const state = {
       shop: {
@@ -330,7 +330,7 @@
       const title = state.shop.member_title || `${state.shop.shop_name} マイカー会員ページ`;
       document.title = `${title}｜${VERSION}`;
       document.getElementById("pageTitle").textContent = title;
-      document.getElementById("pageLead").textContent = `${state.shop.shop_name}に登録したお車・入庫予定・相談履歴を確認できます。`;
+      document.getElementById("pageLead").textContent = `${state.shop.shop_name}に登録したお車ごとの現在状況・整備履歴・次回目安を確認できます。`;
       document.getElementById("footerText").textContent = `${state.shop.shop_name} / ${state.shop.service_name || "DPRO CAR LINE"}`;
       if (state.shop.main_color && /^#[0-9a-fA-F]{6}$/.test(state.shop.main_color)) {
         document.documentElement.style.setProperty("--accent", state.shop.main_color);
@@ -954,5 +954,6 @@ ${text}`;
     }
   </script>
   <script src="ksh-next-5-member-estimate.js?v=20260723"></script>
+  <script src="ksh-next-7-member-history.js?v=20260723"></script>
 </body>
 </html>

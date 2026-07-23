@@ -1,0 +1,36 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-7-RESULT"
+  step: "STEP KSH-NEXT-7"
+  title: "マイカーページ・車両別整備履歴"
+  generated_at_utc: "2026-07-23T01:29:22.922277+00:00"
+targets:
+  - "member.html"
+  - "ksh-next-7-member-history.js"
+hashes:
+  member_before: "97c022ea0a0836f00641b9dd5c6dbab4a8d340f87720e912db14bc73a97b9bd3"
+  member_after: "547d919998a316793d99f5482c944948dd7efae280506e176242f7e99b46c385"
+changes:
+  - "現在の整備状況をページ上部へ表示"
+  - "受付から引渡しまでの進捗タイムラインを表示"
+  - "車検・オイル交換・最終整備・次回提案を車両別に表示"
+  - "完了した整備を車両単位の履歴へ整理"
+  - "完了日・作業内容・完了メモ・実売上・次回目安を表示"
+  - "前回と同じ内容で相談するLINE文面を追加"
+  - "見積確認・承認機能を維持"
+  - "管理用メタデータをお客様表示から除外"
+  - "相談履歴を折りたたみ表示へ整理"
+data_policy:
+  source: "existing public customer-profile response"
+  history_scope: "APIから取得できたrecentReservationsの範囲"
+  full_history_claimed: false
+safety:
+  database_changed: false
+  worker_changed: false
+  existing_api_changed: false
+  estimate_approval_preserved: true
+  line_member_authentication_preserved: true
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-8"
+  title: "次回整備・車検フォロー"
