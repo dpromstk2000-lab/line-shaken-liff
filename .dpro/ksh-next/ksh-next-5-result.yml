@@ -1,0 +1,39 @@
+schema_version: "1.0"
+document:
+  id: "DPRO-KSH-NEXT-5-RESULT"
+  step: "STEP KSH-NEXT-5"
+  title: "見積確認・お客様承認"
+  generated_at_utc: "2026-07-23T01:02:47.086914+00:00"
+targets:
+  - "dashboard.html"
+  - "member.html"
+  - "ksh-next-5-owner-estimate.js"
+  - "ksh-next-5-member-estimate.js"
+hashes:
+  dashboard_before: "ec3790309fd9e42237ae3f7a0630b6c2299bfd53604f8044fa5de0fa7da320ec"
+  dashboard_after: "d1b811841219997aab15358728e2ac328c264546ff6d8759af18ae3521386fc7"
+  member_before: "7f3281928e7ab405976ed158e85f1bddf5c807432d8ea6fd28c45c299576c3f3"
+  member_after: "97c022ea0a0836f00641b9dd5c6dbab4a8d340f87720e912db14bc73a97b9bd3"
+changes:
+  - "オーナーが見積金額・作業内訳を登録できる"
+  - "見積提示時に進捗をお客様確認待ちへ変更"
+  - "マイカーページへ見積金額・内容を表示"
+  - "お客様が承認または変更相談を回答できる"
+  - "回答は既存相談受付APIへ記録"
+  - "オーナー画面で承認済み・変更相談・回答待ちを判定"
+  - "承認前の作業開始を画面上で禁止"
+  - "見積版管理とブラウザ二重送信防止を追加"
+storage:
+  estimate: "reservation memo metadata"
+  response: "existing inquiries API"
+  estimate_versioning: true
+safety:
+  database_changed: false
+  worker_changed: false
+  new_public_admin_endpoint_added: false
+  completed_sales_validation_preserved: true
+  approval_required_before_working: true
+  backup_tag_created: true
+next_step:
+  id: "KSH-NEXT-6"
+  title: "受付iPad最適化"
