@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP KSH-NEXT-8</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-3</title>
 
   <style>
     :root {
@@ -2261,6 +2261,85 @@
       }
     }
 
+
+    /* WANGAN-BIZ-3: ホームページ・予約設定 */
+    .wb3-hero {
+      border: 2px solid #f59e0b;
+      background: linear-gradient(135deg, #111827 0%, #1f2937 72%, #3f2b09 100%);
+      color: #fff;
+      overflow: hidden;
+    }
+    .wb3-hero h3, .wb3-hero p { color: #fff; }
+    .wb3-hero .muted { color: #d1d5db; }
+    .wb3-status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .wb3-status-card {
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .wb3-status-card strong { display:block; font-size: 15px; margin-bottom: 7px; }
+    .wb3-toggle-row {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      padding:13px 0;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .wb3-toggle-row:last-child { border-bottom:0; }
+    .wb3-switch {
+      width:52px;
+      height:30px;
+      accent-color:#f59e0b;
+      flex:0 0 auto;
+    }
+    .wb3-service-table input[type="text"],
+    .wb3-service-table input[type="number"],
+    .wb3-service-table select,
+    .wb3-service-table textarea { min-width: 108px; }
+    .wb3-service-table textarea { min-height: 62px; resize: vertical; }
+    .wb3-service-table .wb3-name { min-width:180px; font-weight:800; }
+    .wb3-service-table .wb3-summary { min-width:240px; }
+    .wb3-resource-grid {
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:12px;
+    }
+    .wb3-resource-card {
+      border:1px solid #e5e7eb;
+      border-radius:14px;
+      padding:14px;
+      background:#fff;
+    }
+    .wb3-resource-card h4 { margin:0 0 8px; }
+    .wb3-resource-card input[type="number"] { max-width:120px; }
+    .wb3-notice-form {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .wb3-notice-form .full { grid-column:1 / -1; }
+    .wb3-system-note {
+      padding:12px 14px;
+      background:#fffbeb;
+      border:1px solid #fde68a;
+      border-radius:12px;
+      color:#92400e;
+      line-height:1.7;
+    }
+    .wb3-mini { font-size:12px; color:#64748b; line-height:1.6; }
+    .wb3-action-line { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    @media (max-width: 900px) {
+      .wb3-status-grid, .wb3-resource-grid, .wb3-notice-form { grid-template-columns:1fr; }
+      .wb3-notice-form .full { grid-column:auto; }
+    }
+
   </style>
 </head>
 
@@ -2276,7 +2355,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP KSH-NEXT-8</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-3</p>
           </div>
         </div>
       </div>
@@ -2290,6 +2369,7 @@
         <button id="nav-ownerSales" onclick="switchTab('ownerSales')">🔒 オーナー確認</button>
         <button id="nav-customers" onclick="switchTab('customers')">👥 顧客・車両</button>
         <button id="nav-settings" onclick="switchTab('settings')">⚙️ 店舗設定</button>
+        <button id="nav-website" onclick="switchTab('website')">🌐 HP・予約設定</button>
       </nav>
 
       <div class="side-footer">
@@ -3330,6 +3410,195 @@
           </div>
         </section>
 
+
+        <section id="section-website" class="section">
+          <div class="card card-pad wb3-hero" style="margin-bottom:16px;">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">ホームページ・予約設定</h3>
+                <p class="muted" style="margin:7px 0 0;line-height:1.7;">
+                  DPROを正本として、ホームページの予約受付、仮予約、写真相談、公開サービス、予約枠、お知らせを管理します。<br>
+                  曜日別営業時間と臨時休業は「店舗設定」で登録すると、LINE・DPRO・ホームページへ共通反映されます。
+                </p>
+              </div>
+              <div class="wb3-action-line">
+                <button class="btn btn-slate" onclick="wb3OpenWebsite()">公開サイトを開く</button>
+                <button class="btn btn-primary" onclick="loadWebsiteAdmin()">最新状態に更新</button>
+              </div>
+            </div>
+            <div class="wb3-status-grid">
+              <div class="wb3-status-card">
+                <strong>DB連携</strong>
+                <span id="wb3DbStatus">確認前</span>
+              </div>
+              <div class="wb3-status-card">
+                <strong>公開受付</strong>
+                <span id="wb3ReceptionStatus">すべて停止中</span>
+              </div>
+              <div class="wb3-status-card">
+                <strong>登録内容</strong>
+                <span id="wb3DataStatus">サービス・予約枠を読み込みます</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-bottom:16px;">
+            <div class="card card-pad">
+              <div class="toolbar">
+                <div>
+                  <h3 style="margin:0">ホームページ受付スイッチ</h3>
+                  <p class="small muted" style="line-height:1.7;margin:6px 0 0;">画面完成前はOFFのままにします。ONにすると対応する受付方式が公開APIで有効になります。</p>
+                </div>
+                <button class="btn btn-primary" onclick="saveWebsiteSettings()">設定を保存</button>
+              </div>
+              <div class="wb3-toggle-row">
+                <div><strong>即時予約</strong><div class="wb3-mini">オイル交換・点検・来店相談など</div></div>
+                <input id="wb3BookingEnabled" class="wb3-switch" type="checkbox">
+              </div>
+              <div class="wb3-toggle-row">
+                <div><strong>WEB仮予約</strong><div class="wb3-mini">車検入庫・修理・持込パーツなど</div></div>
+                <input id="wb3ProvisionalEnabled" class="wb3-switch" type="checkbox">
+              </div>
+              <div class="wb3-toggle-row">
+                <div><strong>写真付き相談・見積もり</strong><div class="wb3-mini">日時を確定せず相談一覧へ登録</div></div>
+                <input id="wb3InquiryEnabled" class="wb3-switch" type="checkbox">
+              </div>
+              <div class="form-grid" style="margin-top:14px;">
+                <div class="form-field">
+                  <label>何日先まで受け付けるか</label>
+                  <input id="wb3BookingHorizon" type="number" min="1" max="365" step="1">
+                </div>
+                <div class="form-field">
+                  <label>当日予約</label>
+                  <select id="wb3SameDayEnabled">
+                    <option value="false">受け付けない</option>
+                    <option value="true">受け付ける</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>当日受付締切（開始何分前）</label>
+                  <input id="wb3SameDayCutoff" type="number" min="0" max="1440" step="30">
+                </div>
+                <div class="form-field">
+                  <label>臨時休業のお知らせ</label>
+                  <select id="wb3AutoNotice">
+                    <option value="true">自動作成する</option>
+                    <option value="false">自動作成しない</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="card card-pad">
+              <h3 style="margin-top:0">公開URL・外部導線</h3>
+              <div class="form-grid">
+                <div class="form-field form-full">
+                  <label>店舗ホームページURL</label>
+                  <input id="wb3WebsiteBaseUrl" type="url" placeholder="https://...">
+                </div>
+                <div class="form-field form-full">
+                  <label>LINE公式URL</label>
+                  <input id="wb3LineUrl" type="url" placeholder="https://lin.ee/...">
+                </div>
+                <div class="form-field form-full">
+                  <label>GoogleマップURL</label>
+                  <input id="wb3MapUrl" type="url" placeholder="https://maps.app.goo.gl/...">
+                </div>
+              </div>
+              <div class="wb3-system-note" style="margin-top:12px;">
+                GitHubには公開URLだけを置きます。Supabaseキー、Service Role、管理コードはホームページへ保存しません。
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-pad" style="margin-bottom:16px;">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">同時受付できる作業枠</h3>
+                <p class="small muted" style="line-height:1.7;margin:6px 0 0;">スタッフ数やリフト数に合わせて設定します。予約済みの枠はホームページの残数へ即時反映されます。</p>
+              </div>
+              <button class="btn btn-primary" onclick="saveWebsiteResources()">予約枠を保存</button>
+            </div>
+            <div id="wb3ResourceGrid" class="wb3-resource-grid" style="margin-top:14px;"></div>
+          </div>
+
+          <div class="card card-pad" style="margin-bottom:16px;">
+            <div class="toolbar">
+              <div>
+                <h3 style="margin:0">ホームページ公開サービス</h3>
+                <p class="small muted" style="line-height:1.7;margin:6px 0 0;">公開・非公開、受付方式、所要時間、料金目安をサービスごとに設定します。</p>
+              </div>
+              <button class="btn btn-primary" onclick="saveWebsiteServices()">サービス設定を保存</button>
+            </div>
+            <div class="table-wrap" style="margin-top:14px;">
+              <table class="wb3-service-table">
+                <thead>
+                  <tr>
+                    <th>公開</th><th>受付</th><th>サービス</th><th>受付方式</th><th>所要時間</th><th>作業枠</th><th>料金目安</th><th>料金補足</th><th>説明</th>
+                  </tr>
+                </thead>
+                <tbody id="wb3ServiceTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="card card-pad">
+              <h3 style="margin-top:0">ホームページへお知らせを追加</h3>
+              <div class="wb3-notice-form">
+                <div class="form-field full">
+                  <label>タイトル</label>
+                  <input id="wb3NoticeTitle" type="text" maxlength="160" placeholder="例：夏季休業のお知らせ">
+                </div>
+                <div class="form-field full">
+                  <label>本文</label>
+                  <textarea id="wb3NoticeBody" maxlength="4000" placeholder="ホームページに表示する内容"></textarea>
+                </div>
+                <div class="form-field">
+                  <label>種類</label>
+                  <select id="wb3NoticeType">
+                    <option value="general">通常のお知らせ</option>
+                    <option value="holiday">休業日</option>
+                    <option value="business_hours">営業時間</option>
+                    <option value="campaign">キャンペーン</option>
+                    <option value="emergency">緊急案内</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>表示優先度（小さいほど上）</label>
+                  <input id="wb3NoticePriority" type="number" min="0" max="9999" value="100">
+                </div>
+                <div class="form-field">
+                  <label>公開開始</label>
+                  <input id="wb3NoticeFrom" type="datetime-local">
+                </div>
+                <div class="form-field">
+                  <label>公開終了</label>
+                  <input id="wb3NoticeUntil" type="datetime-local">
+                </div>
+                <label class="closed-check full"><input id="wb3NoticePublic" type="checkbox" checked> 登録後すぐホームページへ公開する</label>
+              </div>
+              <button class="btn btn-green" style="margin-top:14px;" onclick="createWebsiteNotice()">お知らせを追加</button>
+              <div class="wb3-system-note" style="margin-top:14px;">
+                「店舗設定」で臨時休業・特別営業を登録した場合は、公開お知らせを自動生成できます。同じ内容をここへ二重登録する必要はありません。
+              </div>
+            </div>
+
+            <div class="card card-pad">
+              <div class="toolbar">
+                <h3 style="margin:0">公開お知らせ一覧</h3>
+                <button class="btn btn-slate" onclick="loadWebsiteAdmin()">更新</button>
+              </div>
+              <div class="table-wrap" style="margin-top:14px;">
+                <table>
+                  <thead><tr><th>状態</th><th>内容</th><th>期間</th><th>操作</th></tr></thead>
+                  <tbody id="wb3NoticeTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="section-settings" class="section">
 
           <div class="card card-pad" style="margin-bottom:16px; border:2px solid #bfdbfe; background:#eff6ff;">
@@ -3640,7 +3909,7 @@
   </div>
 
   <script>
-    const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
+    const WORKER_API_BASE = "https://dpro-wangan-biz-api.dpromstk2000.workers.dev";
     const KSH_DEMO_RESET_WORKER_URL = "https://ksh-demo-reset.dpromstk2000.workers.dev";
     const DEFAULT_DASHBOARD_TOKEN = "1234";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
@@ -3867,6 +4136,10 @@
       settings: {
         title: "店舗設定",
         desc: "店舗名・表示文言・定休日・営業時間、営業前DEMO準備を管理します。"
+      },
+      website: {
+        title: "ホームページ・予約設定",
+        desc: "ホームページの受付スイッチ、公開サービス、予約枠、お知らせをDPROから管理します。"
       }
     };
 
@@ -3933,6 +4206,7 @@
       if (tab === "ownerSales") loadOpportunities();
       if (tab === "customers") loadCustomers();
       if (tab === "settings") loadSettings();
+      if (tab === "website") loadWebsiteAdmin();
     }
 
     function refreshCurrentTab() {
@@ -7887,6 +8161,336 @@ ${shopName}です。
       }
 
       return true;
+    }
+
+
+    // -----------------------------------------------------------------------
+    // WANGAN-BIZ-3 ホームページ・予約設定
+    // -----------------------------------------------------------------------
+    let wb3WebsiteSettings = null;
+    let wb3Services = [];
+    let wb3Resources = [];
+    let wb3Notices = [];
+
+    const WB3_RESOURCE_LABELS = {
+      general_bay: "一般整備・車検枠",
+      custom_bay: "カスタム作業枠",
+      consultation: "来店相談枠"
+    };
+
+    const WB3_MODE_LABELS = {
+      instant: "即時予約",
+      provisional: "仮予約",
+      inquiry: "相談のみ"
+    };
+
+    async function loadWebsiteAdmin() {
+      setLoading(true);
+      clearAlert();
+      try {
+        const data = await api("/api/website-admin/bootstrap");
+        wb3WebsiteSettings = data.websiteSettings || {};
+        wb3Services = Array.isArray(data.services) ? data.services : [];
+        wb3Resources = Array.isArray(data.resources) ? data.resources : [];
+        wb3Notices = Array.isArray(data.notices) ? data.notices : [];
+        renderWebsiteSettings();
+        renderWebsiteResources();
+        renderWebsiteServices();
+        renderWebsiteNotices();
+        const db = document.getElementById("wb3DbStatus");
+        if (db) db.textContent = data.databaseVersion ? `正常：${data.databaseVersion}` : "設定未確認";
+        const count = document.getElementById("wb3DataStatus");
+        if (count) count.textContent = `サービス ${wb3Services.length}件 / 予約枠 ${wb3Resources.length}種類 / お知らせ ${wb3Notices.length}件`;
+        updateWebsiteReceptionStatus();
+      } catch (error) {
+        showError(error.message);
+        const db = document.getElementById("wb3DbStatus");
+        if (db) db.textContent = "読み込み失敗";
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderWebsiteSettings() {
+      const s = wb3WebsiteSettings || {};
+      wb3SetChecked("wb3BookingEnabled", s.website_booking_enabled);
+      wb3SetChecked("wb3ProvisionalEnabled", s.website_provisional_enabled);
+      wb3SetChecked("wb3InquiryEnabled", s.website_inquiry_enabled);
+      wb3SetValue("wb3BookingHorizon", s.booking_horizon_days ?? 90);
+      wb3SetValue("wb3SameDayEnabled", String(Boolean(s.same_day_booking_enabled)));
+      wb3SetValue("wb3SameDayCutoff", s.same_day_cutoff_minutes ?? 120);
+      wb3SetValue("wb3AutoNotice", String(s.auto_publish_special_day_notice !== false));
+      wb3SetValue("wb3WebsiteBaseUrl", s.website_base_url || "");
+      wb3SetValue("wb3LineUrl", s.website_line_url || "");
+      wb3SetValue("wb3MapUrl", s.website_map_url || "");
+    }
+
+    function updateWebsiteReceptionStatus() {
+      const status = document.getElementById("wb3ReceptionStatus");
+      if (!status) return;
+      const enabled = [];
+      if (document.getElementById("wb3BookingEnabled")?.checked) enabled.push("即時予約");
+      if (document.getElementById("wb3ProvisionalEnabled")?.checked) enabled.push("仮予約");
+      if (document.getElementById("wb3InquiryEnabled")?.checked) enabled.push("相談");
+      status.textContent = enabled.length ? `${enabled.join("・")}を受付中` : "すべて安全停止中";
+    }
+
+    async function saveWebsiteSettings() {
+      clearAlert();
+      const payload = {
+        websiteBookingEnabled: Boolean(document.getElementById("wb3BookingEnabled")?.checked),
+        websiteProvisionalEnabled: Boolean(document.getElementById("wb3ProvisionalEnabled")?.checked),
+        websiteInquiryEnabled: Boolean(document.getElementById("wb3InquiryEnabled")?.checked),
+        bookingHorizonDays: Number(document.getElementById("wb3BookingHorizon")?.value || 90),
+        sameDayBookingEnabled: document.getElementById("wb3SameDayEnabled")?.value === "true",
+        sameDayCutoffMinutes: Number(document.getElementById("wb3SameDayCutoff")?.value || 120),
+        autoPublishSpecialDayNotice: document.getElementById("wb3AutoNotice")?.value === "true",
+        websiteBaseUrl: document.getElementById("wb3WebsiteBaseUrl")?.value.trim() || "",
+        websiteLineUrl: document.getElementById("wb3LineUrl")?.value.trim() || "",
+        websiteMapUrl: document.getElementById("wb3MapUrl")?.value.trim() || ""
+      };
+      const enabling = payload.websiteBookingEnabled || payload.websiteProvisionalEnabled || payload.websiteInquiryEnabled;
+      if (enabling) {
+        showConfirm("ホームページ受付を有効にしますか？", `
+          <p>ONにした受付方式は、ホームページ実装後に実際の受付へ使用されます。</p>
+          <p class="muted">現在のサイト画面がまだ接続前の場合でも、API側の受付スイッチは有効になります。</p>
+        `, async () => wb3SaveWebsiteSettingsNow(payload), { okText: "保存して有効化" });
+        return;
+      }
+      await wb3SaveWebsiteSettingsNow(payload);
+    }
+
+    async function wb3SaveWebsiteSettingsNow(payload) {
+      try {
+        const result = await api("/api/website-admin/settings", {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+        wb3WebsiteSettings = result.websiteSettings || wb3WebsiteSettings;
+        renderWebsiteSettings();
+        updateWebsiteReceptionStatus();
+        showOk(result.message || "ホームページ・予約設定を保存しました。");
+      } catch (error) { showError(error.message); }
+    }
+
+    function renderWebsiteResources() {
+      const box = document.getElementById("wb3ResourceGrid");
+      if (!box) return;
+      if (!wb3Resources.length) {
+        box.innerHTML = '<div class="muted">予約枠設定がありません。</div>';
+        return;
+      }
+      box.innerHTML = wb3Resources.map((row, index) => `
+        <div class="wb3-resource-card">
+          <h4>${escapeHtml(WB3_RESOURCE_LABELS[row.resourceGroup] || row.resourceGroup)}</h4>
+          <div class="wb3-mini">コード：${escapeHtml(row.resourceGroup)}</div>
+          <div class="form-field" style="margin-top:10px;">
+            <label>同時受付上限</label>
+            <input id="wb3ResourceCapacity-${index}" type="number" min="1" max="30" value="${Number(row.capacity || 1)}">
+          </div>
+          <label class="closed-check"><input id="wb3ResourceActive-${index}" type="checkbox" ${row.isActive ? "checked" : ""}> 使用する</label>
+        </div>
+      `).join("");
+    }
+
+    async function saveWebsiteResources() {
+      clearAlert();
+      const resources = wb3Resources.map((row, index) => ({
+        resourceGroup: row.resourceGroup,
+        capacity: Number(document.getElementById(`wb3ResourceCapacity-${index}`)?.value || 1),
+        isActive: Boolean(document.getElementById(`wb3ResourceActive-${index}`)?.checked)
+      }));
+      try {
+        const result = await api("/api/website-admin/resources", {
+          method: "PATCH",
+          body: JSON.stringify({ resources })
+        });
+        wb3Resources = result.resources || wb3Resources;
+        renderWebsiteResources();
+        showOk(result.message || "予約枠を保存しました。");
+      } catch (error) { showError(error.message); }
+    }
+
+    function renderWebsiteServices() {
+      const body = document.getElementById("wb3ServiceTableBody");
+      if (!body) return;
+      if (!wb3Services.length) {
+        body.innerHTML = '<tr><td colspan="9" class="muted">サービス設定がありません。</td></tr>';
+        return;
+      }
+      body.innerHTML = wb3Services.map((row, index) => {
+        const modeOptions = Object.entries(WB3_MODE_LABELS).map(([value, label]) => `<option value="${value}" ${row.bookingMode === value ? "selected" : ""}>${label}</option>`).join("");
+        const resourceOptions = ['general_bay','custom_bay','consultation'].map(value => `<option value="${value}" ${row.resourceGroup === value ? "selected" : ""}>${escapeHtml(WB3_RESOURCE_LABELS[value])}</option>`).join("");
+        return `
+          <tr data-service-index="${index}">
+            <td><input id="wb3ServicePublic-${index}" type="checkbox" ${row.isPublic ? "checked" : ""}></td>
+            <td><input id="wb3ServiceBooking-${index}" type="checkbox" ${row.isBookingEnabled ? "checked" : ""}></td>
+            <td><input id="wb3ServiceName-${index}" class="wb3-name" type="text" value="${escapeHtml(row.name || "")}"><div class="wb3-mini">${escapeHtml(row.serviceCode)}</div></td>
+            <td><select id="wb3ServiceMode-${index}" onchange="wb3SyncServiceRow(${index})">${modeOptions}</select></td>
+            <td><select id="wb3ServiceDuration-${index}">${[0,30,60,90,120,150,180].map(value => `<option value="${value}" ${Number(row.durationMinutes) === value ? "selected" : ""}>${value === 0 ? "なし" : `${value}分`}</option>`).join("")}</select></td>
+            <td><select id="wb3ServiceResource-${index}"><option value="">なし</option>${resourceOptions}</select></td>
+            <td><input id="wb3ServicePrice-${index}" type="number" min="0" step="100" value="${row.priceFrom ?? ""}" placeholder="未設定"></td>
+            <td><input id="wb3ServicePriceNote-${index}" type="text" value="${escapeHtml(row.priceNote || "")}"></td>
+            <td><textarea id="wb3ServiceSummary-${index}" class="wb3-summary">${escapeHtml(row.summary || "")}</textarea></td>
+          </tr>
+        `;
+      }).join("");
+      wb3Services.forEach((_, index) => wb3SyncServiceRow(index));
+    }
+
+    function wb3SyncServiceRow(index) {
+      const mode = document.getElementById(`wb3ServiceMode-${index}`)?.value;
+      const duration = document.getElementById(`wb3ServiceDuration-${index}`);
+      const resource = document.getElementById(`wb3ServiceResource-${index}`);
+      if (mode === "inquiry") {
+        if (duration) { duration.value = "0"; duration.disabled = true; }
+        if (resource) { resource.value = ""; resource.disabled = true; }
+      } else {
+        if (duration) { duration.disabled = false; if (Number(duration.value) === 0) duration.value = "60"; }
+        if (resource) { resource.disabled = false; if (!resource.value) resource.value = "general_bay"; }
+      }
+    }
+
+    async function saveWebsiteServices() {
+      clearAlert();
+      const services = wb3Services.map((row, index) => {
+        const mode = document.getElementById(`wb3ServiceMode-${index}`)?.value || row.bookingMode;
+        return {
+          serviceCode: row.serviceCode,
+          name: document.getElementById(`wb3ServiceName-${index}`)?.value.trim() || row.name,
+          summary: document.getElementById(`wb3ServiceSummary-${index}`)?.value.trim() || "",
+          bookingMode: mode,
+          durationMinutes: mode === "inquiry" ? 0 : Number(document.getElementById(`wb3ServiceDuration-${index}`)?.value || 60),
+          resourceGroup: mode === "inquiry" ? "" : document.getElementById(`wb3ServiceResource-${index}`)?.value,
+          capacityUnits: mode === "inquiry" ? 0 : 1,
+          priceFrom: document.getElementById(`wb3ServicePrice-${index}`)?.value || null,
+          priceNote: document.getElementById(`wb3ServicePriceNote-${index}`)?.value.trim() || "",
+          isPublic: Boolean(document.getElementById(`wb3ServicePublic-${index}`)?.checked),
+          isBookingEnabled: Boolean(document.getElementById(`wb3ServiceBooking-${index}`)?.checked),
+          displayOrder: row.displayOrder
+        };
+      });
+      try {
+        const result = await api("/api/website-admin/services", {
+          method: "PATCH",
+          body: JSON.stringify({ services })
+        });
+        wb3Services = result.services || wb3Services;
+        renderWebsiteServices();
+        showOk(result.message || "サービス設定を保存しました。");
+      } catch (error) { showError(error.message); }
+    }
+
+    function renderWebsiteNotices() {
+      const body = document.getElementById("wb3NoticeTableBody");
+      if (!body) return;
+      if (!wb3Notices.length) {
+        body.innerHTML = '<tr><td colspan="4" class="muted">お知らせはまだありません。</td></tr>';
+        return;
+      }
+      body.innerHTML = wb3Notices.map(row => `
+        <tr>
+          <td>${row.isPublic ? badgeStatus("公開中") : badgeStatus("非公開")}${row.autoGenerated ? '<div class="wb3-mini">休日設定から自動生成</div>' : ''}</td>
+          <td><strong>${escapeHtml(row.title || "")}</strong><div class="wb3-mini">${escapeHtml(row.body || "")}</div></td>
+          <td class="wb3-mini">${wb3FormatNoticePeriod(row)}</td>
+          <td>
+            <div class="wb3-action-line">
+              <button class="btn btn-slate" onclick="toggleWebsiteNotice('${escapeHtml(row.id)}', ${row.isPublic ? 'false' : 'true'})">${row.isPublic ? "非公開" : "公開"}</button>
+              ${row.autoGenerated ? '' : `<button class="btn btn-red" onclick="deleteWebsiteNotice('${escapeHtml(row.id)}')">削除</button>`}
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function wb3FormatNoticePeriod(row) {
+      const from = row.publishedFrom ? new Date(row.publishedFrom).toLocaleString("ja-JP") : "指定なし";
+      const until = row.publishedUntil ? new Date(row.publishedUntil).toLocaleString("ja-JP") : "期限なし";
+      return `${from}<br>〜 ${until}`;
+    }
+
+    async function createWebsiteNotice() {
+      clearAlert();
+      const title = document.getElementById("wb3NoticeTitle")?.value.trim() || "";
+      if (!title) { showError("お知らせのタイトルを入力してください。"); return; }
+      const payload = {
+        title,
+        body: document.getElementById("wb3NoticeBody")?.value.trim() || "",
+        noticeType: document.getElementById("wb3NoticeType")?.value || "general",
+        priority: Number(document.getElementById("wb3NoticePriority")?.value || 100),
+        publishedFrom: wb3LocalInputToIso(document.getElementById("wb3NoticeFrom")?.value),
+        publishedUntil: wb3LocalInputToIso(document.getElementById("wb3NoticeUntil")?.value),
+        isPublic: Boolean(document.getElementById("wb3NoticePublic")?.checked)
+      };
+      try {
+        const result = await api("/api/website-admin/notices", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        wb3Notices.unshift(result.notice);
+        renderWebsiteNotices();
+        wb3SetValue("wb3NoticeTitle", "");
+        wb3SetValue("wb3NoticeBody", "");
+        wb3SetValue("wb3NoticeFrom", "");
+        wb3SetValue("wb3NoticeUntil", "");
+        showOk(result.message || "お知らせを追加しました。");
+      } catch (error) { showError(error.message); }
+    }
+
+    async function toggleWebsiteNotice(id, makePublic) {
+      clearAlert();
+      const row = wb3Notices.find(item => item.id === id);
+      if (!row) return;
+      try {
+        const result = await api(`/api/website-admin/notices/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            title: row.title,
+            body: row.body,
+            noticeType: row.noticeType,
+            priority: row.priority,
+            publishedFrom: row.publishedFrom,
+            publishedUntil: row.publishedUntil,
+            isPublic: makePublic
+          })
+        });
+        wb3Notices = wb3Notices.map(item => item.id === id ? result.notice : item);
+        renderWebsiteNotices();
+        showOk(makePublic ? "お知らせを公開しました。" : "お知らせを非公開にしました。");
+      } catch (error) { showError(error.message); }
+    }
+
+    function deleteWebsiteNotice(id) {
+      showConfirm("このお知らせを削除しますか？", '<p class="muted">ホームページの一覧からも削除されます。</p>', async () => {
+        try {
+          const result = await api(`/api/website-admin/notices/${encodeURIComponent(id)}`, { method: "DELETE" });
+          wb3Notices = wb3Notices.filter(item => item.id !== id);
+          renderWebsiteNotices();
+          showOk(result.message || "お知らせを削除しました。");
+        } catch (error) { showError(error.message); }
+      }, { okText: "削除する", danger: true });
+    }
+
+    function wb3OpenWebsite() {
+      const url = document.getElementById("wb3WebsiteBaseUrl")?.value.trim() || wb3WebsiteSettings?.website_base_url || "";
+      if (!url) { showError("店舗ホームページURLがまだ設定されていません。"); return; }
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    function wb3SetValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value ?? "";
+    }
+
+    function wb3SetChecked(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.checked = Boolean(value);
+    }
+
+    function wb3LocalInputToIso(value) {
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
     }
 
     async function loadSettings() {
