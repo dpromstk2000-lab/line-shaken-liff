@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-5-R1</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-5-R6</title>
 
   <style>
     :root {
@@ -1689,6 +1689,12 @@
       color: #5b21b6;
     }
 
+    .reception-channel-badge.website {
+      border-color: #67e8f9;
+      background: #ecfeff;
+      color: #155e75;
+    }
+
     .reception-channel-badge.unknown {
       border-color: #cbd5e1;
       background: #f8fafc;
@@ -2491,7 +2497,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-5-R1</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-5-R6</p>
           </div>
         </div>
       </div>
@@ -2839,6 +2845,7 @@
                 <option value="電話">電話</option>
                 <option value="店頭">店頭</option>
                 <option value="管理者代理">管理者代理</option>
+                <option value="ホームページ">ホームページ</option>
                 <option value="未記録">未記録</option>
               </select>
               <button class="btn btn-primary" onclick="loadReservations()">表示</button>
@@ -2876,7 +2883,7 @@
 
             <div class="add-grid">
               <div class="reception-channel-note">
-                LINE・電話・店頭・管理者代理の受付を同じ入庫予定として管理します。受付経路は一覧表示用の管理情報で、お客様向けメモには表示しません。
+                LINE・電話・店頭・管理者代理・ホームページの受付を同じ入庫予定として管理します。受付経路は一覧表示用の管理情報で、お客様向けメモには表示しません。
               </div>
 
               <div class="form-field">
@@ -2886,6 +2893,7 @@
                   <option value="電話">電話</option>
                   <option value="店頭">店頭</option>
                   <option value="管理者代理" selected>管理者代理</option>
+                  <option value="ホームページ">ホームページ</option>
                 </select>
               </div>
 
@@ -5855,8 +5863,8 @@
       }
     }
 
-    const RECEPTION_CHANNELS = ["LINE", "電話", "店頭", "管理者代理"];
-    const RECEPTION_CHANNEL_MARKER_PATTERN = /^【受付経路：(LINE|電話|店頭|管理者代理)】\s*/;
+    const RECEPTION_CHANNELS = ["LINE", "電話", "店頭", "管理者代理", "ホームページ"];
+    const RECEPTION_CHANNEL_MARKER_PATTERN = /^【受付経路：(LINE|電話|店頭|管理者代理|ホームページ)】\s*/;
     const RESERVATION_PROGRESS_STAGES = [
       "仮入庫",
       "入庫予定",
@@ -6108,6 +6116,7 @@
         電話: "phone",
         店頭: "counter",
         管理者代理: "owner",
+        ホームページ: "website",
         未記録: "unknown"
       }[channel] || "unknown";
     }
@@ -6220,6 +6229,7 @@
         電話: allRows.filter(row => inferReservationReceptionChannel(row) === "電話").length,
         店頭: allRows.filter(row => inferReservationReceptionChannel(row) === "店頭").length,
         管理者代理: allRows.filter(row => inferReservationReceptionChannel(row) === "管理者代理").length,
+        ホームページ: allRows.filter(row => inferReservationReceptionChannel(row) === "ホームページ").length,
         未記録: allRows.filter(row => inferReservationReceptionChannel(row) === "未記録").length
       };
 
@@ -6235,7 +6245,7 @@
       }[filter] || "対応中のみ";
 
       const channelName = channelFilter === "all" ? "全受付経路" : channelFilter;
-      el.textContent = `${filterName}・${channelName}：${visible}件 / 取得範囲：${total}件 / 非表示：${hidden}件　｜　LINE ${channelCounts.LINE}件・電話 ${channelCounts.電話}件・店頭 ${channelCounts.店頭}件・代理 ${channelCounts.管理者代理}件・未記録 ${channelCounts.未記録}件　｜　本日 ${today}件・今後7日 ${next7}件・仮入庫 ${provisional}件・対応中 ${active}件・作業完了 ${completed}件・キャンセル/削除 ${hiddenClosed}件`;
+      el.textContent = `${filterName}・${channelName}：${visible}件 / 取得範囲：${total}件 / 非表示：${hidden}件　｜　LINE ${channelCounts.LINE}件・電話 ${channelCounts.電話}件・店頭 ${channelCounts.店頭}件・代理 ${channelCounts.管理者代理}件・HP ${channelCounts.ホームページ}件・未記録 ${channelCounts.未記録}件　｜　本日 ${today}件・今後7日 ${next7}件・仮入庫 ${provisional}件・対応中 ${active}件・作業完了 ${completed}件・キャンセル/削除 ${hiddenClosed}件`;
     }
 
     async function openNewReservationForm() {
