@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-5-R6</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-7</title>
 
   <style>
     :root {
@@ -2497,7 +2497,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-5-R6</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-7</p>
           </div>
         </div>
       </div>
@@ -6640,13 +6640,21 @@
 
     function renderReservationAmount(row) {
       const actual = Number(row.actual_sales_amount || 0);
-      const estimated = Number(row.estimated_amount || 0);
+      const rawEstimated = row.estimated_amount;
+      const hasEstimatedAmount = rawEstimated !== null && rawEstimated !== undefined && rawEstimated !== "" && Number(rawEstimated) > 0;
+      const estimated = hasEstimatedAmount ? Number(rawEstimated) : 0;
 
       if (row.status === "作業完了" && actual > 0) {
         return `<strong>${yen(actual)}</strong><br><span class="badge badge-green">実売上</span>`;
       }
 
-      return yen(estimated || 0);
+      if (hasEstimatedAmount) return yen(estimated);
+
+      if (inferReservationReceptionChannel(row) === "ホームページ") {
+        return `<span class="badge badge-slate">料金未設定</span><br><span class="muted small">サービス設定を確認</span>`;
+      }
+
+      return `<span class="muted">未入力</span>`;
     }
 
     async function loadReservationTimeOptionsForForm(preferredTime = "") {
