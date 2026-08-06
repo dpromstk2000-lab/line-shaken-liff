@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-7</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-8</title>
 
   <style>
     :root {
@@ -2497,7 +2497,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-7</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-8</p>
           </div>
         </div>
       </div>
@@ -2530,6 +2530,7 @@
           <p id="pageDesc">毎日の主要操作をこの画面から始めます。電話・店頭受付、入庫対応、顧客・車両確認へすぐ移動できます。</p>
         </div>
         <div class="top-actions">
+          <button class="btn btn-red" onclick="openBiz8TestDataCleanup()">本番前テスト整理</button>
           <button class="btn btn-orange" onclick="openIpadDashboard()">iPad用画面</button>
           <button class="btn btn-slate" onclick="toggleTokenBox()">管理コード設定</button>
           <button class="btn btn-primary" onclick="refreshCurrentTab()">更新</button>
@@ -10307,6 +10308,178 @@ ${shopName}です。
       const plate = vehicle.plate_last4 ? ` / 下4桁 ${vehicle.plate_last4}` : "";
       return `${name}${plate}`;
     }
+
+
+    // STEP WANGAN-BIZ-8: 本番公開前のDPROテストデータ整理
+    function biz8NormalizePhone(value) {
+      const digits = String(value || "").replace(/\D/g, "");
+      if (digits.startsWith("81") && digits.length >= 11) return `0${digits.slice(2)}`;
+      return digits;
+    }
+
+    function biz8Text(...values) {
+      return values.map(value => String(value || "")).join(" ");
+    }
+
+    function biz8HasMarker(text) {
+      return /(WANGAN-BIZ|DPRO即時予約|DPRO仮予約|DPRO予約テスト|DPRO連動確認テスト|即時予約最終確認|WEB仮予約最終確認|写真相談テスト)/i.test(String(text || ""));
+    }
+
+    function biz8IsTestIdentity(name, phone) {
+      const normalizedName = String(name || "").trim();
+      return /^DPRO/.test(normalizedName) && /テスト/.test(normalizedName) && biz8NormalizePhone(phone) === "09012345678";
+    }
+
+    function biz8IsTestReservation(row) {
+      const customer = row?.customer || {};
+      const name = customer.name || row?.customer_name || row?.customer_name_snapshot || "";
+      const phone = customer.phone || row?.customer_phone || row?.phone_snapshot || "";
+      const text = biz8Text(row?.memo, row?.work_type, row?.source_page, row?.page_url, name);
+      return biz8HasMarker(text) || biz8IsTestIdentity(name, phone);
+    }
+
+    function biz8IsTestInquiry(row) {
+      const name = row?.customer_name_snapshot || row?.customer_name || row?.name || row?.customer?.name || "";
+      const phone = row?.phone_snapshot || row?.phone || row?.customer_phone || row?.customer?.phone || "";
+      const text = biz8Text(row?.message, row?.shop_memo, row?.consult_type, row?.other_consult_detail, row?.source_page, name);
+      return biz8HasMarker(text) || biz8IsTestIdentity(name, phone);
+    }
+
+    function biz8IsTestCustomer(row) {
+      return biz8IsTestIdentity(row?.name, row?.phone);
+    }
+
+    function biz8CleanupLabel(row, type) {
+      if (type === "reservation") {
+        const customer = row?.customer || {};
+        return `${row?.reservation_date || "日付未入力"} ${String(row?.reservation_time || "").slice(0,5)} / ${customer.name || row?.customer_name || "顧客名未入力"} / ${row?.work_type || "作業未入力"}`;
+      }
+      if (type === "inquiry") return `${row?.customer_name_snapshot || row?.customer_name || row?.name || "顧客名未入力"} / ${row?.consult_type || "相談"}`;
+      return `${row?.name || "顧客名未入力"} / ${row?.phone || "電話未入力"}`;
+    }
+
+    async function openBiz8TestDataCleanup() {
+      clearAlert();
+      setLoading(true);
+
+      try {
+        const [reservationData, inquiryData, customerData] = await Promise.all([
+          api('/api/reservations?from=2026-01-01&to=2027-12-31'),
+          api('/api/inquiries?limit=200'),
+          api('/api/customers?limit=1000')
+        ]);
+
+        const reservations = (reservationData.reservations || []).filter(biz8IsTestReservation);
+        const inquiries = (inquiryData.inquiries || []).filter(biz8IsTestInquiry);
+        const customers = (customerData.customers || []).filter(biz8IsTestCustomer);
+
+        window.__WANGAN_BIZ8_CLEANUP__ = { reservations, inquiries, customers };
+        setLoading(false);
+
+        if (!reservations.length && !inquiries.length && !customers.length) {
+          localStorage.setItem('wanganBiz8CleanupCompleted', JSON.stringify({
+            ok: true,
+            completedAt: new Date().toLocaleString('ja-JP'),
+            reservations: 0,
+            inquiries: 0,
+            customers: 0
+          }));
+          showOk('WANGAN-BIZのテストデータは見つかりませんでした。本番前整理は完了です。');
+          return;
+        }
+
+        const list = (rows, type) => rows.slice(0, 8).map(row => `<li>${escapeHtml(biz8CleanupLabel(row, type))}</li>`).join('');
+        const body = `
+          <p style="margin-top:0;color:#991b1b;font-weight:900">WANGAN-BIZの検査で作成したデータだけを整理します。</p>
+          <p class="muted">通常のお客様や、既存のデモデータは対象にしません。予約は「削除済み」、相談は「キャンセル」、対象テスト顧客は「削除済み」へ変更し、履歴とのつながりは保持します。</p>
+          <dl>
+            <dt>入庫予定</dt><dd>${reservations.length}件</dd>
+            <dt>相談</dt><dd>${inquiries.length}件</dd>
+            <dt>テスト顧客</dt><dd>${customers.length}件</dd>
+          </dl>
+          ${reservations.length ? `<h4>入庫予定</h4><ul>${list(reservations, 'reservation')}</ul>` : ''}
+          ${inquiries.length ? `<h4>相談</h4><ul>${list(inquiries, 'inquiry')}</ul>` : ''}
+          ${customers.length ? `<h4>顧客</h4><ul>${list(customers, 'customer')}</ul>` : ''}
+        `;
+
+        showConfirm('本番前テストデータを整理しますか？', body, executeBiz8TestDataCleanup, {
+          okText: 'テストデータを整理',
+          danger: true
+        });
+      } catch (error) {
+        setLoading(false);
+        showError(error.message);
+      }
+    }
+
+    async function executeBiz8TestDataCleanup() {
+      const targets = window.__WANGAN_BIZ8_CLEANUP__ || { reservations: [], inquiries: [], customers: [] };
+      const errors = [];
+      let reservationCount = 0;
+      let inquiryCount = 0;
+      let customerCount = 0;
+
+      clearAlert();
+      setLoading(true);
+
+      for (const row of targets.reservations) {
+        if (!row?.id) continue;
+        try {
+          await api(`/api/reservations/${row.id}`, { method: 'DELETE' });
+          reservationCount += 1;
+        } catch (error) {
+          errors.push(`入庫予定 ${biz8CleanupLabel(row, 'reservation')}：${error.message}`);
+        }
+      }
+
+      for (const row of targets.inquiries) {
+        if (!row?.id) continue;
+        try {
+          const currentMemo = String(row.shop_memo || '').trim();
+          await api(`/api/inquiries/${row.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              status: 'キャンセル',
+              priority: row.priority || '低',
+              shopMemo: [currentMemo, 'WANGAN-BIZ-8 本番公開前テスト整理済み'].filter(Boolean).join('\n')
+            })
+          });
+          inquiryCount += 1;
+        } catch (error) {
+          errors.push(`相談 ${biz8CleanupLabel(row, 'inquiry')}：${error.message}`);
+        }
+      }
+
+      for (const row of targets.customers) {
+        if (!row?.id) continue;
+        try {
+          await api(`/api/customers/${row.id}`, { method: 'DELETE' });
+          customerCount += 1;
+        } catch (error) {
+          errors.push(`顧客 ${biz8CleanupLabel(row, 'customer')}：${error.message}`);
+        }
+      }
+
+      setLoading(false);
+
+      if (errors.length) {
+        showError(`一部を整理できませんでした。\n\n${errors.join('\n')}`);
+        return;
+      }
+
+      const completed = {
+        ok: true,
+        completedAt: new Date().toLocaleString('ja-JP'),
+        reservations: reservationCount,
+        inquiries: inquiryCount,
+        customers: customerCount
+      };
+      localStorage.setItem('wanganBiz8CleanupCompleted', JSON.stringify(completed));
+      window.__WANGAN_BIZ8_CLEANUP__ = null;
+      showOk(`本番前テスト整理が完了しました。入庫予定 ${reservationCount}件、相談 ${inquiryCount}件、顧客 ${customerCount}件を整理しました。`);
+      await refreshCurrentTab();
+    }
+
   </script>
   <script src="ksh-next-5-owner-estimate.js?v=20260723"></script>
   <script src="ksh-next-8-followup-cockpit.js?v=20260723"></script>
