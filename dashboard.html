@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-3</title>
+  <title>DPRO 車検・整備工場 LINE｜オーナー画面 STEP WANGAN-BIZ-5-R1</title>
 
   <style>
     :root {
@@ -2340,6 +2340,142 @@
       .wb3-notice-form .full { grid-column:auto; }
     }
 
+
+
+    /* STEP WANGAN-BIZ-5-R1: 非公開添付写真プレビュー */
+    .inquiry-attachment-card {
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      background: #eff6ff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 240px;
+    }
+
+    .inquiry-attachment-card strong {
+      display: block;
+      color: #1e3a8a;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .inquiry-attachment-card span {
+      display: block;
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .inquiry-photo-modal {
+      width: min(1040px, calc(100vw - 28px));
+      max-width: 1040px;
+    }
+
+    .inquiry-photo-stage {
+      min-height: 420px;
+      border-radius: 16px;
+      background: #0f172a;
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) 52px;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .inquiry-photo-stage img {
+      display: block;
+      width: 100%;
+      height: min(62vh, 680px);
+      object-fit: contain;
+      border-radius: 10px;
+      background: #020617;
+    }
+
+    .inquiry-photo-nav {
+      width: 44px;
+      height: 54px;
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 12px;
+      background: rgba(15,23,42,0.82);
+      color: #ffffff;
+      font-size: 30px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .inquiry-photo-nav:disabled {
+      opacity: 0.25;
+      cursor: default;
+    }
+
+    .inquiry-photo-loading,
+    .inquiry-photo-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 28px;
+      color: #e2e8f0;
+      background: rgba(2,6,23,0.9);
+      font-weight: 800;
+      line-height: 1.7;
+      z-index: 2;
+    }
+
+    .inquiry-photo-error {
+      color: #fecaca;
+    }
+
+    .inquiry-photo-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12px;
+    }
+
+    .inquiry-photo-meta strong {
+      color: #0f172a;
+    }
+
+    @media (max-width: 720px) {
+      .inquiry-attachment-card {
+        align-items: stretch;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .inquiry-photo-stage {
+        min-height: 300px;
+        grid-template-columns: 40px minmax(0, 1fr) 40px;
+        padding: 8px;
+      }
+
+      .inquiry-photo-stage img {
+        height: min(58vh, 520px);
+      }
+
+      .inquiry-photo-nav {
+        width: 36px;
+        height: 48px;
+        font-size: 25px;
+      }
+    }
+
   </style>
 </head>
 
@@ -2355,7 +2491,7 @@
           <div id="dashboardLogoText" class="logo">SH</div>
           <div>
             <h1><span id="dashboardShopName">STREET HOUSE 杵築</span><br>オーナー画面</h1>
-            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-3</p>
+            <p><span id="dashboardServiceName">DPRO車検・整備LINE管理システム</span> / STEP WANGAN-BIZ-5-R1</p>
           </div>
         </div>
       </div>
@@ -3903,6 +4039,39 @@
     </div>
   </div>
 
+
+
+  <div id="inquiryPhotoOverlay" class="modal-overlay" onclick="handleInquiryPhotoOverlayClick(event)">
+    <div class="modal modal-wide inquiry-photo-modal" role="dialog" aria-modal="true" aria-labelledby="inquiryPhotoTitle">
+      <div class="modal-head">
+        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start">
+          <div>
+            <h3 id="inquiryPhotoTitle">添付写真</h3>
+            <div id="inquiryPhotoSub" class="small muted" style="margin-top:4px">非公開保存された写真を確認します。</div>
+          </div>
+          <button class="btn btn-slate" onclick="closeInquiryPhotoViewer()">閉じる</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="inquiry-photo-stage">
+          <button id="inquiryPhotoPrev" class="inquiry-photo-nav" type="button" aria-label="前の写真" onclick="moveInquiryPhoto(-1)">‹</button>
+          <img id="inquiryPhotoImage" alt="相談に添付された写真" referrerpolicy="no-referrer" />
+          <button id="inquiryPhotoNext" class="inquiry-photo-nav" type="button" aria-label="次の写真" onclick="moveInquiryPhoto(1)">›</button>
+          <div id="inquiryPhotoLoading" class="inquiry-photo-loading">写真を安全に読み込んでいます…</div>
+          <div id="inquiryPhotoError" class="inquiry-photo-error" style="display:none"></div>
+        </div>
+        <div class="inquiry-photo-meta">
+          <strong id="inquiryPhotoCounter">添付写真</strong>
+          <span id="inquiryPhotoFileName"></span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-slate" onclick="closeInquiryPhotoViewer()">閉じる</button>
+        <button id="inquiryPhotoOpenOriginal" class="btn btn-primary" onclick="openCurrentInquiryPhotoInNewTab()">別タブで開く</button>
+      </div>
+    </div>
+  </div>
+
   <div id="copyToast" class="copy-toast">
     <strong id="copyToastTitle">コピーしました</strong>
     <span id="copyToastText"></span>
@@ -3921,6 +4090,11 @@
       options: []
     };
     let copyToastTimer = null;
+    let inquiryPhotoViewerState = {
+      inquiryId: "",
+      attachments: [],
+      index: 0
+    };
 
 
     let shopSettings = {
@@ -4846,7 +5020,7 @@
         const carName = row.car_name_snapshot || row.vehicle?.car_name || "";
         const plateLast4 = row.vehicle?.plate_last4 || row.plate_last4 || "";
         const nextShakenText = buildTaskShakenText(row.next_shaken_year || row.vehicle?.next_shaken_year, row.next_shaken_month || row.vehicle?.next_shaken_month, row.vehicle?.next_shaken_date || row.next_shaken_date);
-        const inquiryText = row.message || row.shop_memo || "";
+        const inquiryText = cleanInquiryMessage(row.message) || row.shop_memo || "";
         const memoText = [
           row.shop_memo ? `店舗メモ：${row.shop_memo}` : "",
           row.other_consult_detail ? `その他内容：${row.other_consult_detail}` : ""
@@ -5346,6 +5520,225 @@
       return isActiveInquiryForList(row);
     }
 
+    function parseInquiryPhotoMarkers(message) {
+      const raw = String(message || "");
+      const markerNumbers = new Set();
+      const fallbackAttachments = [];
+
+      const urlPattern = /[【\[]\s*添付写真\s*(\d+)\s*[】\]]\s*(https?:\/\/[^\s<>"']+)/gi;
+      let cleanMessage = raw.replace(urlPattern, (match, number, url) => {
+        const index = Number(number) || (fallbackAttachments.length + 1);
+        markerNumbers.add(index);
+        if (isSafeInquiryPhotoUrl(url)) {
+          fallbackAttachments.push({
+            id: `legacy-${index}`,
+            displayOrder: index,
+            originalName: `添付写真${index}`,
+            mimeType: "image/*",
+            fileSize: 0,
+            signedUrl: url
+          });
+        }
+        return "";
+      });
+
+      const savedMarkerPattern = /[【\[]\s*添付写真\s*(\d+)\s*[】\]]\s*(?:保存済み[^\n]*|管理画面[^\n]*)?/gi;
+      cleanMessage = cleanMessage.replace(savedMarkerPattern, (match, number) => {
+        markerNumbers.add(Number(number) || 1);
+        return "";
+      });
+
+      cleanMessage = cleanMessage
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      fallbackAttachments.sort((a, b) => a.displayOrder - b.displayOrder);
+      return {
+        cleanMessage,
+        markerCount: markerNumbers.size,
+        fallbackAttachments
+      };
+    }
+
+    function cleanInquiryMessage(message) {
+      return parseInquiryPhotoMarkers(message).cleanMessage;
+    }
+
+    function isSafeInquiryPhotoUrl(value) {
+      try {
+        const url = new URL(String(value || ""));
+        return url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    }
+
+    function inquiryAttachmentCount(row) {
+      const parsed = parseInquiryPhotoMarkers(row?.message);
+      const explicit = Number(row?.attachment_count || row?.attachmentCount || 0);
+      return Math.max(parsed.markerCount, Number.isFinite(explicit) ? explicit : 0);
+    }
+
+    function renderInquiryMessageAndAttachments(row) {
+      const parsed = parseInquiryPhotoMarkers(row?.message);
+      const count = inquiryAttachmentCount(row);
+      const message = parsed.cleanMessage || "内容なし";
+      const attachment = count > 0 ? `
+        <div class="inquiry-attachment-card">
+          <div>
+            <strong>📷 添付写真 ${count}枚</strong>
+            <span>非公開Storageから、確認時だけ安全なURLを発行します。</span>
+          </div>
+          <button class="btn btn-primary" type="button" onclick="openInquiryPhotoViewer('${row.id}')">写真を見る</button>
+        </div>
+      ` : "";
+      return `<div class="message-box" style="margin-top:8px">${escapeHtml(message)}</div>${attachment}`;
+    }
+
+    async function openInquiryPhotoViewer(id) {
+      const row = findInquiry(id);
+      if (!row) {
+        showError("写真を確認する相談が見つかりません。");
+        return;
+      }
+
+      inquiryPhotoViewerState = { inquiryId: id, attachments: [], index: 0 };
+      const overlay = document.getElementById("inquiryPhotoOverlay");
+      const customerName = row.customer_name_snapshot || row.customer?.name || "お客様";
+      const carName = row.car_name_snapshot || row.vehicle?.car_name || "車両未入力";
+      document.getElementById("inquiryPhotoTitle").textContent = `${customerName}様の添付写真`;
+      document.getElementById("inquiryPhotoSub").textContent = `${carName} / 相談受付 ${formatDateTime(row.created_at)}`;
+      overlay.classList.add("active");
+      document.body.style.overflow = "hidden";
+      setInquiryPhotoLoading("写真を安全に読み込んでいます…");
+
+      const parsed = parseInquiryPhotoMarkers(row.message);
+      let attachments = [];
+      let endpointError = null;
+
+      try {
+        const data = await api(`/api/website-admin/inquiries/${encodeURIComponent(id)}/attachments`);
+        attachments = Array.isArray(data.attachments)
+          ? data.attachments.filter(item => isSafeInquiryPhotoUrl(item?.signedUrl))
+          : [];
+      } catch (error) {
+        endpointError = error;
+      }
+
+      if (!attachments.length) {
+        attachments = parsed.fallbackAttachments;
+      }
+
+      inquiryPhotoViewerState.attachments = attachments;
+      inquiryPhotoViewerState.index = 0;
+
+      if (!attachments.length) {
+        setInquiryPhotoError(
+          endpointError
+            ? `写真を取得できませんでした。\n${endpointError.message}`
+            : "この相談に確認可能な写真がありません。"
+        );
+        updateInquiryPhotoControls();
+        return;
+      }
+
+      renderCurrentInquiryPhoto();
+    }
+
+    function renderCurrentInquiryPhoto() {
+      const attachments = inquiryPhotoViewerState.attachments;
+      const index = inquiryPhotoViewerState.index;
+      const item = attachments[index];
+      if (!item || !isSafeInquiryPhotoUrl(item.signedUrl)) {
+        setInquiryPhotoError("写真URLを確認できませんでした。");
+        updateInquiryPhotoControls();
+        return;
+      }
+
+      setInquiryPhotoLoading("写真を読み込んでいます…");
+      const image = document.getElementById("inquiryPhotoImage");
+      image.onload = () => {
+        document.getElementById("inquiryPhotoLoading").style.display = "none";
+        document.getElementById("inquiryPhotoError").style.display = "none";
+      };
+      image.onerror = () => {
+        setInquiryPhotoError("写真を表示できませんでした。URLを再発行して、もう一度開いてください。");
+      };
+      image.src = item.signedUrl;
+      image.alt = `${item.originalName || "添付写真"}（${index + 1}枚目）`;
+
+      document.getElementById("inquiryPhotoCounter").textContent = `添付写真 ${index + 1} / ${attachments.length}`;
+      document.getElementById("inquiryPhotoFileName").textContent = [
+        item.originalName || `添付写真${index + 1}`,
+        formatFileSize(item.fileSize)
+      ].filter(Boolean).join(" / ");
+      updateInquiryPhotoControls();
+    }
+
+    function moveInquiryPhoto(direction) {
+      const total = inquiryPhotoViewerState.attachments.length;
+      if (total <= 1) return;
+      inquiryPhotoViewerState.index = (inquiryPhotoViewerState.index + direction + total) % total;
+      renderCurrentInquiryPhoto();
+    }
+
+    function updateInquiryPhotoControls() {
+      const total = inquiryPhotoViewerState.attachments.length;
+      const hasPhoto = total > 0;
+      document.getElementById("inquiryPhotoPrev").disabled = total <= 1;
+      document.getElementById("inquiryPhotoNext").disabled = total <= 1;
+      document.getElementById("inquiryPhotoOpenOriginal").disabled = !hasPhoto;
+    }
+
+    function setInquiryPhotoLoading(message) {
+      const loading = document.getElementById("inquiryPhotoLoading");
+      const error = document.getElementById("inquiryPhotoError");
+      loading.textContent = message || "読み込んでいます…";
+      loading.style.display = "flex";
+      error.style.display = "none";
+      const image = document.getElementById("inquiryPhotoImage");
+      image.removeAttribute("src");
+    }
+
+    function setInquiryPhotoError(message) {
+      const loading = document.getElementById("inquiryPhotoLoading");
+      const error = document.getElementById("inquiryPhotoError");
+      loading.style.display = "none";
+      error.textContent = message || "写真を表示できませんでした。";
+      error.style.display = "flex";
+    }
+
+    function closeInquiryPhotoViewer() {
+      const overlay = document.getElementById("inquiryPhotoOverlay");
+      overlay.classList.remove("active");
+      document.body.style.overflow = "";
+      const image = document.getElementById("inquiryPhotoImage");
+      image.onload = null;
+      image.onerror = null;
+      image.removeAttribute("src");
+      inquiryPhotoViewerState = { inquiryId: "", attachments: [], index: 0 };
+    }
+
+    function handleInquiryPhotoOverlayClick(event) {
+      if (event.target?.id === "inquiryPhotoOverlay") closeInquiryPhotoViewer();
+    }
+
+    function openCurrentInquiryPhotoInNewTab() {
+      const item = inquiryPhotoViewerState.attachments[inquiryPhotoViewerState.index];
+      if (!item || !isSafeInquiryPhotoUrl(item.signedUrl)) return;
+      const opened = window.open(item.signedUrl, "_blank", "noopener,noreferrer");
+      if (opened) opened.opener = null;
+    }
+
+    function formatFileSize(value) {
+      const size = Number(value || 0);
+      if (!Number.isFinite(size) || size <= 0) return "";
+      if (size < 1024) return `${size}B`;
+      if (size < 1024 * 1024) return `${Math.round(size / 1024)}KB`;
+      return `${(size / (1024 * 1024)).toFixed(1)}MB`;
+    }
+
     function renderInquiries(rows) {
       const body = document.getElementById("inquiryTableBody");
       const filter = getInquiryListFilter();
@@ -5387,7 +5780,7 @@
           </td>
           <td>
             ${badgeConsult(row.consult_type)}
-            <div class="message-box" style="margin-top:8px">${escapeHtml(row.message || "内容なし")}</div>
+            ${renderInquiryMessageAndAttachments(row)}
           </td>
           <td>${escapeHtml(row.preferred_visit_date ? formatDate(row.preferred_visit_date) : "未入力")}</td>
           <td><div class="auto-box">${renderAutoBadgesForInquiry(row)}</div></td>
@@ -5926,7 +6319,7 @@
         document.getElementById("reservationEstimatedAmount").value = inquiry.estimated_amount || "";
         document.getElementById("reservationMemo").value = [
           inquiry.consult_type ? `相談内容：${inquiry.consult_type}` : "",
-          inquiry.message ? `内容：${inquiry.message}` : ""
+          cleanInquiryMessage(inquiry.message) ? `内容：${cleanInquiryMessage(inquiry.message)}` : ""
         ].filter(Boolean).join("\n");
 
         document.getElementById("reservationFormBox").dataset.inquiryId = inquiry.id || "";
@@ -9726,6 +10119,21 @@ ${shopName}です。
       }
       return "未入力";
     }
+
+    document.addEventListener("keydown", event => {
+      const overlay = document.getElementById("inquiryPhotoOverlay");
+      if (!overlay?.classList.contains("active")) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeInquiryPhotoViewer();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveInquiryPhoto(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        moveInquiryPhoto(1);
+      }
+    });
 
     function formatMonthLabel(value) {
       if (!value) return "";
