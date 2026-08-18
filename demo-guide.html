@@ -1,0 +1,235 @@
+<!doctype html>
+<!-- DPRO LIVE DEMO COMMON TEMPLATE V1.0 LOCK / CONFIGURABLE TEMPLATE -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title id="pageTitle">DPRO 公開操作デモ・画面一覧</title>
+<style>
+:root{
+  --bg:#f4f4f4;--card:#fff;--ink:#161616;--muted:#6d6d6d;--line:#ded7d0;
+  --brand:#e67e22;--deep:#111827;--brand2:#8e4409;--soft:#fff4e8;
+  --shadow:0 16px 46px rgba(17,24,39,.10)
+}
+*{box-sizing:border-box}
+html{background:var(--bg);scroll-behavior:smooth}
+body{margin:0;min-height:100vh;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;line-height:1.65;background:linear-gradient(180deg,#fff 0%,var(--bg) 100%)}
+a{color:inherit}.page{width:min(1140px,calc(100% - 24px));margin:0 auto;padding:20px 0 48px}
+.hero{position:relative;overflow:hidden;padding:34px;border-radius:28px;color:#fff;background:linear-gradient(135deg,var(--deep),var(--brand) 63%,var(--brand2));box-shadow:0 23px 58px rgba(35,30,27,.20)}
+.hero:after{content:"";position:absolute;right:-95px;bottom:-150px;width:290px;height:290px;border-radius:50%;background:rgba(255,255,255,.07)}
+.kicker{position:relative;z-index:1;font-size:11px;font-weight:1000;letter-spacing:.14em;opacity:.9}
+.hero h1{position:relative;z-index:1;margin:10px 0 0;font-size:clamp(28px,5vw,49px);line-height:1.24}
+.hero p{position:relative;z-index:1;max-width:830px;margin:13px 0 0;font-size:14px;opacity:.93}
+.hero-actions{position:relative;z-index:1;display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.button{min-height:45px;display:inline-flex;align-items:center;justify-content:center;padding:9px 15px;border-radius:999px;text-decoration:none;font-size:12px;font-weight:950}
+.button-light{color:var(--deep);background:#fff}.button-ghost{color:#fff;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.09)}
+.notice{margin-top:15px;padding:15px 17px;border:1px solid #e5cda3;border-radius:15px;background:#fff5e5;color:#725013;font-size:12px;font-weight:760}
+.demo-info{margin-top:16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.demo-info>div{padding:14px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.96);box-shadow:var(--shadow)}
+.demo-info small{display:block;color:var(--brand);font-size:9px;font-weight:1000;letter-spacing:.08em}.demo-info strong{display:block;margin-top:4px;font-size:14px}
+.section-head{margin:32px 0 15px}.section-head small{color:var(--brand);font-size:10px;font-weight:1000;letter-spacing:.12em}.section-head h2{margin:5px 0 0;font-size:clamp(23px,4vw,34px)}.section-head p{max-width:840px;margin:7px 0 0;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.card{min-width:0;padding:20px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.98);box-shadow:var(--shadow)}
+.card-number{color:var(--brand);font-size:10px;font-weight:1000;letter-spacing:.1em}.card h3{margin:7px 0 0;font-size:21px;line-height:1.4}.card p{margin:8px 0 0;color:var(--muted);font-size:12px}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.pills span{padding:5px 8px;border-radius:999px;background:var(--soft);color:var(--deep);font-size:9px;font-weight:900}
+.card-note{margin-top:13px;padding:11px;border-radius:12px;background:var(--soft);color:#675a54;font-size:11px}.card-note b{color:var(--deep)}
+.card-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:15px}
+.open,.official{min-height:44px;display:flex;align-items:center;justify-content:center;padding:9px 13px;border-radius:12px;text-decoration:none;font-size:10px;font-weight:950}
+.open{color:#fff;background:linear-gradient(135deg,var(--deep),var(--brand2))}.official{color:var(--deep);border:1px solid var(--line);background:var(--soft)}
+.flow{margin-top:14px;padding:19px;border:1px solid var(--line);border-radius:19px;background:#fff;box-shadow:var(--shadow)}
+.flow-grid{display:grid;grid-template-columns:repeat(var(--flow-cols,5),minmax(0,1fr));gap:8px}
+.flow-step{padding:12px;border-radius:12px;background:var(--soft)}.flow-step b{display:block;color:var(--brand);font-size:10px}.flow-step strong{display:block;margin-top:4px;font-size:11px}.flow-step.same{border:1px dashed #cdbfb6}
+.footer{margin-top:26px;color:#82736c;font-size:10px;text-align:center}
+@media(max-width:900px){.flow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.hero{padding:25px 20px}.demo-info,.grid,.flow-grid{grid-template-columns:1fr}}
+@media(max-width:420px){.page{width:min(100% - 16px,1140px)}.card-actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="page">
+<section class="hero">
+  <div class="kicker">PUBLIC OPERATION DEMO / V1.0</div>
+  <h1 id="heroTitle"></h1>
+  <p id="heroCopy"></p>
+  <div class="hero-actions">
+    <a class="button button-light" id="officialLink">公式の機能・料金説明を見る</a>
+    <a class="button button-ghost" id="primaryDemoLink">まず体験する</a>
+  </div>
+</section>
+
+<div class="notice" id="notice"></div>
+
+<section class="demo-info" id="quickInfo" aria-label="デモ利用情報"></section>
+
+<div class="section-head">
+  <small>CHOOSE A SCREEN</small>
+  <h2>確認する画面を選択</h2>
+  <p id="screenIntro"></p>
+</div>
+
+<section class="grid" id="screenGrid"></section>
+
+<div class="section-head">
+  <small>RECOMMENDED JOURNEY</small>
+  <h2>おすすめの確認順</h2>
+  <p id="journeyIntro"></p>
+</div>
+<section class="flow"><div class="flow-grid" id="flowGrid"></div></section>
+
+<div class="footer" id="footer"></div>
+</main>
+
+<script>
+/*
+  DPRO LIVE DEMO COMMON TEMPLATE V1.0
+  ------------------------------------------------------------
+  変更してよいのは CONFIG の値とCSS変数のブランド色のみ。
+  DOM骨格・セクション順・公開注意・CHOOSE A SCREEN・
+  RECOMMENDED JOURNEYはCOMMON TEMPLATE V1.0 LOCK対象。
+*/
+const CONFIG = {
+  "systemName": "DPRO 車検・整備工場 LINE",
+  "pageTitle": "DPRO 車検・整備工場 LINE｜公開操作デモ・画面一覧",
+  "heroCopy": "LINE・電話・店頭の受付から、車両単位の整備進捗、見積確認・承認、整備履歴、次回車検・オイル交換の案内まで。受付情報と車両履歴が切れない流れを実画面で確認できます。",
+  "officialUrl": "https://dpromstk2000-lab.github.io/dpro-line-systems-site/lp-car-service.html",
+  "primaryDemoUrl": "https://dpromstk2000-lab.github.io/line-shaken-liff/index-product-demo.html",
+  "notice": "公開デモでは実在する氏名・電話番号・ナンバー・車両情報・整備内容・見積情報を入力せず、必ず架空の内容を使用してください。管理系画面は embed_demo=1 とデモ用管理コード1234を使用し、製品紹介用の安全な表示で確認してください。",
+  "screenIntro": "最初に01の受付・車両情報を確認し、会員側の見積確認・承認→現場進捗→オーナー側の車両履歴・次回フォローの順に進むと、車両単位で受付から再来店までつながる流れを確認できます。",
+  "journeyIntro": "受付した車両が見積承認・整備進行・履歴化され、次回車検やオイル交換案内へつながる順番で確認します。",
+  "adminCode": "1234",
+  "quickInfo": [
+    {
+      "label": "CUSTOMER FLOW",
+      "text": "01 受付・車両 → 02 見積確認・承認 → 03 整備進捗 → 04–05 履歴・次回案内"
+    },
+    {
+      "label": "DEMO INFO",
+      "text": "会員例は demo=1。管理系は embed_demo=1 でデモコード1234を自動設定し更新を抑止。"
+    },
+    {
+      "label": "SCREEN STRUCTURE",
+      "text": "既存の実画面4つで5工程を確認。04–05は同じオーナーPC画面"
+    }
+  ],
+  "screens": [
+    {
+      "step": "01 / お客様 / PRIMARY EXPERIENCE",
+      "title": "お客様受付・車両情報",
+      "description": "車検・整備・カスタム相談の内容と、お客様・車両・希望内容を入力する現行の製品紹介用受付フローを確認できます。",
+      "tags": [
+        "受付相談",
+        "車両情報",
+        "希望内容"
+      ],
+      "note": "現行の製品紹介用受付をDEMO01として維持します。氏名・電話番号・ナンバーなどは必ず架空情報を使用してください。",
+      "url": "https://dpromstk2000-lab.github.io/line-shaken-liff/index-product-demo.html",
+      "cta": "受付デモを体験する",
+      "officialUrl": "https://dpromstk2000-lab.github.io/dpro-line-systems-site/lp-car-service.html"
+    },
+    {
+      "step": "02 / お客様 / ESTIMATE",
+      "title": "マイカーページ｜見積確認・承認",
+      "description": "車両ごとの現在進捗と見積内容を確認し、「この見積を承認する」「内容を相談する」から次の対応へ進める流れを確認できます。",
+      "tags": [
+        "見積確認・承認",
+        "車両別進捗",
+        "整備履歴"
+      ],
+      "note": "demo=1 では架空の会員例を表示します。見積確認から承認・相談の導線を確認してください。",
+      "url": "https://dpromstk2000-lab.github.io/line-shaken-liff/member.html?demo=1",
+      "cta": "見積・会員画面を見る",
+      "officialUrl": "https://dpromstk2000-lab.github.io/dpro-line-systems-site/lp-car-service.html"
+    },
+    {
+      "step": "03 / 受付iPad / OPERATIONS",
+      "title": "受付iPad｜整備進捗・現場対応",
+      "description": "本日の受付、車両単位の入庫状況、整備進捗、現場で必要な確認・操作をiPad向け画面で確認できます。",
+      "tags": [
+        "入庫受付",
+        "整備進捗",
+        "現場対応"
+      ],
+      "note": "embed_demo=1 ではデモ用管理コード1234を自動設定し、製品紹介用として更新処理を抑止します。",
+      "url": "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1",
+      "cta": "受付iPadを開く",
+      "officialUrl": "https://dpromstk2000-lab.github.io/dpro-line-systems-site/lp-car-service.html"
+    },
+    {
+      "step": "04–05 / オーナーPC / SAME SCREEN",
+      "title": "車両履歴・次回車検／オイルフォロー",
+      "description": "顧客・車両・整備履歴を確認し、未対応や次回車検・オイル交換などのフォロー対象とLINE案内文面までを同じ管理画面で確認できます。",
+      "tags": [
+        "車両・整備履歴",
+        "次回車検",
+        "オイル交換フォロー"
+      ],
+      "note": "04と05は同じオーナー画面です。車両・整備履歴を確認した後、次回フォロー／LINE文面の順に確認してください。",
+      "url": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+      "cta": "オーナー画面を開く",
+      "officialUrl": "https://dpromstk2000-lab.github.io/dpro-line-systems-site/lp-car-service.html"
+    }
+  ],
+  "journey": [
+    {
+      "step": "01",
+      "text": "受付・車両登録"
+    },
+    {
+      "step": "02",
+      "text": "見積確認・承認"
+    },
+    {
+      "step": "03",
+      "text": "入庫・整備進捗"
+    },
+    {
+      "step": "04",
+      "text": "車両・整備履歴"
+    },
+    {
+      "step": "05",
+      "text": "次回車検・オイル案内",
+      "sameScreen": true
+    }
+  ]
+};
+
+document.documentElement.style.setProperty("--flow-cols", String(Math.min(CONFIG.journey.length, 7)));
+document.title = CONFIG.pageTitle;
+document.getElementById("heroTitle").innerHTML = `${CONFIG.systemName}<br>公開操作デモ・画面一覧`;
+document.getElementById("heroCopy").textContent = CONFIG.heroCopy;
+document.getElementById("officialLink").href = CONFIG.officialUrl;
+document.getElementById("primaryDemoLink").href = CONFIG.primaryDemoUrl;
+document.getElementById("notice").textContent = CONFIG.notice;
+document.getElementById("screenIntro").textContent = CONFIG.screenIntro;
+document.getElementById("journeyIntro").textContent = CONFIG.journeyIntro;
+document.getElementById("footer").textContent = `${CONFIG.systemName}｜PUBLIC OPERATION DEMO V1.0`;
+
+document.getElementById("quickInfo").innerHTML = CONFIG.quickInfo.map(x =>
+  `<div><small>${x.label}</small><strong>${x.text}</strong></div>`
+).join("");
+
+document.getElementById("screenGrid").innerHTML = CONFIG.screens.map(x => `
+  <article class="card">
+    <div class="card-number">${x.step}</div>
+    <h3>${x.title}</h3>
+    <p>${x.description}</p>
+    <div class="pills">${x.tags.map(t => `<span>${t}</span>`).join("")}</div>
+    <div class="card-note">${x.note}</div>
+    <div class="card-actions">
+      <a class="open" href="${x.url}">${x.cta}</a>
+      <a class="official" href="${x.officialUrl}">説明</a>
+    </div>
+  </article>
+`).join("");
+
+document.getElementById("flowGrid").innerHTML = CONFIG.journey.map(x => `
+  <div class="flow-step${x.sameScreen ? " same" : ""}">
+    <b>${x.step}${x.sameScreen ? " / SAME SCREEN" : ""}</b>
+    <strong>${x.text}</strong>
+  </div>
+`).join("");
+</script>
+</body>
+</html>
