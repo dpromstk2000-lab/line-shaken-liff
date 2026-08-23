@@ -4087,9 +4087,10 @@
   </div>
 
   <script>
-    const WORKER_API_BASE = "https://dpro-wangan-biz-api.dpromstk2000.workers.dev";
+    const CONTROL_ADAPTER_BASE = "https://ropwvdnohadwxfbkcopx.supabase.co/functions/v1/dpro-car-service-control-adapter";
+    const WORKER_API_BASE = CONTROL_ADAPTER_BASE + "/wangan";
     const KSH_DEMO_RESET_WORKER_URL = "https://ksh-demo-reset.dpromstk2000.workers.dev";
-    const DEFAULT_DASHBOARD_TOKEN = "1234";
+    const DEMO_DASHBOARD_TOKEN = "1234";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
 
     let messageEditorState = {
@@ -4258,7 +4259,7 @@
       }
     }
 
-    let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
+    let dashboardToken = localStorage.getItem("dpro_car_service_owner_session") || "";
     let currentTab = "today";
     let currentCustomerFilter = "all";
 
@@ -4348,8 +4349,8 @@
 
     window.addEventListener("load", async () => {
       if (IS_EMBED_DEMO) {
-        dashboardToken = "1234";
-        try { localStorage.setItem("ksh_dashboard_token", "1234"); } catch (error) {}
+        dashboardToken = DEMO_DASHBOARD_TOKEN;
+        try { localStorage.removeItem("dpro_car_service_owner_session"); } catch (error) {}
         const banner = document.getElementById("embed-demo-banner");
         if (banner) banner.style.display = "block";
       }
@@ -4534,14 +4535,14 @@
 
     function saveToken() {
       dashboardToken = document.getElementById("tokenInput").value.trim();
-      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      if (IS_EMBED_DEMO) localStorage.removeItem("dpro_car_service_owner_session"); else if (dashboardToken) localStorage.setItem("dpro_car_service_owner_session", dashboardToken); else localStorage.removeItem("dpro_car_service_owner_session");
       showOk("認証トークンを保存しました。");
     }
 
     function resetToken() {
-      dashboardToken = DEFAULT_DASHBOARD_TOKEN;
+      dashboardToken = IS_EMBED_DEMO ? DEMO_DASHBOARD_TOKEN : "";
       document.getElementById("tokenInput").value = dashboardToken;
-      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      if (IS_EMBED_DEMO) localStorage.removeItem("dpro_car_service_owner_session"); else if (dashboardToken) localStorage.setItem("dpro_car_service_owner_session", dashboardToken); else localStorage.removeItem("dpro_car_service_owner_session");
       showOk("認証トークンを初期値に戻しました。");
     }
 
@@ -4550,7 +4551,8 @@
 
       const headers = {
         "Content-Type": "application/json",
-        "X-Dashboard-Token": dashboardToken,
+        ...(IS_EMBED_DEMO ? { "X-DPRO-Demo": "1" } : {}),
+        ...(!IS_EMBED_DEMO && dashboardToken ? { "Authorization": `Bearer ${dashboardToken}` } : {}),
         ...(options.headers || {})
       };
 

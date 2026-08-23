@@ -1433,8 +1433,9 @@
   </div>
 
   <script>
-    const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
-    const DEFAULT_DASHBOARD_TOKEN = "1234";
+    const CONTROL_ADAPTER_BASE = "https://ropwvdnohadwxfbkcopx.supabase.co/functions/v1/dpro-car-service-control-adapter";
+    const WORKER_API_BASE = CONTROL_ADAPTER_BASE + "/ksh";
+    const DEMO_DASHBOARD_TOKEN = "1234";
     const LINE_MANAGER_URL = "https://manager.line.biz/";
 
 
@@ -1493,7 +1494,7 @@
       }
     }
 
-    let dashboardToken = localStorage.getItem("ksh_dashboard_token") || DEFAULT_DASHBOARD_TOKEN;
+    let dashboardToken = localStorage.getItem("dpro_car_service_owner_session") || "";
     let currentTab = "today";
     let reservationFilter = "today";
     let returnUrl = "dashboard.html";
@@ -1532,8 +1533,8 @@
 
     window.addEventListener("load", async () => {
       if (IS_EMBED_DEMO) {
-        dashboardToken = "1234";
-        try { localStorage.setItem("ksh_dashboard_token", "1234"); } catch (error) {}
+        dashboardToken = DEMO_DASHBOARD_TOKEN;
+        try { localStorage.removeItem("dpro_car_service_owner_session"); } catch (error) {}
         const banner = document.getElementById("embed-demo-banner");
         if (banner) banner.style.display = "block";
       }
@@ -1609,30 +1610,32 @@
     }
 
     function saveToken() {
-      dashboardToken = document.getElementById("tokenInput").value.trim() || DEFAULT_DASHBOARD_TOKEN;
-      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      dashboardToken = document.getElementById("tokenInput").value.trim();
+      if (IS_EMBED_DEMO) localStorage.removeItem("dpro_car_service_owner_session"); else if (dashboardToken) localStorage.setItem("dpro_car_service_owner_session", dashboardToken); else localStorage.removeItem("dpro_car_service_owner_session");
       showOk("認証トークンを保存しました。");
     }
 
     function resetToken() {
-      dashboardToken = DEFAULT_DASHBOARD_TOKEN;
+      dashboardToken = IS_EMBED_DEMO ? DEMO_DASHBOARD_TOKEN : "";
       document.getElementById("tokenInput").value = dashboardToken;
-      localStorage.setItem("ksh_dashboard_token", dashboardToken);
+      if (IS_EMBED_DEMO) localStorage.removeItem("dpro_car_service_owner_session"); else if (dashboardToken) localStorage.setItem("dpro_car_service_owner_session", dashboardToken); else localStorage.removeItem("dpro_car_service_owner_session");
       showOk("認証トークンを初期値に戻しました。");
     }
 
     function buildApiUrl(path) {
       const url = new URL(`${WORKER_API_BASE}${path}`);
       const isPublicApi = url.pathname.startsWith("/api/public/") || url.pathname === "/health";
-      if (!isPublicApi && dashboardToken) {
-        url.searchParams.set("token", dashboardToken);
-      }
+      // R2: credential is carried only by adapter Authorization/demo headers; never in URL.
       return url.toString();
     }
 
     async function api(path, options = {}) {
       const url = buildApiUrl(path);
-      const headers = { ...(options.headers || {}) };
+      const headers = {
+        ...(IS_EMBED_DEMO ? { "X-DPRO-Demo": "1" } : {}),
+        ...(!IS_EMBED_DEMO && dashboardToken ? { "Authorization": `Bearer ${dashboardToken}` } : {}),
+        ...(options.headers || {})
+      };
 
       // iPad画面は現場で使うため、CORSの事前確認で止まりにくい形にする。
       // Worker側は request.text() からJSONを読むため、text/plain でも正常に処理できます。

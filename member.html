@@ -284,9 +284,20 @@
 
   <script>
     const LIFF_ID = "2010239091-K5EeUmBh";
-    const WORKER_API_BASE = "https://ksh-line-demo-api.dpromstk2000.workers.dev";
+    const CONTROL_ADAPTER_BASE = "https://ropwvdnohadwxfbkcopx.supabase.co/functions/v1/dpro-car-service-control-adapter";
+    const WORKER_API_BASE = CONTROL_ADAPTER_BASE + "/ksh";
     const SHOP_CODE = "street_house_kitsuki";
     const VERSION = "STEP KSH-NEXT-7";
+    let lineIdToken = "";
+    const IS_DPRO_DEMO = new URLSearchParams(location.search).get("demo") === "1";
+    const DPRO_ORIGINAL_FETCH = window.fetch.bind(window);
+    window.fetch = function(resource, options = {}) {
+      const headers = new Headers(options.headers || {});
+      const url = String(resource || "");
+      if (IS_DPRO_DEMO && url.startsWith(CONTROL_ADAPTER_BASE)) headers.set("X-DPRO-Demo", "1");
+      if (lineIdToken && url.includes("/api/public/customer-profile")) headers.set("X-Line-ID-Token", lineIdToken);
+      return DPRO_ORIGINAL_FETCH(resource, { ...options, headers });
+    };
 
     const state = {
       shop: {
@@ -355,13 +366,14 @@
           await liff.init({ liffId: LIFF_ID });
           if (liff.isLoggedIn()) {
             state.lineProfile = await liff.getProfile();
+            lineIdToken = liff.getIDToken() || "";
           }
         }
       } catch (error) {
         console.warn("LIFF init failed", error);
       }
 
-      const lineUserId = state.lineProfile?.userId || queryLineUserId;
+      const lineUserId = state.lineProfile?.userId || "";
       if (!lineUserId) {
         state.loading = false;
         state.profile = null;
@@ -370,7 +382,7 @@
       }
 
       try {
-        const response = await fetch(`${WORKER_API_BASE}/api/public/customer-profile?lineUserId=${encodeURIComponent(lineUserId)}`);
+        const response = await fetch(`${WORKER_API_BASE}/api/public/customer-profile`);
         const data = await response.json();
         state.loading = false;
         state.profile = data || null;
