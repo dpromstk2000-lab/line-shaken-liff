@@ -375,3 +375,33 @@ ${shop}です。
     fallbackMessage
   };
 })();
+/* DPRO TUTORIAL CAR SERVICE R4 loader - 2026-08-26 */
+(() => {
+  "use strict";
+  if (window.__DPRO_CAR_SERVICE_TUTORIAL_R4_LOADER__) return;
+  window.__DPRO_CAR_SERVICE_TUTORIAL_R4_LOADER__ = true;
+
+  const cssHref = "dpro-tutorial-car-service.css?v=20260826-r4";
+  const jsSrc = "dpro-tutorial-car-service.js?v=20260826-r4";
+
+  if (!document.querySelector('link[href*="dpro-tutorial-car-service.css"]')) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = cssHref;
+    document.head.appendChild(link);
+  }
+
+  const loadTutorial = () => {
+    if (document.querySelector('script[src*="dpro-tutorial-car-service.js"]')) return;
+    const script = document.createElement("script");
+    script.src = jsSrc;
+    script.defer = true;
+    document.body.appendChild(script);
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", loadTutorial, { once: true });
+  } else {
+    loadTutorial();
+  }
+})();
