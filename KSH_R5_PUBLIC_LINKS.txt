@@ -1,0 +1,6 @@
+TUTORIAL=https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1
+GUIDE=https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1#dpro-tutorial-guide-center-entry
+QUICK=https://dpromstk2000-lab.github.io/line-shaken-liff/DPRO_TUTORIAL_KSH_QUICK_START_V1.0.pdf
+DETAILED=https://dpromstk2000-lab.github.io/line-shaken-liff/DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0.pdf
+PUBLIC_REACHABLE=PASS
+PDF_BYTES_MATCH=PASS

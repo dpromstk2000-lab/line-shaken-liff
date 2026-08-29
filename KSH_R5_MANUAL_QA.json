@@ -17,6 +17,9 @@
   "business_mutation": 0,
   "render_qr_status": "PASS",
   "visual_qa": "PENDING_ASSISTANT_VISUAL_REVIEW",
-  "r5_status": "CANDIDATE_READY_FOR_VISUAL_REVIEW",
-  "r6_authorized_now": false
+  "r5_status": "CANDIDATE_READY_FOR_ASSISTANT_VISUAL_REVIEW",
+  "r6_authorized_now": false,
+  "public_pdf_verification": "PASS",
+  "all_public_destinations": "PASS",
+  "manual_commit": "c22e2e74ff2e0afe9f9d51fefb165579983339f4"
 }
