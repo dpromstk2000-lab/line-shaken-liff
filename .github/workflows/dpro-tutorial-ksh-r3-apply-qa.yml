@@ -224,7 +224,7 @@ jobs:
                   widths=drv.execute_script('return [innerWidth,document.documentElement.scrollWidth,document.body.scrollWidth]')
                   row['innerWidth'],row['documentElement_scrollWidth'],row['body_scrollWidth']=widths
                   row['overflow']=max(widths[1],widths[2])-widths[0]
-                  if w in (390,320): row['checks']['OVERFLOW_0']=row['overflow']==0
+                  if w in (390,320): row['checks']['OVERFLOW_0']=row['overflow']<=0
                   else: row['checks']['OVERFLOW_0']=True
 
                   requests=perf_requests(drv)
