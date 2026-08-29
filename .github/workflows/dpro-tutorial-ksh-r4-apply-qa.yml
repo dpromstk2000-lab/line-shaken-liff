@@ -1,0 +1,273 @@
+name: DPRO KSH Tutorial R4 Guide Center Apply and LIVE QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dpro-tutorial-ksh-r4-apply-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-qa:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout newest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify R3 FULL PASS baseline before R4 write
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dpro-tutorial-car-service.js
+          test -f dpro-tutorial-car-service.css
+          test -f dashboard.html
+          test -f owner-ipad.html
+          grep -q "CAR_SERVICE-R3-20260829" dpro-tutorial-car-service.js
+          test "$(grep -o "id:'KSH-F10-" dpro-tutorial-car-service.js | wc -l | tr -d ' ')" = "10"
+          grep -q "dpro-tutorial-car-service.js" dashboard.html
+          grep -q "dpro-tutorial-car-service.js" owner-ipad.html
+
+      - name: Apply R4 exact First10 Guide Center
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64
+          js_b64 = """KGZ1bmN0aW9uKCl7Cid1c2Ugc3RyaWN0JzsKCmNvbnN0IEtFWT0nZHByb190dXRvcmlhbF9jYXJfc2VydmljZV92MV8xJzsKY29uc3QgVkVSU0lPTj0nQ0FSX1NFUlZJQ0UtUjMtMjAyNjA4MjknOwpjb25zdCBHVUlERV9WRVJTSU9OPSdDQVJfU0VSVklDRS1SNC0yMDI2MDgyOSc7CmNvbnN0IEFVVE9fS0VZPUtFWSsnX2F1dG9zdGFydCc7CmNvbnN0IFNURVBfQ09VTlQ9MTA7CmNvbnN0IHN0ZXBzPVsKe2lkOidLU0gtRjEwLTAxJyxzdXJmYWNlOidvd25lcl9wYycsc2VjdGlvbjondG9kYXknLHByaW1hcnk6JyNuYXYtdG9kYXknLGZhbGxiYWNrOlsnI3BhZ2VUaXRsZSddLHRpdGxlOifjgb7jgZrjgIzku4rml6XjgoTjgovjgZPjgajjgI3jgpLnorroqo0nLGJvZHk6J+avjuaXpeOBruWFpeWPo+OBp+OBmeOAguebuOirh+WvvuW/nOOAgeWFpeW6q+WvvuW/nOOAgemhp+WuouODu+i7iuS4oeeiuuiqjeOBuOmAsuOCgOWJjeOBq+OAgeS7iuaXpeOBruWFqOS9k+WDj+OCkueiuuiqjeOBl+OBvuOBmeOAgicsc2FmZTon44K144Kk44OJ44OK44OT44Gu5aC05omA44KS56K66KqN44GZ44KL44Gg44GR44Gn44GZ44CC5L+d5a2Y44O76YCB5L+h44O756K65a6a44O744OH44O844K/5pu05paw44Gv6KGM44GE44G+44Gb44KT44CCJ30sCntpZDonS1NILUYxMC0wMicsc3VyZmFjZTonb3duZXJfcGMnLHNlY3Rpb246J2lucXVpcmllcycscHJpbWFyeTonI25hdi1pbnF1aXJpZXMnLGZhbGxiYWNrOlsnI25hdi10b2RheSddLHRpdGxlOifmlrDjgZfjgYTnm7joq4fjga/jgIznm7joq4fkuIDopqfjgI0nLGJvZHk6J0xJTkXjgoTlj5fku5jjgYvjgonlhaXjgaPjgZ/nm7joq4flhoXlrrnjgpLnorroqo3jgZnjgovloLTmiYDjgafjgZnjgILnm7joq4fnqK7liKXjgoTluIzmnJvlhaXluqvml6XjgpLopovjgabmrKHjga7lr77lv5zjgpLliKTmlq3jgZfjgb7jgZnjgIInLHNhZmU6J+ebuOirh+eKtuaFi+OBruWkieabtOOAgeS/neWtmOOAgei/lOS/oemAgeS/oeOBr+ihjOOBhOOBvuOBm+OCk+OAgid9LAp7aWQ6J0tTSC1GMTAtMDMnLHN1cmZhY2U6J293bmVyX3BjJyxzZWN0aW9uOidyZXNlcnZhdGlvbnMnLHByaW1hcnk6JyNuYXYtcmVzZXJ2YXRpb25zJyxmYWxsYmFjazpbJyNuYXYtaW5xdWlyaWVzJywnI25hdi10b2RheSddLHRpdGxlOiflhaXluqvkuojlrprjgpLnorroqo0nLGJvZHk6J+OBiuWuouanmOOBruS7ruW4jOacm+OBqOW6l+iIl+eiuuiqjea4iOOBv+OBruWFpeW6q+S6iOWumuOCkuWMuuWIpeOBl+OBpueiuuiqjeOBl+OBvuOBmeOAgicsc2FmZTon6L+95Yqg44O757eo6ZuG44O75pel5pmC56K65a6a44O75L+d5a2Y44Gv6KGM44GE44G+44Gb44KT44CCJ30sCntpZDonS1NILUYxMC0wNCcsc3VyZmFjZTonb3duZXJfcGMnLHNlY3Rpb246J2N1c3RvbWVycycscHJpbWFyeTonI25hdi1jdXN0b21lcnMnLGZhbGxiYWNrOlsnI25hdi1yZXNlcnZhdGlvbnMnLCcjbmF2LXRvZGF5J10sdGl0bGU6J+mhp+WuouOBqOi7iuS4oeOCkuS4gOe3kuOBq+eiuuiqjScsYm9keTon6aGn5a6i44GU44Go44Gu55m76Yyy6LuK5Lih44KS56K66KqN44GZ44KL5YWl5Y+j44Gn44GZ44CCVHV0b3JpYWzjga/lrp/poaflrqLjga7mpJzntKLoqp7jgpLoh6rli5XlhaXlipvjgZfjgb7jgZvjgpPjgIInLHNhZmU6J+mhp+WuouODu+i7iuS4oeOBrui/veWKoOOAgee3qOmbhuOAgeWJiumZpOOBr+ihjOOBhOOBvuOBm+OCk+OAgid9LAp7aWQ6J0tTSC1GMTAtMDUnLHN1cmZhY2U6J293bmVyX3BjJyxzZWN0aW9uOidyZXNlcnZhdGlvbnMnLHByaW1hcnk6JyNyZXNlcnZhdGlvblByb2dyZXNzU3RhZ2UnLGZhbGxiYWNrOlsnI25hdi1yZXNlcnZhdGlvbnMnXSx0aXRsZTon5L2c5qWt6YCy5o2X44Gu6KaL5pa5Jyxib2R5Oiflj5fku5jjgIHngrnmpJzjgIHopovnqY3jgIHjgYrlrqLmp5jnorroqo3jgIHkvZzmpa3jgIHmnIDntYLnorroqo3jgIHlvJXmuKHjgZfjgajjgYTjgYbpgLLmjZfjga7mhI/lkbPjgpLnorroqo3jgZfjgb7jgZnjgIInLHNhZmU6J+OCu+ODrOOCr+ODiOWApOOBr+WkieabtOOBm+OBmuOAgW9uY2hhbmdl44KE5L+d5a2Y5Yem55CG44KC55m654Gr44GV44Gb44G+44Gb44KT44CCJ30sCntpZDonS1NILUYxMC0wNicsc3VyZmFjZTonb3duZXJfcGMnLHNlY3Rpb246J3Jlc2VydmF0aW9ucycscHJpbWFyeTonI3Jlc2VydmF0aW9uRXN0aW1hdGVCb3ggaDQnLGZhbGxiYWNrOlsnI25hdi1yZXNlcnZhdGlvbnMnXSx0aXRsZTon6KaL56mN44Ko44Oq44Ki44KS56K66KqNJyxib2R5OifopovnqY3ph5HpoY3jg7vkvZzmpa3lhoXoqLPjgajjgIHjgYrlrqLmp5jjgbjjga7mj5DnpLrnirbmhYvjgpLnorroqo3jgZnjgovkvY3nva7jgpLnkIbop6PjgZfjgb7jgZnjgIInLHNhZmU6J+imi+epjeOCqOODquOCouWGheOBruimi+WHuuOBl+OBoOOBkeOCkuWvvuixoeOBq+OBl+OAgeimi+epjeaPkOekuuODu+S/neWtmOODu+aJv+iqjeOBr+ihjOOBhOOBvuOBm+OCk+OAgid9LAp7aWQ6J0tTSC1GMTAtMDcnLHN1cmZhY2U6J293bmVyX3BjJyxzZWN0aW9uOidmb2xsb3d1cHMnLHByaW1hcnk6JyNuYXYtZm9sbG93dXBzJyxmYWxsYmFjazpbJyNuYXYtdG9kYXknXSx0aXRsZTon5qyh5Zue6YCj57Wh44Gv44CM44OB44Oj44OD44OI5YCZ6KOc44CNJyxib2R5Oifou4rmpJzmoYjlhoXjgIHjgqrjgqTjg6vkuqTmj5vjgIHopovnqY3lvozlho3pgKPntaHjgarjganjgIHmrKHjgavpgKPntaHjgZfjgZ/jgYTlgJnoo5zjga7lhaXlj6PjgpLnorroqo3jgZfjgb7jgZnjgIInLHNhZmU6J0xJTkXpgIHkv6HjgIHpgIHkv6HmuIjjgb/oqJjpjLLjgIHlho3pgKPntaHnmbvpjLLjga/ooYzjgYTjgb7jgZvjgpPjgIInfSwKe2lkOidLU0gtRjEwLTA4JyxzdXJmYWNlOidvd25lcl9wYycsc2VjdGlvbjonb3Bwb3J0dW5pdGllcycscHJpbWFyeTonI25hdi1vcHBvcnR1bml0aWVzJyxmYWxsYmFjazpbJyNuYXYtZm9sbG93dXBzJywnI25hdi10b2RheSddLHRpdGxlOifllrbmpa3lgJnoo5zjga7opovmlrknLGJvZHk6J+i7iuaknOODu+OCquOCpOODq+S6pOaPm+ODu+asoeWbnuaPkOahiOOBquOBqeOAgeasoeOBruahiOWGheOBq+OBpOOBquOBjOOCi+WAmeijnOOBruWFpeWPo+OCkueiuuiqjeOBl+OBvuOBmeOAgicsc2FmZTon6aGn5a6i54q25oWL44CB5Za25qWt57WQ5p6c44CB6YCa55+l54q25oWL44Gv5aSJ5pu044GX44G+44Gb44KT44CCJ30sCntpZDonS1NILUYxMC0wOScsc3VyZmFjZTonb3duZXJfcGMnLHNlY3Rpb246J3RvZGF5JyxwcmltYXJ5OididXR0b25bb25jbGljaz0ib3BlbklwYWREYXNoYm9hcmQoKSJdJyxmYWxsYmFjazpbJyNuYXYtdG9kYXknXSx0aXRsZTonaVBhZOePvuWgtOeUu+mdouOBuOenu+WLlScsYm9keTon54++5aC05ZCR44GR44Gu44CM5LuK5pel44Gu54++5aC044CN44CM6Zu76Kmx44O75bqX6aCt5Y+X5LuY44CN44CM5LuK5b6M44Gu5LqI5a6a44CN44CM6aGn5a6i5qSc57Si44CN44KS56K66KqN44GZ44KL44Gf44KB44CB5qyh44Gu44K544OG44OD44OX44GnaVBhZOeUu+mdouOBuOenu+OCiuOBvuOBmeOAgicsc2FmZTonTmV4dOaTjeS9nOOBp+OBr+ijveWTgeODnOOCv+ODs+OCkuiHquWLleOCr+ODquODg+OCr+OBm+OBmuOAgW93bmVyLWlwYWQuaHRtbOOBuOOBruWuieWFqOOBqueUu+mdoumBt+enu+OBoOOBkeOCkuihjOOBhOOBvuOBmeOAgid9LAp7aWQ6J0tTSC1GMTAtMTAnLHN1cmZhY2U6J293bmVyX2lwYWQnLHNlY3Rpb246J3RvZGF5JyxwcmltYXJ5OicjdGFiLXRvZGF5JyxmYWxsYmFjazpbJy50YWJzJ10sdGl0bGU6J2lQYWTjga4044Gk44Gu5YWl5Y+j44KS56K66KqNJyxib2R5OifjgIzku4rml6Xjga7nj77loLTjgI3jgIzpm7voqbHjg7vlupfpoK3lj5fku5jjgI3jgIzku4rlvozjga7kuojlrprjgI3jgIzpoaflrqLmpJzntKLjgI3jga4044K/44OW44GM54++5aC05pON5L2c44Gu5Lit5b+D44Gn44GZ44CC5a6M5LqG5b6M44GvR3VpZGUgQ2VudGVy44G46YCy44G/44G+44GZ44CCJyxzYWZlOifjgr/jg5bopovlh7rjgZfjga7loLTmiYDjgpLoqqzmmI7jgZnjgovjgaDjgZHjgafjgIHlj5fku5jnmbvpjLLjg7vpgLLmjZfmm7TmlrDjg7vpoaflrqLlpInmm7Tjga/ooYzjgYTjgb7jgZvjgpPjgIInfQpdOwoKY29uc3QgZ3VpZGVJdGVtcz1zdGVwcy5tYXAoKHMsaSk9Pih7aWQ6cy5pZCxvcmRlcjppKzEsc3VyZmFjZTpzLnN1cmZhY2Uscm91dGU6cy5zdXJmYWNlPT09J293bmVyX2lwYWQnPydvd25lci1pcGFkLmh0bWw/ZW1iZWRfZGVtbz0xJzonZGFzaGJvYXJkLmh0bWw/ZW1iZWRfZGVtbz0xJyxwcmltYXJ5OnMucHJpbWFyeSxmYWxsYmFjazpzLmZhbGxiYWNrLnNsaWNlKCksdGl0bGU6cy50aXRsZSxib2R5OnMuYm9keSxzYWZlOnMuc2FmZX0pKTsKCmxldCBpZHg9MCxjYXJkPW51bGwsaGw9bnVsbCxsYXllcj1udWxsLGRyYWc9bnVsbCxsYXN0Rm9jdXM9bnVsbDsKCmZ1bmN0aW9uIGN1cnJlbnRTdXJmYWNlKCl7cmV0dXJuIC8oPzpefFwvKW93bmVyLWlwYWRcLmh0bWwkL2kudGVzdChsb2NhdGlvbi5wYXRobmFtZSk/J293bmVyX2lwYWQnOidvd25lcl9wYyc7fQpmdW5jdGlvbiByZWFkU3RhdGUoKXt0cnl7Y29uc3Qgcz1KU09OLnBhcnNlKGxvY2FsU3RvcmFnZS5nZXRJdGVtKEtFWSl8fCd7fScpO2lmKHMudmVyc2lvbj09PVZFUlNJT04mJk51bWJlci5pc0ludGVnZXIocy5zdGVwKSl7cmV0dXJue3ZlcnNpb246VkVSU0lPTixzdGVwOk1hdGgubWF4KDAsTWF0aC5taW4oU1RFUF9DT1VOVC0xLHMuc3RlcCkpLGRvbmU6ISFzLmRvbmV9O319Y2F0Y2goZSl7fXJldHVybnt2ZXJzaW9uOlZFUlNJT04sc3RlcDowLGRvbmU6ZmFsc2V9O30KZnVuY3Rpb24gbG9hZCgpe2NvbnN0IHM9cmVhZFN0YXRlKCk7aWR4PXMuZG9uZT8wOnMuc3RlcDtyZXR1cm4gczt9CmZ1bmN0aW9uIHNhdmUoZG9uZSxzdGVwKXtjb25zdCBuPU51bWJlci5pc0ludGVnZXIoc3RlcCk/c3RlcDppZHg7dHJ5e2xvY2FsU3RvcmFnZS5zZXRJdGVtKEtFWSxKU09OLnN0cmluZ2lmeSh7dmVyc2lvbjpWRVJTSU9OLHN0ZXA6TWF0aC5tYXgoMCxNYXRoLm1pbihTVEVQX0NPVU5ULTEsbikpLGRvbmU6ISFkb25lLHVwZGF0ZWRBdDpuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCl9KSk7fWNhdGNoKGUpe319CmZ1bmN0aW9uIHZpc2libGUoZWwpe2lmKCFlbHx8IWVsLmdldENsaWVudFJlY3RzKCkubGVuZ3RoKXJldHVybiBmYWxzZTtjb25zdCBjcz1nZXRDb21wdXRlZFN0eWxlKGVsKTtpZihjcy5kaXNwbGF5PT09J25vbmUnfHxjcy52aXNpYmlsaXR5PT09J2hpZGRlbid8fGNzLm9wYWNpdHk9PT0nMCcpcmV0dXJuIGZhbHNlO2NvbnN0IHI9ZWwuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCk7cmV0dXJuIHIud2lkdGg+MCYmci5oZWlnaHQ+MCYmci5ib3R0b20+MCYmci5yaWdodD4wJiZyLnRvcDxpbm5lckhlaWdodCYmci5sZWZ0PGlubmVyV2lkdGg7fQpmdW5jdGlvbiByZXNvbHZlVGFyZ2V0KCl7Y29uc3Qgcz1zdGVwc1tpZHhdO2Zvcihjb25zdCBzZWxlY3RvciBvZiBbcy5wcmltYXJ5XS5jb25jYXQocy5mYWxsYmFja3x8W10pKXtsZXQgZWw9bnVsbDt0cnl7ZWw9ZG9jdW1lbnQucXVlcnlTZWxlY3RvcihzZWxlY3Rvcik7fWNhdGNoKGUpe31pZih2aXNpYmxlKGVsKSlyZXR1cm57ZWwsc2VsZWN0b3IscHJpbWFyeTpzZWxlY3Rvcj09PXMucHJpbWFyeX07fXJldHVybiBudWxsO30KZnVuY3Rpb24gcmVtb3ZlSGlnaGxpZ2h0KCl7aWYoaGwpaGwucmVtb3ZlKCk7aGw9bnVsbDt9CmZ1bmN0aW9uIGhpZ2hsaWdodCgpe3JlbW92ZUhpZ2hsaWdodCgpO2NvbnN0IGZvdW5kPXJlc29sdmVUYXJnZXQoKTtpZighZm91bmQpcmV0dXJuIG51bGw7Y29uc3Qgcj1mb3VuZC5lbC5nZXRCb3VuZGluZ0NsaWVudFJlY3QoKTtobD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTtobC5jbGFzc05hbWU9J2RwdC1oaWdobGlnaHQnO2hsLnNldEF0dHJpYnV0ZSgnYXJpYS1oaWRkZW4nLCd0cnVlJyk7T2JqZWN0LmFzc2lnbihobC5zdHlsZSx7bGVmdDooci5sZWZ0LTUpKydweCcsdG9wOihyLnRvcC01KSsncHgnLHdpZHRoOihyLndpZHRoKzEwKSsncHgnLGhlaWdodDooci5oZWlnaHQrMTApKydweCd9KTtsYXllci5hcHBlbmRDaGlsZChobCk7cmV0dXJuIGZvdW5kO30KZnVuY3Rpb24gY2xhbXAoeCx5KXtjb25zdCByPWNhcmQuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCkscGFkPTg7Y29uc3QgbWF4WD1NYXRoLm1heChwYWQsaW5uZXJXaWR0aC1yLndpZHRoLXBhZCksbWF4WT1NYXRoLm1heChwYWQsaW5uZXJIZWlnaHQtci5oZWlnaHQtcGFkKTtyZXR1cm57eDpNYXRoLm1heChwYWQsTWF0aC5taW4oeCxtYXhYKSkseTpNYXRoLm1heChwYWQsTWF0aC5taW4oeSxtYXhZKSl9O30KZnVuY3Rpb24gZm9jdXNTYWZlKGVsKXt0cnl7ZWw/LmZvY3VzKHtwcmV2ZW50U2Nyb2xsOnRydWV9KTt9Y2F0Y2goZSl7dHJ5e2VsPy5mb2N1cygpO31jYXRjaChfKXt9fX0KZnVuY3Rpb24gcmVuZGVyKG9wdGlvbnM9e30pe2lmKCFjYXJkKXJldHVybjtjb25zdCBzPXN0ZXBzW2lkeF0sZm91bmQ9aGlnaGxpZ2h0KCk7Y2FyZC5xdWVyeVNlbGVjdG9yKCcuZHB0LXN0ZXAnKS50ZXh0Q29udGVudD1gU1RFUCAke2lkeCsxfSAvICR7U1RFUF9DT1VOVH1gO2NhcmQucXVlcnlTZWxlY3RvcignaDMnKS50ZXh0Q29udGVudD1zLnRpdGxlO2NhcmQucXVlcnlTZWxlY3RvcignLmRwdC1jb3B5JykudGV4dENvbnRlbnQ9cy5ib2R5O2NhcmQucXVlcnlTZWxlY3RvcignLmRwdC1zYWZldHknKS50ZXh0Q29udGVudD0n5a6J5YWo77yaJytzLnNhZmU7Y2FyZC5xdWVyeVNlbGVjdG9yKCcuZHB0LWZhbGxiYWNrJykudGV4dENvbnRlbnQ9Zm91bmQ/KGZvdW5kLnByaW1hcnk/J+WvvuixoeS9jee9ruOCkuODj+OCpOODqeOCpOODiOOBl+OBpuOBhOOBvuOBmeOAgic6J+S4u+WvvuixoeOBjOimi+OBpOOBi+OCieOBquOBhOOBn+OCgeOAgeWuieWFqOOBquS7o+abv+S9jee9ruOCkuODj+OCpOODqeOCpOODiOOBl+OBpuOBhOOBvuOBmeOAgicpOifjgZPjga7nlLvpnaLnirbmhYvjgafjga/lronlhajjgavooajnpLrjgafjgY3jgovlr77osaHjgYzopovjgaTjgYvjgonjgarjgYTjgZ/jgoHjgIHoqqzmmI7jgqvjg7zjg4njgaDjgZHjgafntprooYzjgafjgY3jgb7jgZnjgIInO2NhcmQucXVlcnlTZWxlY3RvcignLmRwdC1wcm9ncmVzcyBpJykuc3R5bGUud2lkdGg9KChpZHgrMSkqMTApKyclJztjYXJkLnF1ZXJ5U2VsZWN0b3IoJ1tkYXRhLWJhY2tdJykuZGlzYWJsZWQ9aWR4PT09MDtjYXJkLnF1ZXJ5U2VsZWN0b3IoJ1tkYXRhLW5leHRdJykudGV4dENvbnRlbnQ9aWR4PT09U1RFUF9DT1VOVC0xPyflrozkuoYnOihpZHg9PT04PydpUGFk44G46YCy44KAJzon5qyh44G4Jyk7c2F2ZShmYWxzZSk7aWYob3B0aW9ucy5mb2N1cylmb2N1c1NhZmUoY2FyZC5xdWVyeVNlbGVjdG9yKCdbZGF0YS1uZXh0XScpKTt9CmZ1bmN0aW9uIGRhc2hib2FyZFVybCgpe2NvbnN0IHU9bmV3IFVSTCgnZGFzaGJvYXJkLmh0bWwnLGxvY2F0aW9uLmhyZWYpO3Uuc2VhcmNoUGFyYW1zLnNldCgnZW1iZWRfZGVtbycsJzEnKTtyZXR1cm4gdTt9CmZ1bmN0aW9uIGlwYWRVcmwoKXtjb25zdCBiYWNrPWRhc2hib2FyZFVybCgpO2NvbnN0IHU9bmV3IFVSTCgnb3duZXItaXBhZC5odG1sJyxsb2NhdGlvbi5ocmVmKTt1LnNlYXJjaFBhcmFtcy5zZXQoJ2VtYmVkX2RlbW8nLCcxJyk7dS5zZWFyY2hQYXJhbXMuc2V0KCdyZXR1cm4nLGJhY2suaHJlZik7cmV0dXJuIHU7fQpmdW5jdGlvbiByb3V0ZUZvclN0ZXAoc3RlcEluZGV4KXtyZXR1cm4gc3RlcEluZGV4PT09OT9pcGFkVXJsKCk6ZGFzaGJvYXJkVXJsKCk7fQpmdW5jdGlvbiBtYXJrQXV0b1N0YXJ0KCl7dHJ5e3Nlc3Npb25TdG9yYWdlLnNldEl0ZW0oQVVUT19LRVksJzEnKTt9Y2F0Y2goZSl7fX0KZnVuY3Rpb24gdGFrZUF1dG9TdGFydCgpe3RyeXtjb25zdCB2PXNlc3Npb25TdG9yYWdlLmdldEl0ZW0oQVVUT19LRVkpPT09JzEnO3Nlc3Npb25TdG9yYWdlLnJlbW92ZUl0ZW0oQVVUT19LRVkpO3JldHVybiB2O31jYXRjaChlKXtyZXR1cm4gZmFsc2U7fX0KZnVuY3Rpb24gbmF2aWdhdGVGb3JTdGVwKHN0ZXBJbmRleCl7Y29uc3QgZGVzaXJlZD1zdGVwc1tzdGVwSW5kZXhdLnN1cmZhY2U7aWYoY3VycmVudFN1cmZhY2UoKT09PWRlc2lyZWQpcmV0dXJuIGZhbHNlO3NhdmUoZmFsc2Usc3RlcEluZGV4KTttYXJrQXV0b1N0YXJ0KCk7bG9jYXRpb24uaHJlZj1yb3V0ZUZvclN0ZXAoc3RlcEluZGV4KS5ocmVmO3JldHVybiB0cnVlO30KZnVuY3Rpb24gYWR2YW5jZSgpe2lmKCFjYXJkKXJldHVybjtpZihpZHg9PT04KXtpZHg9OTtzYXZlKGZhbHNlLGlkeCk7bWFya0F1dG9TdGFydCgpO2xvY2F0aW9uLmhyZWY9aXBhZFVybCgpLmhyZWY7cmV0dXJuO31pZihpZHg8U1RFUF9DT1VOVC0xKXtpZHgrKztpZihuYXZpZ2F0ZUZvclN0ZXAoaWR4KSlyZXR1cm47cmVuZGVyKHtmb2N1czp0cnVlfSk7fWVsc2V7c2F2ZSh0cnVlLGlkeCk7Y2xvc2Uoe3Jlc3RvcmVGb2N1czpmYWxzZX0pO29wZW5HdWlkZSgpO319CmZ1bmN0aW9uIGJhY2soKXtpZighY2FyZHx8aWR4PT09MClyZXR1cm47aWR4LS07aWYobmF2aWdhdGVGb3JTdGVwKGlkeCkpcmV0dXJuO3JlbmRlcih7Zm9jdXM6dHJ1ZX0pO30KZnVuY3Rpb24gc2tpcCgpe3NhdmUodHJ1ZSxTVEVQX0NPVU5ULTEpO2lkeD1TVEVQX0NPVU5ULTE7Y2xvc2Uoe3Jlc3RvcmVGb2N1czpmYWxzZX0pO29wZW5HdWlkZSgpO30KCmZ1bmN0aW9uIG9wZW4oc3RhcnQpe2lmKGNhcmQpcmV0dXJuO2lmKE51bWJlci5pc0ludGVnZXIoc3RhcnQpKWlkeD1NYXRoLm1heCgwLE1hdGgubWluKFNURVBfQ09VTlQtMSxzdGFydCkpO2Vsc2UgbG9hZCgpO2lmKG5hdmlnYXRlRm9yU3RlcChpZHgpKXJldHVybjtsYXN0Rm9jdXM9ZG9jdW1lbnQuYWN0aXZlRWxlbWVudDtsYXllcj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTtsYXllci5pZD0nZHByby10dXRvcmlhbC1sYXllcic7bGF5ZXIuaW5uZXJIVE1MPWA8ZGl2IGNsYXNzPSJkcHQtY2FyZCIgcm9sZT0iZGlhbG9nIiBhcmlhLW1vZGFsPSJmYWxzZSIgYXJpYS1sYWJlbGxlZGJ5PSJkcHQtdGl0bGUiPjxkaXYgY2xhc3M9ImRwdC1oYW5kbGUiIHRhYmluZGV4PSIwIiBhcmlhLWxhYmVsPSJUdXRvcmlhbOOCq+ODvOODieenu+WLleODj+ODs+ODieODqyI+PHN0cm9uZz5EUFJPIEZpcnN0MTA8L3N0cm9uZz48c3Bhbj7jgZPjgZPjgpLjg4njg6njg4PjgrA8L3NwYW4+PC9kaXY+PGRpdiBjbGFzcz0iZHB0LXByb2dyZXNzIiBhcmlhLWhpZGRlbj0idHJ1ZSI+PGk+PC9pPjwvZGl2PjxkaXYgY2xhc3M9ImRwdC1ib2R5Ij48ZGl2IGNsYXNzPSJkcHQtc3RlcCI+PC9kaXY+PGgzIGlkPSJkcHQtdGl0bGUiPjwvaDM+PHAgY2xhc3M9ImRwdC1jb3B5Ij48L3A+PGRpdiBjbGFzcz0iZHB0LXNhZmV0eSI+PC9kaXY+PGRpdiBjbGFzcz0iZHB0LWZhbGxiYWNrIj48L2Rpdj48L2Rpdj48ZGl2IGNsYXNzPSJkcHQtYWN0aW9ucyI+PGJ1dHRvbiB0eXBlPSJidXR0b24iIGNsYXNzPSJkcHQtc2Vjb25kYXJ5IiBkYXRhLWJhY2s+5oi744KLPC9idXR0b24+PGJ1dHRvbiB0eXBlPSJidXR0b24iIGNsYXNzPSJkcHQtcHJpbWFyeSIgZGF0YS1uZXh0PuasoeOBuDwvYnV0dG9uPjxidXR0b24gdHlwZT0iYnV0dG9uIiBjbGFzcz0iZHB0LWdob3N0IiBkYXRhLXNraXA+44K544Kt44OD44OXPC9idXR0b24+PGJ1dHRvbiB0eXBlPSJidXR0b24iIGNsYXNzPSJkcHQtZGFuZ2VyIiBkYXRhLWNsb3NlPumWieOBmOOCizwvYnV0dG9uPjwvZGl2PjwvZGl2PmA7ZG9jdW1lbnQuYm9keS5hcHBlbmRDaGlsZChsYXllcik7Y2FyZD1sYXllci5xdWVyeVNlbGVjdG9yKCcuZHB0LWNhcmQnKTtjb25zdCBoYW5kbGU9Y2FyZC5xdWVyeVNlbGVjdG9yKCcuZHB0LWhhbmRsZScpO2hhbmRsZS5hZGRFdmVudExpc3RlbmVyKCdwb2ludGVyZG93bicsZT0+e2lmKGUuaXNQcmltYXJ5PT09ZmFsc2UpcmV0dXJuO2lmKGUucG9pbnRlclR5cGU9PT0nbW91c2UnJiZlLmJ1dHRvbiE9PTApcmV0dXJuO2NvbnN0IHI9Y2FyZC5nZXRCb3VuZGluZ0NsaWVudFJlY3QoKTtkcmFnPXtpZDplLnBvaW50ZXJJZCxkeDplLmNsaWVudFgtci5sZWZ0LGR5OmUuY2xpZW50WS1yLnRvcH07Y2FyZC5kYXRhc2V0LmRyYWdnZWQ9JzEnO3RyeXtoYW5kbGUuc2V0UG9pbnRlckNhcHR1cmUoZS5wb2ludGVySWQpO31jYXRjaChfKXt9ZS5wcmV2ZW50RGVmYXVsdCgpO30pO2hhbmRsZS5hZGRFdmVudExpc3RlbmVyKCdwb2ludGVybW92ZScsZT0+e2lmKCFkcmFnfHxkcmFnLmlkIT09ZS5wb2ludGVySWQpcmV0dXJuO2NvbnN0IHA9Y2xhbXAoZS5jbGllbnRYLWRyYWcuZHgsZS5jbGllbnRZLWRyYWcuZHkpO2NhcmQuc3R5bGUubGVmdD1wLngrJ3B4JztjYXJkLnN0eWxlLnRvcD1wLnkrJ3B4JztjYXJkLnN0eWxlLnJpZ2h0PSdhdXRvJztjYXJkLnN0eWxlLmJvdHRvbT0nYXV0byc7aGlnaGxpZ2h0KCk7ZS5wcmV2ZW50RGVmYXVsdCgpO30pO2NvbnN0IHN0b3A9ZT0+e2lmKGRyYWcmJighZXx8ZHJhZy5pZD09PWUucG9pbnRlcklkKSlkcmFnPW51bGw7fTtoYW5kbGUuYWRkRXZlbnRMaXN0ZW5lcigncG9pbnRlcnVwJyxzdG9wKTtoYW5kbGUuYWRkRXZlbnRMaXN0ZW5lcigncG9pbnRlcmNhbmNlbCcsc3RvcCk7Y2FyZC5xdWVyeVNlbGVjdG9yKCdbZGF0YS1iYWNrXScpLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJyxiYWNrKTtjYXJkLnF1ZXJ5U2VsZWN0b3IoJ1tkYXRhLW5leHRdJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGFkdmFuY2UpO2NhcmQucXVlcnlTZWxlY3RvcignW2RhdGEtc2tpcF0nKS5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsc2tpcCk7Y2FyZC5xdWVyeVNlbGVjdG9yKCdbZGF0YS1jbG9zZV0nKS5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsKCk9PmNsb3NlKCkpO3JlbmRlcih7Zm9jdXM6dHJ1ZX0pO30KZnVuY3Rpb24gY2xvc2Uob3B0aW9ucz17fSl7Y29uc3QgcmVzdG9yZT1vcHRpb25zLnJlc3RvcmVGb2N1cyE9PWZhbHNlO2lmKGxheWVyKWxheWVyLnJlbW92ZSgpO2xheWVyPWNhcmQ9aGw9bnVsbDtkcmFnPW51bGw7aWYocmVzdG9yZSl7Y29uc3QgbGF1bmNoZXI9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2Rwcm8tdHV0b3JpYWwtbGF1bmNoZXInKTtmb2N1c1NhZmUobGFzdEZvY3VzJiZsYXN0Rm9jdXMuaXNDb25uZWN0ZWQ/bGFzdEZvY3VzOmxhdW5jaGVyKTt9fQoKZnVuY3Rpb24gb3Blbkd1aWRlKCl7CmNsb3NlKHtyZXN0b3JlRm9jdXM6ZmFsc2V9KTsKbGV0IGdjPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdkcHJvLXR1dG9yaWFsLWd1aWRlLWNlbnRlcicpO2lmKGdjKWdjLnJlbW92ZSgpOwpjb25zdCBzdGF0ZT1yZWFkU3RhdGUoKSxoYXNSZXN1bWU9IXN0YXRlLmRvbmUmJnN0YXRlLnN0ZXA+MDsKZ2M9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnc2VjdGlvbicpO2djLmlkPSdkcHJvLXR1dG9yaWFsLWd1aWRlLWNlbnRlcic7Z2Muc2V0QXR0cmlidXRlKCdyb2xlJywnZGlhbG9nJyk7Z2Muc2V0QXR0cmlidXRlKCdhcmlhLW1vZGFsJywndHJ1ZScpO2djLnNldEF0dHJpYnV0ZSgnYXJpYS1sYWJlbGxlZGJ5JywnZHB0LWd1aWRlLXRpdGxlJyk7CmdjLmlubmVySFRNTD1gPGRpdiBjbGFzcz0iZHB0LWd1aWRlLWhlYWQiPjxkaXY+PHN0cm9uZz5EUFJPIFRVVE9SSUFMPC9zdHJvbmc+PGgyIGlkPSJkcHQtZ3VpZGUtdGl0bGUiPkNBUiBTRVJWSUNFIEd1aWRlIENlbnRlcjwvaDI+PHNtYWxsPkZpcnN0MTAg44Go5a6M5YWo44Gr5ZCM44GYMTDjgrnjg4bjg4Pjg5c8L3NtYWxsPjwvZGl2PjxidXR0b24gdHlwZT0iYnV0dG9uIiBkYXRhLWdjbG9zZT7plonjgZjjgos8L2J1dHRvbj48L2Rpdj48ZGl2IGNsYXNzPSJkcHQtZ3VpZGUtY29udGVudCI+PGRpdiBjbGFzcz0iZHB0LWd1aWRlLWNvbnRyb2xzIj48YnV0dG9uIHR5cGU9ImJ1dHRvbiIgaWQ9ImRwcm8tdHV0b3JpYWwtZ3VpZGUtc3RhcnQiIGNsYXNzPSJkcHQtcHJpbWFyeSI+U3RhcnQ8L2J1dHRvbj4ke2hhc1Jlc3VtZT8nPGJ1dHRvbiB0eXBlPSJidXR0b24iIGlkPSJkcHJvLXR1dG9yaWFsLWd1aWRlLXJlc3VtZSIgY2xhc3M9ImRwdC1zZWNvbmRhcnkiPlJlc3VtZTwvYnV0dG9uPic6Jyd9PGJ1dHRvbiB0eXBlPSJidXR0b24iIGlkPSJkcHJvLXR1dG9yaWFsLWd1aWRlLXJlcGxheSIgY2xhc3M9ImRwdC1naG9zdCI+UmVwbGF5PC9idXR0b24+PHNwYW4gY2xhc3M9ImRwdC1ndWlkZS1zdGF0ZSIgYXJpYS1saXZlPSJwb2xpdGUiPiR7c3RhdGUuZG9uZT8n5a6M5LqG5riI44G/Jzpg54++5ZyoIFNURVAgJHtzdGF0ZS5zdGVwKzF9IC8gJHtTVEVQX0NPVU5UfWB9PC9zcGFuPjwvZGl2PjxkaXYgY2xhc3M9ImRwdC1ndWlkZS1ncmlkIj4ke2d1aWRlSXRlbXMubWFwKGc9PmA8YXJ0aWNsZSBjbGFzcz0iZHB0LWd1aWRlLXN0ZXAiIGRhdGEtc3RlcC1pZD0iJHtnLmlkfSIgZGF0YS1vcmRlcj0iJHtnLm9yZGVyfSIgZGF0YS1zdXJmYWNlPSIke2cuc3VyZmFjZX0iIGRhdGEtcm91dGU9IiR7Zy5yb3V0ZX0iPjxkaXYgY2xhc3M9ImRwdC1ndWlkZS1zdGVwLWtpY2tlciI+U1RFUCAke2cub3JkZXJ9IC8gJHtTVEVQX0NPVU5UfSDCtyAke2cuaWR9PC9kaXY+PGgzPiR7Zy50aXRsZX08L2gzPjxwPiR7Zy5ib2R5fTwvcD48ZGw+PGRpdj48ZHQ+55S76Z2iPC9kdD48ZGQ+JHtnLnJvdXRlfTwvZGQ+PC9kaXY+PGRpdj48ZHQ+5a++6LGhPC9kdD48ZGQ+JHtnLnByaW1hcnl9PC9kZD48L2Rpdj48ZGl2PjxkdD5mYWxsYmFjazwvZHQ+PGRkPiR7Zy5mYWxsYmFjay5qb2luKCcgLyAnKX08L2RkPjwvZGl2PjwvZGw+PHNtYWxsPuWuieWFqO+8miR7Zy5zYWZlfTwvc21hbGw+PC9hcnRpY2xlPmApLmpvaW4oJycpfTwvZGl2PjwvZGl2PmA7CmRvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQoZ2MpOwpjb25zdCBjbG9zZUd1aWRlPSgpPT57Z2MucmVtb3ZlKCk7Zm9jdXNTYWZlKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdkcHJvLXR1dG9yaWFsLWd1aWRlLWNlbnRlci1lbnRyeScpKTt9OwpnYy5xdWVyeVNlbGVjdG9yKCdbZGF0YS1nY2xvc2VdJykub25jbGljaz1jbG9zZUd1aWRlOwpnYy5xdWVyeVNlbGVjdG9yKCcjZHByby10dXRvcmlhbC1ndWlkZS1zdGFydCcpLm9uY2xpY2s9KCk9PntnYy5yZW1vdmUoKTtpZHg9MDtzYXZlKGZhbHNlLDApO29wZW4oMCk7fTsKY29uc3QgcmVzdW1lPWdjLnF1ZXJ5U2VsZWN0b3IoJyNkcHJvLXR1dG9yaWFsLWd1aWRlLXJlc3VtZScpO2lmKHJlc3VtZSlyZXN1bWUub25jbGljaz0oKT0+e2djLnJlbW92ZSgpO2lkeD1zdGF0ZS5zdGVwO29wZW4oc3RhdGUuc3RlcCk7fTsKZ2MucXVlcnlTZWxlY3RvcignI2Rwcm8tdHV0b3JpYWwtZ3VpZGUtcmVwbGF5Jykub25jbGljaz0oKT0+e2djLnJlbW92ZSgpO2lkeD0wO3NhdmUoZmFsc2UsMCk7b3BlbigwKTt9Owpmb2N1c1NhZmUoZ2MucXVlcnlTZWxlY3RvcignW2RhdGEtZ2Nsb3NlXScpKTsKfQoKZnVuY3Rpb24gaW5zdGFsbCgpe2lmKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdkcHJvLXR1dG9yaWFsLWxhdW5jaGVyJykpcmV0dXJuO2NvbnN0IHN0YXRlPXJlYWRTdGF0ZSgpO2lkeD1zdGF0ZS5kb25lPzA6c3RhdGUuc3RlcDtjb25zdCBsYXVuY2hlcj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdidXR0b24nKTtsYXVuY2hlci5pZD0nZHByby10dXRvcmlhbC1sYXVuY2hlcic7bGF1bmNoZXIudHlwZT0nYnV0dG9uJztsYXVuY2hlci50ZXh0Q29udGVudD0n5pON5L2c44Ks44Kk44OJJztsYXVuY2hlci5zZXRBdHRyaWJ1dGUoJ2FyaWEtbGFiZWwnLCdEUFJPIFR1dG9yaWFs44KS6ZaL44GPJyk7bGF1bmNoZXIub25jbGljaz0oKT0+b3BlbigpO2RvY3VtZW50LmJvZHkuYXBwZW5kQ2hpbGQobGF1bmNoZXIpO2NvbnN0IGVudHJ5PWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2J1dHRvbicpO2VudHJ5LmlkPSdkcHJvLXR1dG9yaWFsLWd1aWRlLWNlbnRlci1lbnRyeSc7ZW50cnkudHlwZT0nYnV0dG9uJztlbnRyeS50ZXh0Q29udGVudD0nR3VpZGUgQ2VudGVyJztlbnRyeS5zZXRBdHRyaWJ1dGUoJ2FyaWEtbGFiZWwnLCdHdWlkZSBDZW50ZXLjgpLplovjgY8nKTtlbnRyeS5vbmNsaWNrPSgpPT5vcGVuR3VpZGUoKTtkb2N1bWVudC5ib2R5LmFwcGVuZENoaWxkKGVudHJ5KTt3aW5kb3cuRFBST0NhclNlcnZpY2VUdXRvcmlhbD17b3BlbixvcGVuR3VpZGUscmVwbGF5OigpPT57aWR4PTA7c2F2ZShmYWxzZSwwKTtvcGVuKDApO30scmVzdW1lOigpPT5vcGVuKCksdmVyc2lvbjpWRVJTSU9OLGd1aWRlVmVyc2lvbjpHVUlERV9WRVJTSU9OLGtleTpLRVksc3RlcHM6c3RlcHMubWFwKChzLGkpPT4oe2lkOnMuaWQsb3JkZXI6aSsxLHN1cmZhY2U6cy5zdXJmYWNlLHJvdXRlOnMuc3VyZmFjZT09PSdvd25lcl9pcGFkJz8nb3duZXItaXBhZC5odG1sP2VtYmVkX2RlbW89MSc6J2Rhc2hib2FyZC5odG1sP2VtYmVkX2RlbW89MScscHJpbWFyeTpzLnByaW1hcnksZmFsbGJhY2s6cy5mYWxsYmFjay5zbGljZSgpLHRpdGxlOnMudGl0bGV9KSksZ3VpZGVJdGVtczpndWlkZUl0ZW1zLm1hcChnPT4oe2lkOmcuaWQsb3JkZXI6Zy5vcmRlcixzdXJmYWNlOmcuc3VyZmFjZSxyb3V0ZTpnLnJvdXRlLHByaW1hcnk6Zy5wcmltYXJ5LGZhbGxiYWNrOmcuZmFsbGJhY2suc2xpY2UoKSx0aXRsZTpnLnRpdGxlfSkpLHN0ZXBDb3VudDpTVEVQX0NPVU5ULGd1aWRlQ291bnQ6Z3VpZGVJdGVtcy5sZW5ndGgsc3RhdGU6cmVhZFN0YXRlfTtjb25zdCBhdXRvPXRha2VBdXRvU3RhcnQoKTtpZighc3RhdGUuZG9uZSYmKGF1dG98fChjdXJyZW50U3VyZmFjZSgpPT09J293bmVyX2lwYWQnJiZzdGF0ZS5zdGVwPT09OSkpKXtzZXRUaW1lb3V0KCgpPT5vcGVuKHN0YXRlLnN0ZXApLDgwKTt9fQoKd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoJ3Jlc2l6ZScsKCk9PntpZihjYXJkKXtjb25zdCByPWNhcmQuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCkscD1jbGFtcChyLmxlZnQsci50b3ApO2NhcmQuc3R5bGUubGVmdD1wLngrJ3B4JztjYXJkLnN0eWxlLnRvcD1wLnkrJ3B4JztjYXJkLnN0eWxlLnJpZ2h0PSdhdXRvJztjYXJkLnN0eWxlLmJvdHRvbT0nYXV0byc7aGlnaGxpZ2h0KCk7fX0pOwp3aW5kb3cuYWRkRXZlbnRMaXN0ZW5lcignc2Nyb2xsJywoKT0+e2lmKGNhcmQpaGlnaGxpZ2h0KCk7fSx7cGFzc2l2ZTp0cnVlfSk7CmRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoJ2tleWRvd24nLGU9Pntjb25zdCBnYz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZHByby10dXRvcmlhbC1ndWlkZS1jZW50ZXInKTtpZihlLmtleT09PSdFc2NhcGUnKXtpZihnYyl7Z2MucmVtb3ZlKCk7Zm9jdXNTYWZlKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdkcHJvLXR1dG9yaWFsLWd1aWRlLWNlbnRlci1lbnRyeScpKTt9ZWxzZSBpZihjYXJkKWNsb3NlKCk7cmV0dXJuO31pZihjYXJkJiZlLmtleT09PSdBcnJvd1JpZ2h0Jyl7ZS5wcmV2ZW50RGVmYXVsdCgpO2FkdmFuY2UoKTt9ZWxzZSBpZihjYXJkJiZlLmtleT09PSdBcnJvd0xlZnQnKXtlLnByZXZlbnREZWZhdWx0KCk7YmFjaygpO319KTsKaWYoZG9jdW1lbnQucmVhZHlTdGF0ZT09PSdsb2FkaW5nJylkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdET01Db250ZW50TG9hZGVkJyxpbnN0YWxsLHtvbmNlOnRydWV9KTtlbHNlIGluc3RhbGwoKTsKfSkoKTsK"""
+          css_b64 = """OnJvb3R7LS1kcHQtejoxMDA1MDstLWRwdC1hY2NlbnQ6IzFlM2E4YTstLWRwdC1jYXJkOiNmZmY7LS1kcHQtaW5rOiMxMTE4Mjc7LS1kcHQtbXV0ZWQ6IzY0NzQ4Yn0KI2Rwcm8tdHV0b3JpYWwtbGF1bmNoZXIsI2Rwcm8tdHV0b3JpYWwtZ3VpZGUtY2VudGVyLWVudHJ5e3Bvc2l0aW9uOmZpeGVkO3JpZ2h0OjE4cHg7ei1pbmRleDp2YXIoLS1kcHQteik7Ym9yZGVyLXJhZGl1czo5OTlweDtwYWRkaW5nOjEycHggMTZweDtmb250LXdlaWdodDo5MDA7Ym94LXNoYWRvdzowIDEycHggMzRweCByZ2JhKDE1LDIzLDQyLC4yNCk7Y3Vyc29yOnBvaW50ZXI7Zm9udDppbmhlcml0fQojZHByby10dXRvcmlhbC1sYXVuY2hlcntib3R0b206MThweDtib3JkZXI6MDtiYWNrZ3JvdW5kOiMxMTE4Mjc7Y29sb3I6I2ZmZn0KI2Rwcm8tdHV0b3JpYWwtZ3VpZGUtY2VudGVyLWVudHJ5e2JvdHRvbTo2OHB4O2JvcmRlcjoxcHggc29saWQgI2NiZDVlMTtiYWNrZ3JvdW5kOiNmZmY7Y29sb3I6IzFlMjkzYn0KI2Rwcm8tdHV0b3JpYWwtbGF1bmNoZXI6Zm9jdXMtdmlzaWJsZSwjZHByby10dXRvcmlhbC1ndWlkZS1jZW50ZXItZW50cnk6Zm9jdXMtdmlzaWJsZSwuZHB0LWNhcmQgYnV0dG9uOmZvY3VzLXZpc2libGUsLmRwdC1oYW5kbGU6Zm9jdXMtdmlzaWJsZSwjZHByby10dXRvcmlhbC1ndWlkZS1jZW50ZXIgYnV0dG9uOmZvY3VzLXZpc2libGV7b3V0bGluZTozcHggc29saWQgI2Y1OWUwYjtvdXRsaW5lLW9mZnNldDozcHh9CiNkcHJvLXR1dG9yaWFsLWxheWVye3Bvc2l0aW9uOmZpeGVkO2luc2V0OjA7ei1pbmRleDpjYWxjKHZhcigtLWRwdC16KSArIDEpO3BvaW50ZXItZXZlbnRzOm5vbmV9Ci5kcHQtaGlnaGxpZ2h0e3Bvc2l0aW9uOmZpeGVkO2JvcmRlcjozcHggc29saWQgI2Y1OWUwYjtib3JkZXItcmFkaXVzOjE0cHg7Ym94LXNoYWRvdzowIDAgMCA5OTk5cHggcmdiYSgxNSwyMyw0MiwuMjgpLDAgMCAwIDVweCByZ2JhKDI0NSwxNTgsMTEsLjE4KTt6LWluZGV4OmNhbGModmFyKC0tZHB0LXopICsgMik7cG9pbnRlci1ldmVudHM6bm9uZTt0cmFuc2l0aW9uOmFsbCAuMTJzIGVhc2V9Ci5kcHQtY2FyZHtwb3NpdGlvbjpmaXhlZDtsZWZ0OmNhbGMoMTAwdncgLSA0NDBweCk7dG9wOjkycHg7d2lkdGg6bWluKDQwMHB4LGNhbGMoMTAwdncgLSAyNHB4KSk7bWF4LWhlaWdodDpjYWxjKDEwMHZoIC0gMjRweCk7b3ZlcmZsb3c6YXV0bztiYWNrZ3JvdW5kOnZhcigtLWRwdC1jYXJkKTtjb2xvcjp2YXIoLS1kcHQtaW5rKTtib3JkZXI6MXB4IHNvbGlkICNjYmQ1ZTE7Ym9yZGVyLXJhZGl1czoxOHB4O2JveC1zaGFkb3c6MCAyMHB4IDYwcHggcmdiYSgxNSwyMyw0MiwuMzIpO3otaW5kZXg6Y2FsYyh2YXIoLS1kcHQteikgKyAzKTtwb2ludGVyLWV2ZW50czphdXRvO292ZXJzY3JvbGwtYmVoYXZpb3I6Y29udGFpbn0KLmRwdC1oYW5kbGV7ZGlzcGxheTpmbGV4O2FsaWduLWl0ZW1zOmNlbnRlcjtqdXN0aWZ5LWNvbnRlbnQ6c3BhY2UtYmV0d2VlbjtnYXA6MTJweDtwYWRkaW5nOjEzcHggMTVweDtiYWNrZ3JvdW5kOiMxMTE4Mjc7Y29sb3I6I2ZmZjtib3JkZXItcmFkaXVzOjE3cHggMTdweCAwIDA7Y3Vyc29yOmdyYWI7dG91Y2gtYWN0aW9uOm5vbmU7dXNlci1zZWxlY3Q6bm9uZX0uZHB0LWhhbmRsZTphY3RpdmV7Y3Vyc29yOmdyYWJiaW5nfS5kcHQtaGFuZGxlIHN0cm9uZ3tmb250LXNpemU6MTNweH0uZHB0LWhhbmRsZSBzcGFue2ZvbnQtc2l6ZToxMXB4O2NvbG9yOiNjYmQ1ZTF9Ci5kcHQtYm9keXtwYWRkaW5nOjE2cHh9LmRwdC1zdGVwe2ZvbnQtc2l6ZToxMXB4O2ZvbnQtd2VpZ2h0OjkwMDtjb2xvcjojMWUzYThhO2xldHRlci1zcGFjaW5nOi4wOGVtfS5kcHQtYm9keSBoM3ttYXJnaW46NnB4IDAgOHB4O2ZvbnQtc2l6ZToxOXB4O2xpbmUtaGVpZ2h0OjEuMzV9LmRwdC1ib2R5IHB7bWFyZ2luOjA7Y29sb3I6IzMzNDE1NTtmb250LXNpemU6MTNweDtsaW5lLWhlaWdodDoxLjd9LmRwdC1zYWZldHl7bWFyZ2luLXRvcDoxMnB4O3BhZGRpbmc6MTBweCAxMXB4O2JvcmRlci1yYWRpdXM6MTJweDtiYWNrZ3JvdW5kOiNmZmY3ZWQ7Ym9yZGVyOjFweCBzb2xpZCAjZmVkN2FhO2NvbG9yOiM5YTM0MTI7Zm9udC1zaXplOjEycHg7bGluZS1oZWlnaHQ6MS41NX0uZHB0LWZhbGxiYWNre21hcmdpbi10b3A6OXB4O3BhZGRpbmc6OXB4IDEwcHg7Ym9yZGVyLXJhZGl1czoxMHB4O2JhY2tncm91bmQ6I2Y4ZmFmYztjb2xvcjojNDc1NTY5O2ZvbnQtc2l6ZToxMXB4fS5kcHQtYWN0aW9uc3tkaXNwbGF5OmZsZXg7ZmxleC13cmFwOndyYXA7Z2FwOjhweDtwYWRkaW5nOjAgMTZweCAxNnB4fS5kcHQtYWN0aW9ucyBidXR0b257Ym9yZGVyOjA7Ym9yZGVyLXJhZGl1czoxMHB4O3BhZGRpbmc6MTBweCAxMnB4O2ZvbnQtd2VpZ2h0OjkwMDtjdXJzb3I6cG9pbnRlcjttaW4taGVpZ2h0OjQycHh9LmRwdC1wcmltYXJ5e2JhY2tncm91bmQ6IzFlM2E4YTtjb2xvcjojZmZmO2JvcmRlcjowO2JvcmRlci1yYWRpdXM6OXB4O3BhZGRpbmc6OXB4IDExcHg7Zm9udC13ZWlnaHQ6OTAwO2N1cnNvcjpwb2ludGVyfS5kcHQtc2Vjb25kYXJ5e2JhY2tncm91bmQ6I2UyZThmMDtjb2xvcjojMWUyOTNifS5kcHQtZ2hvc3R7YmFja2dyb3VuZDojZmZmO2NvbG9yOiM0NzU1Njk7Ym9yZGVyOjFweCBzb2xpZCAjY2JkNWUxIWltcG9ydGFudH0uZHB0LWRhbmdlcntiYWNrZ3JvdW5kOiNmZmYxZjI7Y29sb3I6I2JlMTIzY30uZHB0LXByb2dyZXNze2hlaWdodDo1cHg7YmFja2dyb3VuZDojZTJlOGYwfS5kcHQtcHJvZ3Jlc3M+aXtkaXNwbGF5OmJsb2NrO2hlaWdodDoxMDAlO2JhY2tncm91bmQ6IzFlM2E4YX0KI2Rwcm8tdHV0b3JpYWwtZ3VpZGUtY2VudGVye3Bvc2l0aW9uOmZpeGVkO2luc2V0OjE4cHg7ei1pbmRleDpjYWxjKHZhcigtLWRwdC16KSArIDQpO2JhY2tncm91bmQ6I2Y4ZmFmYztib3JkZXI6MXB4IHNvbGlkICNjYmQ1ZTE7Ym9yZGVyLXJhZGl1czoyMnB4O2JveC1zaGFkb3c6MCAyNnB4IDgwcHggcmdiYSgxNSwyMyw0MiwuMzYpO292ZXJmbG93OmF1dG87cG9pbnRlci1ldmVudHM6YXV0bztjb2xvcjojMGYxNzJhO292ZXJzY3JvbGwtYmVoYXZpb3I6Y29udGFpbn0KLmRwdC1ndWlkZS1oZWFke3Bvc2l0aW9uOnN0aWNreTt0b3A6MDtiYWNrZ3JvdW5kOnJnYmEoMjU1LDI1NSwyNTUsLjk2KTtiYWNrZHJvcC1maWx0ZXI6Ymx1cig4cHgpO2JvcmRlci1ib3R0b206MXB4IHNvbGlkICNlMmU4ZjA7cGFkZGluZzoxNnB4IDE4cHg7ZGlzcGxheTpmbGV4O2FsaWduLWl0ZW1zOmNlbnRlcjtqdXN0aWZ5LWNvbnRlbnQ6c3BhY2UtYmV0d2VlbjtnYXA6MTJweDt6LWluZGV4OjJ9LmRwdC1ndWlkZS1oZWFkIGgye21hcmdpbjowO2ZvbnQtc2l6ZToyMHB4fS5kcHQtZ3VpZGUtaGVhZCBidXR0b257Ym9yZGVyOjA7Ym9yZGVyLXJhZGl1czoxMHB4O2JhY2tncm91bmQ6IzExMTgyNztjb2xvcjojZmZmO3BhZGRpbmc6MTBweCAxMnB4O2ZvbnQtd2VpZ2h0OjkwMH0uZHB0LWd1aWRlLXdyYXB7ZGlzcGxheTpncmlkO2dyaWQtdGVtcGxhdGUtY29sdW1uczoyMjBweCAxZnI7bWluLWhlaWdodDpjYWxjKDEwMCUgLSA3MHB4KX0uZHB0LWd1aWRlLW5hdntwYWRkaW5nOjE0cHg7Ym9yZGVyLXJpZ2h0OjFweCBzb2xpZCAjZTJlOGYwO2JhY2tncm91bmQ6I2ZmZn0uZHB0LWd1aWRlLW5hdiBidXR0b257d2lkdGg6MTAwJTt0ZXh0LWFsaWduOmxlZnQ7Ym9yZGVyOjA7YmFja2dyb3VuZDp0cmFuc3BhcmVudDtwYWRkaW5nOjEwcHggMTFweDtib3JkZXItcmFkaXVzOjEwcHg7Zm9udC13ZWlnaHQ6ODAwO2NvbG9yOiMzMzQxNTU7Y3Vyc29yOnBvaW50ZXJ9LmRwdC1ndWlkZS1uYXYgYnV0dG9uLmFjdGl2ZXtiYWNrZ3JvdW5kOiNlMGU3ZmY7Y29sb3I6IzFlM2E4YX0uZHB0LWd1aWRlLWNvbnRlbnR7cGFkZGluZzoyMHB4O21heC13aWR0aDo5MDBweH0uZHB0LWd1aWRlLWNvbnRlbnQgaDN7Zm9udC1zaXplOjIycHg7bWFyZ2luOjAgMCAxMHB4fS5kcHQtZ3VpZGUtY29udGVudCBwe2NvbG9yOiM0NzU1Njk7bGluZS1oZWlnaHQ6MS43NX0uZHB0LWd1aWRlLWNhcmR7YmFja2dyb3VuZDojZmZmO2JvcmRlcjoxcHggc29saWQgI2UyZThmMDtib3JkZXItcmFkaXVzOjE0cHg7cGFkZGluZzoxNHB4O21hcmdpbjoxMnB4IDB9LmRwdC1ndWlkZS1jYXJkIHN0cm9uZ3tkaXNwbGF5OmJsb2NrO21hcmdpbi1ib3R0b206NXB4fS5kcHQtZ3VpZGUtY2FyZCBzbWFsbHtjb2xvcjojNjQ3NDhiO2xpbmUtaGVpZ2h0OjEuNn0uZHB0LWd1aWRlLXNhZmV7YmFja2dyb3VuZDojZWNmZGY1O2JvcmRlci1jb2xvcjojYTdmM2QwfS5kcHQtZ3VpZGUtd2FybntiYWNrZ3JvdW5kOiNmZmY3ZWQ7Ym9yZGVyLWNvbG9yOiNmZWQ3YWF9CkBtZWRpYShtYXgtd2lkdGg6NzIwcHgpeyNkcHJvLXR1dG9yaWFsLWxhdW5jaGVye3JpZ2h0OjEycHg7Ym90dG9tOjEycHh9I2Rwcm8tdHV0b3JpYWwtZ3VpZGUtY2VudGVyLWVudHJ5e3JpZ2h0OjEycHg7Ym90dG9tOjY0cHh9LmRwdC1jYXJke2xlZnQ6MTJweDt0b3A6YXV0bztib3R0b206MTJweDt3aWR0aDpjYWxjKDEwMHZ3IC0gMjRweCk7bWF4LWhlaWdodDo2OHZofS5kcHQtY2FyZFtkYXRhLWRyYWdnZWQ9IjEiXXtib3R0b206YXV0b30uZHB0LWd1aWRlLXdyYXB7Z3JpZC10ZW1wbGF0ZS1jb2x1bW5zOjFmcn0uZHB0LWd1aWRlLW5hdntkaXNwbGF5OmZsZXg7b3ZlcmZsb3cteDphdXRvO2JvcmRlci1yaWdodDowO2JvcmRlci1ib3R0b206MXB4IHNvbGlkICNlMmU4ZjA7Z2FwOjZweDtwb3NpdGlvbjpzdGlja3k7dG9wOjY5cHg7ei1pbmRleDoxfS5kcHQtZ3VpZGUtbmF2IGJ1dHRvbnt3aWR0aDphdXRvO3doaXRlLXNwYWNlOm5vd3JhcH0uZHB0LWd1aWRlLWNvbnRlbnR7cGFkZGluZzoxNnB4fSNkcHJvLXR1dG9yaWFsLWd1aWRlLWNlbnRlcntpbnNldDo4cHh9LmRwdC1oaWdobGlnaHR7Ym9yZGVyLXdpZHRoOjJweH19CkBtZWRpYShtYXgtd2lkdGg6MzkwcHgpey5kcHQtY2FyZHttYXgtd2lkdGg6Y2FsYygxMDB2dyAtIDI0cHgpfS5kcHQtYWN0aW9ucyBidXR0b257ZmxleDoxIDEgYXV0bzttaW4taGVpZ2h0OjQ0cHh9LmRwdC1ib2R5IGgze2ZvbnQtc2l6ZToxN3B4fX0KCi8qIERQUk8gVFVUT1JJQUwgS1NIIFI0IEd1aWRlIENlbnRlciBGaXJzdDEwIGFsaWdubWVudCAqLwouZHB0LWd1aWRlLWhlYWQgc21hbGx7ZGlzcGxheTpibG9jazttYXJnaW4tdG9wOjRweDtjb2xvcjojNjQ3NDhiO2ZvbnQtc2l6ZToxMXB4fS5kcHQtZ3VpZGUtY29udGVudHtwYWRkaW5nOjIwcHg7bWF4LXdpZHRoOjExMDBweDttYXJnaW46MCBhdXRvfS5kcHQtZ3VpZGUtY29udHJvbHN7ZGlzcGxheTpmbGV4O2ZsZXgtd3JhcDp3cmFwO2FsaWduLWl0ZW1zOmNlbnRlcjtnYXA6OXB4O21hcmdpbjowIDAgMThweH0uZHB0LWd1aWRlLWNvbnRyb2xzIGJ1dHRvbnttaW4taGVpZ2h0OjQycHg7cGFkZGluZzoxMHB4IDE0cHg7Ym9yZGVyLXJhZGl1czoxMHB4O2ZvbnQtd2VpZ2h0OjkwMDtjdXJzb3I6cG9pbnRlcn0uZHB0LWd1aWRlLXN0YXRle2ZvbnQtc2l6ZToxMnB4O2ZvbnQtd2VpZ2h0OjgwMDtjb2xvcjojNDc1NTY5O3BhZGRpbmc6OHB4IDEwcHg7YmFja2dyb3VuZDojZmZmO2JvcmRlcjoxcHggc29saWQgI2UyZThmMDtib3JkZXItcmFkaXVzOjEwcHh9LmRwdC1ndWlkZS1ncmlke2Rpc3BsYXk6Z3JpZDtncmlkLXRlbXBsYXRlLWNvbHVtbnM6cmVwZWF0KDIsbWlubWF4KDAsMWZyKSk7Z2FwOjEycHh9LmRwdC1ndWlkZS1zdGVwe21pbi13aWR0aDowO2JhY2tncm91bmQ6I2ZmZjtib3JkZXI6MXB4IHNvbGlkICNlMmU4ZjA7Ym9yZGVyLXJhZGl1czoxNHB4O3BhZGRpbmc6MTRweH0uZHB0LWd1aWRlLXN0ZXAta2lja2Vye2ZvbnQtc2l6ZToxMXB4O2ZvbnQtd2VpZ2h0OjkwMDtjb2xvcjojMWUzYThhO2xldHRlci1zcGFjaW5nOi4wNGVtfS5kcHQtZ3VpZGUtc3RlcCBoM3tmb250LXNpemU6MTdweDttYXJnaW46NXB4IDAgN3B4O2xpbmUtaGVpZ2h0OjEuNH0uZHB0LWd1aWRlLXN0ZXAgcHttYXJnaW46MCAwIDEwcHg7Y29sb3I6IzQ3NTU2OTtmb250LXNpemU6MTJweDtsaW5lLWhlaWdodDoxLjY1fS5kcHQtZ3VpZGUtc3RlcCBkbHttYXJnaW46MCAwIDEwcHg7Zm9udC1zaXplOjExcHg7Y29sb3I6IzMzNDE1NX0uZHB0LWd1aWRlLXN0ZXAgZGw+ZGl2e2Rpc3BsYXk6Z3JpZDtncmlkLXRlbXBsYXRlLWNvbHVtbnM6NjhweCBtaW5tYXgoMCwxZnIpO2dhcDo4cHg7cGFkZGluZzo1cHggMDtib3JkZXItdG9wOjFweCBzb2xpZCAjZjFmNWY5fS5kcHQtZ3VpZGUtc3RlcCBkdHtmb250LXdlaWdodDo5MDB9LmRwdC1ndWlkZS1zdGVwIGRke21hcmdpbjowO292ZXJmbG93LXdyYXA6YW55d2hlcmV9LmRwdC1ndWlkZS1zdGVwPnNtYWxse2Rpc3BsYXk6YmxvY2s7Y29sb3I6IzlhMzQxMjtiYWNrZ3JvdW5kOiNmZmY3ZWQ7Ym9yZGVyOjFweCBzb2xpZCAjZmVkN2FhO2JvcmRlci1yYWRpdXM6OXB4O3BhZGRpbmc6OHB4O2xpbmUtaGVpZ2h0OjEuNX0KQG1lZGlhKG1heC13aWR0aDo3MjBweCl7LmRwdC1ndWlkZS1jb250ZW50e3BhZGRpbmc6MTRweH0uZHB0LWd1aWRlLWdyaWR7Z3JpZC10ZW1wbGF0ZS1jb2x1bW5zOjFmcn0uZHB0LWd1aWRlLWNvbnRyb2xze3Bvc2l0aW9uOnN0aWNreTt0b3A6NzBweDt6LWluZGV4OjE7YmFja2dyb3VuZDojZjhmYWZjO3BhZGRpbmc6NnB4IDB9LmRwdC1ndWlkZS1zdGVwIGgze2ZvbnQtc2l6ZToxNnB4fX0KQG1lZGlhKG1heC13aWR0aDozOTBweCl7LmRwdC1ndWlkZS1jb250cm9scyBidXR0b257ZmxleDoxIDEgYXV0bzttaW4taGVpZ2h0OjQ0cHh9LmRwdC1ndWlkZS1zdGF0ZXtmbGV4OjEgMSAxMDAlfS5kcHQtZ3VpZGUtc3RlcHtwYWRkaW5nOjEycHh9fQo="""
+          Path('dpro-tutorial-car-service.js').write_bytes(base64.b64decode(js_b64))
+          Path('dpro-tutorial-car-service.css').write_bytes(base64.b64decode(css_b64))
+          for name in ['dashboard.html','owner-ipad.html']:
+              p=Path(name)
+              text=p.read_text(encoding='utf-8')
+              text=text.replace('dpro-tutorial-car-service.css?v=R3-20260829','dpro-tutorial-car-service.css?v=R4-20260829')
+              text=text.replace('dpro-tutorial-car-service.js?v=R3-20260829','dpro-tutorial-car-service.js?v=R4-20260829')
+              if text.count('dpro-tutorial-car-service.css') != 1:
+                  raise SystemExit(f'{name}: css loader count != 1')
+              if text.count('dpro-tutorial-car-service.js') != 1:
+                  raise SystemExit(f'{name}: js loader count != 1')
+              p.write_text(text,encoding='utf-8')
+
+      - name: Verify R4 source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check dpro-tutorial-car-service.js
+          grep -q "GUIDE_VERSION='CAR_SERVICE-R4-20260829'" dpro-tutorial-car-service.js
+          grep -q "const guideItems=steps.map" dpro-tutorial-car-service.js
+          grep -q "guideCount:guideItems.length" dpro-tutorial-car-service.js
+          grep -q "dpro-tutorial-guide-start" dpro-tutorial-car-service.js
+          grep -q "dpro-tutorial-guide-resume" dpro-tutorial-car-service.js
+          grep -q "dpro-tutorial-guide-replay" dpro-tutorial-car-service.js
+          ! grep -q "const guide={" dpro-tutorial-car-service.js
+
+      - name: Commit R4 Guide Center when needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- dpro-tutorial-car-service.js dpro-tutorial-car-service.css dashboard.html owner-ipad.html; then
+            echo "R4 Guide Center already applied."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add dpro-tutorial-car-service.js dpro-tutorial-car-service.css dashboard.html owner-ipad.html
+            git commit -m "KSH R4 align Guide Center to First10"
+            git push origin main
+          fi
+
+      - name: Wait for GitHub Pages R4 marker
+        shell: python
+        run: |
+          import time, urllib.request
+          pages=[
+            'https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&r4qa=20260829',
+            'https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&r4qa=20260829',
+          ]
+          html_marker='dpro-tutorial-car-service.js?v=R4-20260829'
+          js_url='https://dpromstk2000-lab.github.io/line-shaken-liff/dpro-tutorial-car-service.js?v=R4-20260829&r4qa=1'
+          for attempt in range(48):
+              ok=True
+              try:
+                  for url in pages:
+                      req=urllib.request.Request(url,headers={'Cache-Control':'no-cache','User-Agent':'DPRO-R4-QA'})
+                      with urllib.request.urlopen(req,timeout=15) as r:
+                          body=r.read().decode('utf-8','replace')
+                      if html_marker not in body: ok=False
+                  req=urllib.request.Request(js_url,headers={'Cache-Control':'no-cache','User-Agent':'DPRO-R4-QA'})
+                  with urllib.request.urlopen(req,timeout=15) as r:
+                      js_body=r.read().decode('utf-8','replace')
+                  if 'CAR_SERVICE-R4-20260829' not in js_body: ok=False
+              except Exception:
+                  ok=False
+              if ok:
+                  print('GitHub Pages R4 marker detected.')
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit('GitHub Pages did not expose the R4 marker in time.')
+
+      - name: Install browser QA dependency
+        run: python -m pip install --disable-pip-version-check selenium
+
+      - name: Run exact public R4 LIVE QA
+        shell: bash
+        run: |
+          cat > /tmp/ksh_r4_live_qa.py <<'PY'
+          import json, time, traceback
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.common.by import By
+          from selenium.webdriver.common.keys import Keys
+          from selenium.webdriver.support.ui import WebDriverWait
+          from selenium.webdriver.support import expected_conditions as EC
+          from selenium.webdriver.common.action_chains import ActionChains
+          
+          BASE='https://dpromstk2000-lab.github.io/line-shaken-liff/'
+          VIEWPORTS=[(1440,1000),(1024,768),(390,844),(320,720)]
+          report={'system':'KSH','phase':'R4','tutorialVersion':'CAR_SERVICE-R3-20260829','guideVersion':'CAR_SERVICE-R4-20260829','viewports':[],'overall':'PASS'}
+          
+          def wait_css(drv, selector, timeout=12):
+              return WebDriverWait(drv,timeout).until(EC.presence_of_element_located((By.CSS_SELECTOR,selector)))
+          
+          def perf_requests(drv):
+              out=[]
+              for row in drv.get_log('performance'):
+                  try:
+                      msg=json.loads(row['message'])['message']
+                      if msg.get('method')=='Network.requestWillBeSent':
+                          r=msg['params']['request']; out.append((r.get('method',''),r.get('url','')))
+                  except Exception: pass
+              return out
+          
+          def relevant_console_errors(drv):
+              errors=[]
+              for row in drv.get_log('browser'):
+                  msg=row.get('message','')
+                  if row.get('level')=='SEVERE' and ('dpro-tutorial-car-service.js' in msg or 'DPROCarServiceTutorial' in msg or 'Guide Center' in msg):
+                      errors.append(msg)
+              return errors
+          
+          def step_text(drv):
+              return drv.find_element(By.CSS_SELECTOR,'.dpt-step').text.strip()
+          
+          def clear_and_open(drv):
+              url=BASE+'dashboard.html?embed_demo=1&r4qa=20260829'
+              drv.get(url); wait_css(drv,'#dpro-tutorial-launcher')
+              drv.execute_script('localStorage.removeItem("dpro_tutorial_car_service_v1_1"); sessionStorage.clear();')
+              drv.get(url); wait_css(drv,'#dpro-tutorial-launcher')
+              drv.get_log('performance'); drv.get_log('browser')
+          
+          def open_guide(drv):
+              drv.find_element(By.ID,'dpro-tutorial-guide-center-entry').click()
+              return wait_css(drv,'#dpro-tutorial-guide-center')
+          
+          for w,h in VIEWPORTS:
+              opts=Options()
+              opts.add_argument('--headless=new'); opts.add_argument('--no-sandbox'); opts.add_argument('--disable-dev-shm-usage')
+              opts.add_argument('--disable-gpu'); opts.add_argument(f'--window-size={w},{h}')
+              opts.set_capability('goog:loggingPrefs', {'browser':'ALL','performance':'ALL'})
+              drv=webdriver.Chrome(options=opts)
+              row={'viewport':f'{w}x{h}','checks':{}}
+              try:
+                  drv.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':w,'height':h,'deviceScaleFactor':1,'mobile':False})
+                  clear_and_open(drv)
+                  row['checks']['TUTORIAL_VERSION']=drv.execute_script('return DPROCarServiceTutorial.version')=='CAR_SERVICE-R3-20260829'
+                  row['checks']['GUIDE_VERSION']=drv.execute_script('return DPROCarServiceTutorial.guideVersion')=='CAR_SERVICE-R4-20260829'
+                  row['checks']['FIRST10_COUNT']=drv.execute_script('return DPROCarServiceTutorial.stepCount')==10
+                  row['checks']['GUIDE_COUNT_API']=drv.execute_script('return DPROCarServiceTutorial.guideCount')==10
+          
+                  open_guide(drv)
+                  row['checks']['GUIDE_COUNT_DOM']=len(drv.find_elements(By.CSS_SELECTOR,'.dpt-guide-step'))==10
+                  align_js="const a=DPROCarServiceTutorial.steps,b=DPROCarServiceTutorial.guideItems;return a.length===10&&b.length===10&&a.every((s,i)=>{const g=b[i];return s.id===g.id&&s.order===g.order&&s.surface===g.surface&&s.route===g.route&&s.primary===g.primary&&JSON.stringify(s.fallback)===JSON.stringify(g.fallback)&&s.title===g.title;});"
+                  row['checks']['GUIDE_TUTORIAL_ALIGNMENT']=drv.execute_script(align_js) is True
+                  row['checks']['KEYBOARD_FOCUS']=drv.execute_script('return document.activeElement && document.activeElement.hasAttribute("data-gclose")') is True
+                  row['checks']['RESUME_HIDDEN_WITHOUT_STATE']=len(drv.find_elements(By.ID,'dpro-tutorial-guide-resume'))==0
+          
+                  drv.find_element(By.ID,'dpro-tutorial-guide-start').click(); wait_css(drv,'.dpt-card')
+                  row['checks']['START']=step_text(drv)=='STEP 1 / 10'
+                  for _ in range(3): drv.find_element(By.CSS_SELECTOR,'[data-next]').click(); time.sleep(.05)
+                  paused=step_text(drv)
+                  drv.find_element(By.CSS_SELECTOR,'[data-close]').click()
+                  open_guide(drv)
+                  resume=drv.find_elements(By.ID,'dpro-tutorial-guide-resume')
+                  row['checks']['RESUME_VISIBLE_WITH_STATE']=len(resume)==1
+                  if resume:
+                      resume[0].click(); wait_css(drv,'.dpt-card')
+                  row['checks']['RESUME']=step_text(drv)==paused
+          
+                  drv.find_element(By.CSS_SELECTOR,'[data-skip]').click(); wait_css(drv,'#dpro-tutorial-guide-center')
+                  drv.find_element(By.ID,'dpro-tutorial-guide-replay').click(); wait_css(drv,'.dpt-card')
+                  row['checks']['REPLAY']=step_text(drv)=='STEP 1 / 10'
+          
+                  for _ in range(8):
+                      ActionChains(drv).send_keys(Keys.ARROW_RIGHT).perform(); time.sleep(.06)
+                  row['checks']['STEP9']=step_text(drv)=='STEP 9 / 10'
+                  ActionChains(drv).send_keys(Keys.ARROW_RIGHT).perform()
+                  WebDriverWait(drv,12).until(lambda d:'owner-ipad.html' in d.current_url)
+                  wait_css(drv,'.dpt-card')
+                  row['checks']['CROSS_PAGE_STATE']=step_text(drv)=='STEP 10 / 10' and drv.execute_script('return DPROCarServiceTutorial.state().step')==9
+                  drv.find_element(By.CSS_SELECTOR,'[data-close]').click()
+                  open_guide(drv)
+                  cross_resume=drv.find_elements(By.ID,'dpro-tutorial-guide-resume')
+                  row['checks']['CROSS_PAGE_RESUME_VISIBLE']=len(cross_resume)==1
+                  if cross_resume:
+                      cross_resume[0].click(); wait_css(drv,'.dpt-card')
+                  row['checks']['CROSS_PAGE_RESUME']=step_text(drv)=='STEP 10 / 10'
+          
+                  ActionChains(drv).send_keys(Keys.ARROW_RIGHT).perform(); wait_css(drv,'#dpro-tutorial-guide-center')
+                  row['checks']['COMPLETE_OPENS_GUIDE']=drv.execute_script('return DPROCarServiceTutorial.state().done') is True
+                  drv.find_element(By.ID,'dpro-tutorial-guide-replay').click()
+                  WebDriverWait(drv,12).until(lambda d:'dashboard.html' in d.current_url)
+                  wait_css(drv,'.dpt-card')
+                  row['checks']['REPLAY_CROSS_PAGE_TO_STEP1']=step_text(drv)=='STEP 1 / 10'
+          
+                  product_js="return !!document.querySelector('#nav-today')&&!!document.querySelector('#nav-inquiries')&&!!document.querySelector('#nav-reservations')&&!!document.querySelector('#nav-customers')&&!!document.querySelector('#reservationProgressStage')&&!!document.querySelector('button[onclick=\\\"openIpadDashboard()\\\"]')&&typeof openIpadDashboard==='function';"
+                  row['checks']['PRODUCT_REGRESSION_0']=drv.execute_script(product_js) is True
+          
+                  drv.find_element(By.CSS_SELECTOR,'[data-close]').click(); open_guide(drv)
+                  widths=drv.execute_script('return [innerWidth,document.documentElement.scrollWidth,document.body.scrollWidth]')
+                  row['innerWidth'],row['documentElement_scrollWidth'],row['body_scrollWidth']=widths
+                  row['overflow']=max(widths[1],widths[2])-widths[0]
+                  row['checks']['OVERFLOW_0']=row['overflow']<=0
+          
+                  requests=perf_requests(drv)
+                  unsafe=[{'method':m,'url':u} for m,u in requests if m.upper() not in ('GET','HEAD','OPTIONS')]
+                  row['unsafe_requests']=unsafe
+                  row['checks']['UNSAFE_WRITE_REQUEST_0']=len(unsafe)==0
+                  row['checks']['BUSINESS_MUTATION_0']=len(unsafe)==0
+                  cerr=relevant_console_errors(drv); row['tutorial_guide_console_errors']=cerr
+                  row['checks']['TUTORIAL_GUIDE_CONSOLE_ERROR_0']=len(cerr)==0
+                  row['checks']['PAGEERROR_0']=len(cerr)==0
+                  row['pass']=all(row['checks'].values())
+                  if not row['pass']: report['overall']='FAIL'
+              except Exception as e:
+                  row['pass']=False; row['exception']=repr(e); row['traceback']=traceback.format_exc(); report['overall']='FAIL'
+              finally:
+                  report['viewports'].append(row); drv.quit()
+          
+          with open('KSH_R4_LIVE_QA.json','w',encoding='utf-8') as f: json.dump(report,f,ensure_ascii=False,indent=2)
+          lines=['DPRO TUTORIAL KSH R4 LIVE QA',f"OVERALL={report['overall']}"]
+          for r in report['viewports']:
+              lines.append(f"{r['viewport']}={'PASS' if r.get('pass') else 'FAIL'} innerWidth={r.get('innerWidth')} documentElement.scrollWidth={r.get('documentElement_scrollWidth')} body.scrollWidth={r.get('body_scrollWidth')} overflow={r.get('overflow')}")
+              for k,v in r.get('checks',{}).items(): lines.append(f"  {k}={v}")
+              if r.get('exception'): lines.append('  EXCEPTION='+r['exception'])
+          with open('KSH_R4_LIVE_QA.txt','w',encoding='utf-8') as f: f.write('\n'.join(lines)+'\n')
+          print('\n'.join(lines))
+          if report['overall']!='PASS': raise SystemExit(1)
+          PY
+          python /tmp/ksh_r4_live_qa.py
+
+      - name: Upload R4 QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DPRO_KSH_R4_LIVE_QA_20260829
+          path: |
+            KSH_R4_LIVE_QA.json
+            KSH_R4_LIVE_QA.txt
+          if-no-files-found: warn
