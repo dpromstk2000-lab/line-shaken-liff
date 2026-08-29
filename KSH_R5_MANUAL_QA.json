@@ -1,0 +1,22 @@
+{
+  "system": "KSH",
+  "batch": "08",
+  "phase": "R5",
+  "source_head": "9db39d2d2a99e0083373a9bff87f5a8c7f44ea13",
+  "source_tree": "fbf42f9210e0c685619a5026d0be5d5251e7c958",
+  "tutorial_version": "CAR_SERVICE-R3-20260829",
+  "guide_version": "CAR_SERVICE-R4-20260829",
+  "first10_count": 10,
+  "guide_count": 10,
+  "quick_pdf": "DPRO_TUTORIAL_KSH_QUICK_START_V1.0.pdf",
+  "detailed_pdf": "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0.pdf",
+  "tutorial_url": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+  "guide_url": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1#dpro-tutorial-guide-center-entry",
+  "live_capture_status": "PASS",
+  "unsafe_write_requests": 0,
+  "business_mutation": 0,
+  "render_qr_status": "PASS",
+  "visual_qa": "PENDING_ASSISTANT_VISUAL_REVIEW",
+  "r5_status": "CANDIDATE_READY_FOR_VISUAL_REVIEW",
+  "r6_authorized_now": false
+}

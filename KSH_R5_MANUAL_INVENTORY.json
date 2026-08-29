@@ -1,0 +1,10 @@
+{
+  "quick_pdf": "DPRO_TUTORIAL_KSH_QUICK_START_V1.0.pdf",
+  "detailed_pdf": "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0.pdf",
+  "tutorial_url": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+  "guide_url": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1#dpro-tutorial-guide-center-entry",
+  "first10_count": 10,
+  "guide_count": 10,
+  "quick_sha256": "a25a35093dafe0a21c7645c40a11fe362ca2d26d7fee5605d0f0ae1b047cf4f5",
+  "detailed_sha256": "c3f0195e2ccaf8cac01029527ba07a1d9a4bfbff99cf0721aae3a818640aa424"
+}

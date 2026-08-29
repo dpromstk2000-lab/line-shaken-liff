@@ -1,0 +1,30 @@
+{
+  "dashboard": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&r5capture=20260829",
+  "ipad": "https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&r5capture=20260829",
+  "screenshots": {
+    "tutorial_step01.png": {
+      "sha256": "735b8c1aa28711a14698d48150a505b3728a9c2fcf6ad236199f046882b2eb38",
+      "selector": ".dpt-card"
+    },
+    "tutorial_step05.png": {
+      "sha256": "e0555646058b533ab24292e087738a1bd412fe3c0d4f61c5245fb71a76c9a77c",
+      "selector": ".dpt-card"
+    },
+    "tutorial_step09.png": {
+      "sha256": "ac0fbf5a38c7e857b2fe72ffb23475f5b0321ea8864d6a2d5acb50591a97173a",
+      "selector": ".dpt-card"
+    },
+    "guide_center.png": {
+      "sha256": "7489ce1ee713660192c54a270eaba6cc3977e3de414f574125f1ea56a8779420",
+      "selector": "#dpro-tutorial-guide-center"
+    },
+    "tutorial_step10.png": {
+      "sha256": "298ebbd7856a5fb3d8bbb6e6444e58d901381fd6ec481af0c639ce75c4f2103a",
+      "selector": ".dpt-card"
+    }
+  },
+  "unsafe_requests": [],
+  "tutorial_console_errors": [],
+  "business_mutation": 0,
+  "status": "PASS"
+}

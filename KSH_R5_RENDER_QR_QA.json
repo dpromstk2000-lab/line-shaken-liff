@@ -1,0 +1,146 @@
+{
+  "pdfs": {
+    "DPRO_TUTORIAL_KSH_QUICK_START_V1.0.pdf": {
+      "pages": 1,
+      "sha256": "a25a35093dafe0a21c7645c40a11fe362ca2d26d7fee5605d0f0ae1b047cf4f5"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0.pdf": {
+      "pages": 6,
+      "sha256": "c3f0195e2ccaf8cac01029527ba07a1d9a4bfbff99cf0721aae3a818640aa424"
+    }
+  },
+  "pages": {
+    "DPRO_TUTORIAL_KSH_QUICK_START_V1.0_PAGE_01.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "fb36ce67e0b1b31f5da2ff3af86545560c63621ed788145d626e7e646b741b2f"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_01.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "64ab73d5feac1381debfb7440cca10b66460d7d60838099493d994011f5a345b"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_02.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "2af9c452ceabc51c253c9a57fe5f2e68c80bf93e9ff77802d35c35ea697fdd5f"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_03.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "78e3fb3de368f302453be5d5f47aee49fad57fc99248747d0ffeb25149c61e95"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_04.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "6f9f9a75314b62ff915b3de7902d2d04acb398e6092e6cadfc5b6da3a3209664"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_05.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "0fc0539521c384fc39ada98e3b26459d42bbdebb310c4c4287efa2c6aed34cca"
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_06.png": {
+      "size": [
+        993,
+        1404
+      ],
+      "bbox": [
+        0,
+        0,
+        993,
+        1373
+      ],
+      "render_nonblank": true,
+      "sha256": "5c227a5ecb77230e0b39602e904f2071802344691abe0c988755b01581a01865"
+    }
+  },
+  "qr": {
+    "DPRO_TUTORIAL_KSH_QUICK_START_V1.0_PAGE_01.png": {
+      "decoded": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+      "expected": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+      "match": true
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_01.png": {
+      "decoded": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+      "expected": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1",
+      "match": true
+    },
+    "DPRO_TUTORIAL_KSH_DETAILED_MANUAL_V1.0_PAGE_06.png": {
+      "decoded": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1#dpro-tutorial-guide-center-entry",
+      "expected": "https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1#dpro-tutorial-guide-center-entry",
+      "match": true
+    }
+  },
+  "gates": {
+    "QUICK_START_A4_PORTRAIT": "PASS",
+    "QUICK_START_RENDERED_PAGES": 1,
+    "DETAILED_A4_PORTRAIT": "PASS",
+    "DETAILED_RENDERED_ALL_PAGES": "PASS",
+    "QR_DECODE_EVERY_RENDERED_QR": "PASS",
+    "QR_DESTINATION_EXACT_PUBLIC": "PASS",
+    "CURRENT_LIVE_DEMO_SCREENSHOTS_ONLY": "PASS",
+    "PII_SENSITIVE_DATA": 0,
+    "SECRETS_CREDENTIALS": 0,
+    "CLIPPING_PREFLIGHT": 0,
+    "BROKEN_IMAGE_PREFLIGHT": 0,
+    "ACCIDENTAL_BLANK": 0,
+    "BUSINESS_MUTATION": 0,
+    "VISUAL_QA_EVERY_PAGE": "PENDING_ASSISTANT_VISUAL_REVIEW"
+  },
+  "status": "PASS"
+}
