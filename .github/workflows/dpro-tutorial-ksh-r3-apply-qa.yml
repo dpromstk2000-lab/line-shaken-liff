@@ -1,0 +1,265 @@
+name: DPRO KSH Tutorial R3 Apply and LIVE QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dpro-tutorial-ksh-r3-apply-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dpro-ksh-tutorial-r3
+  cancel-in-progress: false
+
+jobs:
+  apply-and-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify R3 Tutorial root files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dpro-tutorial-car-service.js
+          test -f dpro-tutorial-car-service.css
+          grep -q "CAR_SERVICE-R3-20260829" dpro-tutorial-car-service.js
+          test "$(grep -o "id:'KSH-F10-" dpro-tutorial-car-service.js | wc -l | tr -d ' ')" = "10"
+          grep -q "primary:'#reservationEstimateBox h4'" dpro-tutorial-car-service.js
+          grep -q "primary:'#tab-today'" dpro-tutorial-car-service.js
+          node --check dpro-tutorial-car-service.js
+
+      - name: Attach Tutorial assets to dashboard and owner iPad
+        shell: python
+        run: |
+          from pathlib import Path
+
+          css = '<link rel="stylesheet" href="dpro-tutorial-car-service.css?v=R3-20260829">'
+          js = '<script defer src="dpro-tutorial-car-service.js?v=R3-20260829"></script>'
+
+          for name in ['dashboard.html', 'owner-ipad.html']:
+              p = Path(name)
+              text = p.read_text(encoding='utf-8')
+              if 'dpro-tutorial-car-service.css' not in text:
+                  if '</head>' not in text:
+                      raise SystemExit(f'{name}: </head> not found')
+                  text = text.replace('</head>', f'  {css}\n</head>', 1)
+              if 'dpro-tutorial-car-service.js' not in text:
+                  if '</body>' not in text:
+                      raise SystemExit(f'{name}: </body> not found')
+                  text = text.replace('</body>', f'  {js}\n</body>', 1)
+              p.write_text(text, encoding='utf-8')
+
+          for name in ['dashboard.html', 'owner-ipad.html']:
+              text = Path(name).read_text(encoding='utf-8')
+              assert text.count('dpro-tutorial-car-service.css') == 1, name
+              assert text.count('dpro-tutorial-car-service.js') == 1, name
+
+      - name: Commit loader attachment when needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- dashboard.html owner-ipad.html; then
+            echo "Tutorial loader already attached."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add dashboard.html owner-ipad.html
+            git commit -m "KSH R3 attach Tutorial to dashboard and iPad"
+            git push origin main
+          fi
+
+      - name: Wait for GitHub Pages R3 marker
+        shell: python
+        run: |
+          import time, urllib.request
+          urls = [
+              'https://dpromstk2000-lab.github.io/line-shaken-liff/dashboard.html?embed_demo=1&r3qa=20260829',
+              'https://dpromstk2000-lab.github.io/line-shaken-liff/owner-ipad.html?embed_demo=1&r3qa=20260829',
+          ]
+          marker = 'dpro-tutorial-car-service.js?v=R3-20260829'
+          for attempt in range(36):
+              ok = True
+              for url in urls:
+                  try:
+                      req = urllib.request.Request(url, headers={'Cache-Control':'no-cache','User-Agent':'DPRO-R3-QA'})
+                      with urllib.request.urlopen(req, timeout=15) as r:
+                          body = r.read().decode('utf-8', 'replace')
+                      if marker not in body:
+                          ok = False
+                  except Exception:
+                      ok = False
+              if ok:
+                  print('GitHub Pages R3 marker detected.')
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit('GitHub Pages did not expose the R3 marker in time.')
+
+      - name: Install browser QA dependency
+        run: python -m pip install --disable-pip-version-check selenium
+
+      - name: Run exact public LIVE QA
+        shell: bash
+        run: |
+          cat > /tmp/ksh_r3_live_qa.py <<'PY'
+          import json, time, traceback
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.common.by import By
+          from selenium.webdriver.common.keys import Keys
+          from selenium.webdriver.support.ui import WebDriverWait
+          from selenium.webdriver.support import expected_conditions as EC
+          from selenium.webdriver.common.action_chains import ActionChains
+
+          BASE='https://dpromstk2000-lab.github.io/line-shaken-liff/'
+          VIEWPORTS=[(1440,1000),(1024,768),(390,844),(320,720)]
+          report={'system':'KSH','phase':'R3','version':'CAR_SERVICE-R3-20260829','viewports':[],'overall':'PASS'}
+
+          def wait_css(drv, selector, timeout=12):
+              return WebDriverWait(drv,timeout).until(EC.presence_of_element_located((By.CSS_SELECTOR,selector)))
+
+          def perf_requests(drv):
+              out=[]
+              for row in drv.get_log('performance'):
+                  try:
+                      msg=json.loads(row['message'])['message']
+                      if msg.get('method')=='Network.requestWillBeSent':
+                          r=msg['params']['request']; out.append((r.get('method',''),r.get('url','')))
+                  except Exception: pass
+              return out
+
+          def tutorial_console_errors(drv):
+              errors=[]
+              for row in drv.get_log('browser'):
+                  msg=row.get('message','')
+                  if row.get('level')=='SEVERE' and ('dpro-tutorial-car-service.js' in msg or 'DPROCarServiceTutorial' in msg):
+                      errors.append(msg)
+              return errors
+
+          def step_text(drv):
+              return drv.find_element(By.CSS_SELECTOR,'.dpt-step').text.strip()
+
+          def open_clean(drv,url):
+              drv.get(url)
+              wait_css(drv,'#dpro-tutorial-launcher')
+              drv.execute_script('localStorage.removeItem("dpro_tutorial_car_service_v1_1"); sessionStorage.clear();')
+              drv.get(url)
+              wait_css(drv,'#dpro-tutorial-launcher')
+              drv.get_log('performance'); drv.get_log('browser')
+
+          for w,h in VIEWPORTS:
+              opts=Options()
+              opts.add_argument('--headless=new'); opts.add_argument('--no-sandbox'); opts.add_argument('--disable-dev-shm-usage')
+              opts.add_argument('--disable-gpu'); opts.add_argument(f'--window-size={w},{h}')
+              opts.set_capability('goog:loggingPrefs', {'browser':'ALL','performance':'ALL'})
+              drv=webdriver.Chrome(options=opts)
+              row={'viewport':f'{w}x{h}','checks':{},'targets':[]}
+              try:
+                  drv.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':w,'height':h,'deviceScaleFactor':1,'mobile':False})
+                  open_clean(drv,BASE+'dashboard.html?embed_demo=1&r3qa=20260829')
+                  row['checks']['FIRST10_COUNT']=drv.execute_script('return window.DPROCarServiceTutorial.stepCount')==10
+                  row['checks']['VERSION']=drv.execute_script('return window.DPROCarServiceTutorial.version')=='CAR_SERVICE-R3-20260829'
+
+                  drv.find_element(By.ID,'dpro-tutorial-launcher').click(); wait_css(drv,'.dpt-card')
+                  row['targets'].append({'step':1,'resolution':drv.find_element(By.CSS_SELECTOR,'.dpt-fallback').text})
+                  drv.find_element(By.CSS_SELECTOR,'[data-next]').click(); row['checks']['NEXT']=step_text(drv)=='STEP 2 / 10'
+                  row['targets'].append({'step':2,'resolution':drv.find_element(By.CSS_SELECTOR,'.dpt-fallback').text})
+                  drv.find_element(By.CSS_SELECTOR,'[data-back]').click(); row['checks']['BACK']=step_text(drv)=='STEP 1 / 10'
+
+                  drv.find_element(By.CSS_SELECTOR,'[data-next]').click(); drv.find_element(By.CSS_SELECTOR,'[data-next]').click()
+                  before=step_text(drv)
+                  drv.find_element(By.CSS_SELECTOR,'[data-close]').click(); row['checks']['CLOSE']=len(drv.find_elements(By.CSS_SELECTOR,'.dpt-card'))==0
+                  drv.find_element(By.ID,'dpro-tutorial-launcher').click(); row['checks']['RESUME']=step_text(drv)==before
+                  ActionChains(drv).send_keys(Keys.ESCAPE).perform(); row['checks']['ESC']=len(drv.find_elements(By.CSS_SELECTOR,'.dpt-card'))==0
+                  drv.find_element(By.ID,'dpro-tutorial-launcher').click()
+
+                  handle=drv.find_element(By.CSS_SELECTOR,'.dpt-handle')
+                  card=drv.find_element(By.CSS_SELECTOR,'.dpt-card')
+                  r0=drv.execute_script('const r=arguments[0].getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};',card)
+                  ActionChains(drv).move_to_element(handle).click_and_hold().move_by_offset(-120,-60).release().perform()
+                  r1=drv.execute_script('const r=arguments[0].getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};',card)
+                  row['checks']['MOUSE_POINTER_DRAG']=(r1['x']!=r0['x'] or r1['y']!=r0['y']) and r1['x']>=7 and r1['y']>=7
+
+                  drv.execute_cdp_cmd('Emulation.setTouchEmulationEnabled',{'enabled':True,'maxTouchPoints':1})
+                  hr=drv.execute_script('const r=arguments[0].getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};',handle)
+                  sx=hr['x']+min(20,hr['w']/2); sy=hr['y']+min(15,hr['h']/2)
+                  drv.execute_cdp_cmd('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':sx,'y':sy}]})
+                  drv.execute_cdp_cmd('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':max(2,w-2),'y':max(2,h-2)}]})
+                  drv.execute_cdp_cmd('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+                  time.sleep(.15)
+                  r2=drv.execute_script('const r=arguments[0].getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};',card)
+                  row['checks']['TOUCH_POINTER_DRAG']=(r2['x']!=r1['x'] or r2['y']!=r1['y'])
+                  row['checks']['VIEWPORT_CLAMP']=r2['x']>=7 and r2['y']>=7 and r2['x']+r2['w']<=w+1 and r2['y']+r2['h']<=h+1
+
+                  drv.find_element(By.CSS_SELECTOR,'[data-skip]').click(); wait_css(drv,'#dpro-tutorial-guide-center')
+                  row['checks']['SKIP']=True
+                  drv.find_element(By.ID,'dpro-tutorial-replay').click(); wait_css(drv,'.dpt-card')
+                  row['checks']['REPLAY']=step_text(drv)=='STEP 1 / 10'
+
+                  # Keyboard-only completion; capture each target/fallback message.
+                  row['targets']=[{'step':1,'resolution':drv.find_element(By.CSS_SELECTOR,'.dpt-fallback').text}]
+                  for expected in range(2,10):
+                      ActionChains(drv).send_keys(Keys.ARROW_RIGHT).perform(); time.sleep(.08)
+                      row['targets'].append({'step':expected,'resolution':drv.find_element(By.CSS_SELECTOR,'.dpt-fallback').text})
+                  row['checks']['STEP9']=step_text(drv)=='STEP 9 / 10'
+                  ActionChains(drv).send_keys(Keys.ARROW_RIGHT).perform()
+                  WebDriverWait(drv,12).until(lambda d:'owner-ipad.html' in d.current_url)
+                  wait_css(drv,'.dpt-card')
+                  row['targets'].append({'step':10,'resolution':drv.find_element(By.CSS_SELECTOR,'.dpt-fallback').text})
+                  row['checks']['CROSS_PAGE_RESUME']=step_text(drv)=='STEP 10 / 10' and drv.execute_script('return DPROCarServiceTutorial.state().step')==9
+                  ActionChains(drv).send_keys(Keys.ARROW_RIGHT).perform(); wait_css(drv,'#dpro-tutorial-guide-center')
+                  row['checks']['KEYBOARD_ONLY']=drv.execute_script('return DPROCarServiceTutorial.state().done') is True
+                  ActionChains(drv).send_keys(Keys.ESCAPE).perform(); drv.find_element(By.ID,'dpro-tutorial-launcher').click(); wait_css(drv,'.dpt-card')
+                  row['checks']['FOCUS_VISIBLE_RECOVERABLE']=drv.execute_script('return document.activeElement && document.activeElement.hasAttribute("data-next")') is True
+
+                  widths=drv.execute_script('return [innerWidth,document.documentElement.scrollWidth,document.body.scrollWidth]')
+                  row['innerWidth'],row['documentElement_scrollWidth'],row['body_scrollWidth']=widths
+                  row['overflow']=max(widths[1],widths[2])-widths[0]
+                  if w in (390,320): row['checks']['OVERFLOW_0']=row['overflow']==0
+                  else: row['checks']['OVERFLOW_0']=True
+
+                  requests=perf_requests(drv)
+                  unsafe=[{'method':m,'url':u} for m,u in requests if m.upper() not in ('GET','HEAD','OPTIONS')]
+                  row['unsafe_requests']=unsafe
+                  row['checks']['UNSAFE_WRITE_REQUEST']=len(unsafe)==0
+                  row['checks']['BUSINESS_MUTATION']=len(unsafe)==0
+                  cerr=tutorial_console_errors(drv); row['tutorial_console_errors']=cerr
+                  row['checks']['TUTORIAL_CONSOLE_ERROR_0']=len(cerr)==0
+                  row['checks']['TUTORIAL_PAGEERROR_0']=len(cerr)==0
+                  row['pass']=all(row['checks'].values()) and len(row['targets'])==10
+                  if not row['pass']: report['overall']='FAIL'
+              except Exception as e:
+                  row['pass']=False; row['exception']=repr(e); row['traceback']=traceback.format_exc(); report['overall']='FAIL'
+              finally:
+                  report['viewports'].append(row); drv.quit()
+
+          with open('KSH_R3_LIVE_QA.json','w',encoding='utf-8') as f: json.dump(report,f,ensure_ascii=False,indent=2)
+          lines=['DPRO TUTORIAL KSH R3 LIVE QA',f"OVERALL={report['overall']}"]
+          for r in report['viewports']:
+              lines.append(f"{r['viewport']}={'PASS' if r.get('pass') else 'FAIL'} innerWidth={r.get('innerWidth')} documentElement.scrollWidth={r.get('documentElement_scrollWidth')} body.scrollWidth={r.get('body_scrollWidth')} overflow={r.get('overflow')}")
+              for k,v in r.get('checks',{}).items(): lines.append(f"  {k}={v}")
+              if r.get('exception'): lines.append('  EXCEPTION='+r['exception'])
+          with open('KSH_R3_LIVE_QA.txt','w',encoding='utf-8') as f: f.write('\n'.join(lines)+'\n')
+          print('\n'.join(lines))
+          if report['overall']!='PASS': raise SystemExit(1)
+          PY
+          python /tmp/ksh_r3_live_qa.py
+
+      - name: Upload R3 QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DPRO_KSH_R3_LIVE_QA_20260829
+          path: |
+            KSH_R3_LIVE_QA.json
+            KSH_R3_LIVE_QA.txt
+          if-no-files-found: warn
