@@ -1,0 +1,76 @@
+/* DPRO CAR UI Quality Layer R2 / 2026-10-08
+ * Presentation-only. Does not change authentication, requests, persistence,
+ * reservation logic, estimate approval, demo protection or publication stage.
+ * Enabled explicitly by dpro-car-ui-r2.js (scoped to known CAR pages).
+ */
+:root {
+  --car-ink:#172338;
+  --car-muted:#475569;
+  --car-accent:#c27b20;
+  --car-focus:#ffd98c;
+}
+html[data-dpro-car-ui="r2"] { text-size-adjust:100%; -webkit-text-size-adjust:100%; }
+html[data-dpro-car-ui="r2"] body { line-height:1.58; }
+html[data-dpro-car-ui="r2"] :where(button,input,select,textarea,a) { font-family:inherit; }
+html[data-dpro-car-ui="r2"] :where(button, a, input, select, textarea):focus-visible {
+  outline:3px solid var(--car-focus);outline-offset:3px;
+}
+html[data-dpro-car-ui="r2"] :where(button,[role="button"]) { touch-action:manipulation; }
+html[data-dpro-car-ui="r2"] :where(input,select,textarea) { max-width:100%; }
+html[data-dpro-car-ui="r2"] :where(.card,.panel,.section,.form-field,.stat,.toolbar,.topbar,.table-wrap) { min-width:0; }
+html[data-dpro-car-ui="r2"] :where(.card,.panel,.section,.muted,.small,p,td,th,h1,h2,h3) { overflow-wrap:anywhere; }
+html[data-dpro-car-ui="r2"] :where(.btn,.link-btn,.tab-btn,.filter-btn,.followup-filter-btn) { min-height:44px; line-height:1.42; }
+html[data-dpro-car-ui="r2"] .dpro-car-skip {
+ position:fixed; z-index:15000; top:-100px;left:12px;padding:12px 18px;
+ background:#fff;color:#162237;border:2px solid #c27b20;border-radius:10px;font-weight:800;
+}
+html[data-dpro-car-ui="r2"] .dpro-car-skip:focus {top:10px;}
+/* Desktop owner dashboard */
+html[data-car-page="dashboard"] .sidebar .nav button {
+ min-height:45px;line-height:1.4;padding-top:10px;padding-bottom:10px;
+}
+html[data-car-page="dashboard"] .sidebar .nav button:focus-visible { outline-offset:-3px; }
+html[data-car-page="dashboard"] .sidebar .nav button.active {
+ box-shadow:inset 4px 0 0 #fbbf61;
+}
+html[data-car-page="dashboard"] .topbar { row-gap:12px; }
+html[data-car-page="dashboard"] .topbar .top-actions { gap:8px;flex-wrap:wrap; }
+html[data-car-page="dashboard"] .table-wrap { max-width:100%; overflow-x:auto;overscroll-behavior-x:contain; }
+html[data-car-page="dashboard"] .table-wrap table { width:100%; }
+html[data-car-page="dashboard"] .token-row { gap:8px;flex-wrap:wrap; }
+/* Reception and shop-floor tablet */
+html[data-car-page="ipad"] .header .tabs { scroll-padding-inline:12px; }
+html[data-car-page="ipad"] .header .tab-btn { min-height:48px;white-space:normal; }
+html[data-car-page="ipad"] :where(.header-actions,.modal-actions,.actions) { gap:8px; }
+html[data-car-page="ipad"] :where(.card,.panel,.summary-card,.work-card) { min-width:0; }
+/* Member and consultation pages retain their dark identity. */
+html[data-car-page="member"] :where(.card,.vehicle-card,.history-card),
+html[data-car-page="consult"] .card { overflow-wrap:anywhere; }
+html[data-car-page="member"] :where(.link-btn,button),
+html[data-car-page="consult"] :where(button,.day-btn) { min-height:46px; }
+html[data-car-page="member"] :where(.muted,.small,.tiny),
+html[data-car-page="consult"] :where(.muted,.small-help) { color:#c0c6cf; }
+html[data-car-page="member"] .wrap,
+html[data-car-page="consult"] .wrap { width:100%; }
+@media(max-width:767px){
+ html[data-dpro-car-ui="r2"] :where(input,select,textarea) { font-size:16px; }
+ html[data-dpro-car-ui="r2"] :where(.grid2,.grid3,.grid4) { min-width:0; }
+ html[data-car-page="dashboard"] .topbar .top-actions { display:flex;flex-wrap:wrap; }
+ html[data-car-page="dashboard"] .topbar .top-actions .btn { flex:1 1 130px; }
+ html[data-car-page="dashboard"] .token-row input { flex:1 1 100%; }
+ html[data-car-page="ipad"] .header .tabs { display:flex;overflow-x:auto;scroll-snap-type:x proximity; }
+ html[data-car-page="ipad"] .header .tab-btn { flex:0 0 auto;min-width:95px;scroll-snap-align:start; }
+ html[data-car-page="ipad"] .header-actions { display:flex;flex-wrap:wrap; }
+ html[data-car-page="member"] .wrap,
+ html[data-car-page="consult"] .wrap { padding-left:14px;padding-right:14px; }
+}
+@media(max-width:390px){
+ html[data-car-page="ipad"] .header .tab-btn { min-width:86px;padding-left:11px;padding-right:11px; }
+ html[data-car-page="member"] .card,
+ html[data-car-page="consult"] .card { padding:16px 14px; }
+}
+@media(prefers-reduced-motion:reduce){
+ html[data-dpro-car-ui="r2"] *,html[data-dpro-car-ui="r2"] *::before,html[data-dpro-car-ui="r2"] *::after {
+  scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;
+ }
+}
