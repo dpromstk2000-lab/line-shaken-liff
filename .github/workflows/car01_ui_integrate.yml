@@ -1,0 +1,115 @@
+name: DPRO CAR-01 UI integration (safe PR)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Validate submitted overlay scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dpro-car-ui-r2.css
+          test -s dpro-car-ui-r2.js
+          test -s apply_car01.py
+          node --check dpro-car-ui-r2.js
+          python3 -m py_compile apply_car01.py
+
+      - name: Validate upstream source and apply CAR-01 (fail closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 apply_car01.py .
+          python3 apply_car01.py . --apply
+
+      - name: Static regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYQA'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          targets=['dashboard.html','owner-ipad.html','member.html','index-product-demo.html']
+          css='dpro-car-ui-r2.css?v=20261008-R2'
+          js='dpro-car-ui-r2.js?v=20261008-R2'
+          class Ids(HTMLParser):
+            def __init__(self): super().__init__(); self.ids=[]
+            def handle_starttag(self, tag, attrs):
+              self.ids.extend(v for k,v in attrs if k=='id' and v is not None)
+          for name in targets:
+            data=Path(name).read_text(encoding='utf-8')
+            assert data.count(css)==1, name + ': CSS not exactly once'
+            assert data.count(js)==1, name + ': JS not exactly once'
+            assert data.lower().count('</head>')==1, name + ': malformed head'
+            parser=Ids(); parser.feed(data)
+            assert len(parser.ids)==len(set(parser.ids)), name + ': duplicate static IDs'
+            print('PASS',name,'CSS/JS linked exactly once, no duplicate static IDs')
+          client=Path('dpro-car-ui-r2.js').read_text(encoding='utf-8')
+          assert not any(word in client for word in ('fetch(', 'XMLHttpRequest', 'localStorage.', 'sessionStorage.', 'navigator.sendBeacon'))
+          print('PASS overlay has no API, storage or transmission calls')
+          PYQA
+
+      - name: Upload patched HTML as recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DPRO-CAR-CAR01-PATCHED-HTML-20261008
+          path: |
+            dashboard.html
+            owner-ipad.html
+            member.html
+            index-product-demo.html
+          retention-days: 14
+
+      - name: Prepare review-only pull request (no automatic merge)
+        id: pr
+        continue-on-error: true
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          add-paths: |
+            dashboard.html
+            owner-ipad.html
+            member.html
+            index-product-demo.html
+          commit-message: 'CAR-01: enable UI accessibility and mobile readability layer'
+          title: 'CAR-01: DPRO CAR UI readability / accessibility layer (review required)'
+          body: |
+            CAR-01 presentation-only improvement for PC/iPad/member/consultation pages.
+            Preserves original business logic, reservation, estimates, LINE verification and APIs.
+            Fails closed when original HTML blob does not match audited versions.
+            This PR DOES NOT automatically deploy. Inspect the diff and test before merging.
+            STREET HOUSE proposal-only staging settings remain unchanged.
+          branch: car01-ui-review-20261008
+          base: main
+          draft: true
+
+      - name: Report completion and fallback
+        if: always()
+        shell: bash
+        env:
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: |
+          {
+            echo '## DPRO CAR-01 result'
+            echo ''
+            if [ -n "$PR_URL" ]; then
+              echo "Draft PR: $PR_URL"
+              echo 'Review the changes and complete QA before merging. Do not merge on this run alone.'
+            else
+              echo 'PR creation may be blocked by repository Actions permissions.'
+              echo 'When validation succeeded, use the patched HTML recovery artifact from this run.'
+              echo 'Do NOT assume the changes have been deployed.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
