@@ -74,3 +74,27 @@ html[data-car-page="consult"] .wrap { width:100%; }
   scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;
  }
 }
+
+/* R5: readability revisions. Scoped; no business logic changes. */
+html[data-car-page="member"] :where(.wrap,.card,.history-card,.vehicle-card) { overflow-wrap:anywhere; }
+html[data-car-page="member"] :where(.card > p,.card .muted,.card .tiny,.card .small,
+  .history-card,.vehicle-card,.info-list,.sub) { font-size:clamp(13px,2.3vw,14px);line-height:1.66; }
+html[data-car-page="member"] :where(h2) { font-size:clamp(17px,3.3vw,20px);line-height:1.45; }
+html[data-car-page="member"] :where(h3) { font-size:16px;line-height:1.45; }
+html[data-car-page="member"] :where(button,.link-btn) { font-size:14px;line-height:1.5; }
+html[data-car-page="member"] :where(.title-row,.btn-row) { min-width:0; }
+html[data-car-page="consult"] :where(.field label,.step-title,.mode-title) { font-size:clamp(15px,2.8vw,17px);line-height:1.48; }
+html[data-car-page="consult"] :where(.small-help,.notice,.mode-text,.account-help,
+  .profile-help,.quick-choice,.status-line,.field) { font-size:clamp(13px,2.3vw,14px);line-height:1.6; }
+html[data-car-page="consult"] :where(input,select,textarea) { font-size:16px;line-height:1.45; }
+html[data-car-page="consult"] :where(.quick-choice,.btn-primary,.btn-secondary) { min-height:48px; }
+html[data-car-page="consult"] .quick-choice-grid { gap:10px; }
+html[data-car-page="consult"] .quick-choice { white-space:normal;overflow-wrap:anywhere;text-align:left; }
+html[data-car-page="consult"] .dpro-car-demo-hide { display:none!important; }
+html[data-car-page="consult"] .mode-panel:not(.checking) { border-color:#97652b; }
+html[data-car-page="consult"] #customerModeBox { min-width:0; }
+@media(max-width:430px){
+ html[data-car-page="consult"] .quick-choice-grid { grid-template-columns:minmax(0,1fr)!important; }
+ html[data-car-page="member"] .card { padding:17px 15px; }
+ html[data-car-page="member"] :where(.grid2,.grid3) { min-width:0; }
+}

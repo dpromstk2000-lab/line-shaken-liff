@@ -1,4 +1,4 @@
-/* DPRO CAR UI Quality Layer R2 / 2026-10-08
+/* DPRO CAR UI Quality Layer R2 + R5 / 2026-10-09
  * Deliberately leaves all existing handlers, forms, networking, storage,
  * authorization and shop identity unchanged. Safe as a no-op on unknown pages.
  */
@@ -44,6 +44,38 @@
         observer.observe(nav,{attributes:true,subtree:true,attributeFilter:['class']});
       }
     }
+  }
+  // R5: consultation sample has NO registered customer/vehicle fixture.
+  // Fix the indefinitely visible 'checking' message using the application's
+  // own local, non-network state helpers. Never run on authenticated screens.
+  function initSafeConsultDemo() {
+    if (page !== 'consult') return;
+    const banner = document.getElementById('embed-demo-banner');
+    if (!banner || !banner.textContent.includes('製品紹介用デモ')) return;
+    if (document.documentElement.dataset.carDemoInit === 'r5') return;
+    // The product-demo source sets IS_EMBED_DEMO=true and does not query profiles.
+    // Deferring once allows its onload callback to populate the demo identity.
+    setTimeout(() => {
+      if (typeof renderNoRegisteredCustomer !== 'function' || typeof setCustomerMode !== 'function') return;
+      renderNoRegisteredCustomer();
+      setCustomerMode('initial', '初回相談の表示例',
+        'このデモでは顧客・車両の登録照会を行いません。お車を入力して画面を試せます。送信しても記録されません。');
+      const help = document.getElementById('lineAccountHelp');
+      if (help) help.textContent = 'デモ用アカウントです。実際の顧客情報は取得しません。';
+      const choice = document.getElementById('vehicleQuickChoice');
+      if (choice) { choice.classList.add('dpro-car-demo-hide'); choice.setAttribute('aria-hidden','true'); }
+      const registered = document.getElementById('quickRegisteredBtn');
+      if (registered) registered.disabled = true;
+      const newButton = document.getElementById('quickNewVehicleBtn');
+      if (newButton) newButton.setAttribute('aria-pressed','true');
+      const status = document.getElementById('customerModeBox');
+      if (status) status.setAttribute('aria-live','polite');
+      document.documentElement.dataset.carDemoInit = 'r5';
+    }, 0);
+  }
+  if (page === 'consult') {
+    if (document.readyState === 'complete') initSafeConsultDemo();
+    else window.addEventListener('load', initSafeConsultDemo, {once:true});
   }
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true});
   else init();
