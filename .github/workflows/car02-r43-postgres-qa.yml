@@ -46,3 +46,5 @@ jobs:
         run: node --test test-*.mjs
       - name: Run R13 schema and R43 integration against isolated PostgreSQL 17
         run: node pg17-integration.mjs
+      - name: R45 HTTP + identity + real PostgreSQL transaction integration (CI fake credentials only)
+        run: node pg17-http-integration-r45.mjs
