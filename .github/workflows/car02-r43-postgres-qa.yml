@@ -52,3 +52,5 @@ jobs:
         run: node pg17-staff-integration-r46.mjs
       - name: R48 private photo read, customer authorization and real PostgreSQL 17 QA (disposable only)
         run: node pg17-photo-view-integration-r48.mjs
+      - name: R50 unified verified HTTP, PostgreSQL and private photo QA (isolated CI only)
+        run: node pg17-unified-integration-r50.mjs
