@@ -1,0 +1,50 @@
+name: DPRO CAR02 R52 locked Edge runtime smoke
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r52-deno-cold-start:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout R52 review files
+        uses: actions/checkout@v4
+      - name: Setup Deno runtime
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify R51 and R52 route tests without network
+        run: node --test test-car02-edge-boundary-r51.mjs test-car02-edge-boundary-r52.mjs test-car02-edge-entry-r52.mjs
+      - name: Validate staging Edge entrypoint in Deno
+        run: deno check car02-edge-entry-r52.ts
+      - name: Boot locked Edge candidate and verify HTTP fail-closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno serve --no-check --host=127.0.0.1 --port=8765 car02-edge-entry-r52.ts > /tmp/car02-r52-deno.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 50); do
+            if curl --silent --output /dev/null http://127.0.0.1:8765/dpro-car02-stage/health; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/car02-r52-deno.log; exit 1; fi
+            sleep 1
+          done
+          python3 - <<'PY'
+          import urllib.request,urllib.error,json
+          BASE='http://127.0.0.1:8765'
+          for prefix in ('/dpro-car02-stage','/functions/v1/dpro-car02-stage'):
+              with urllib.request.urlopen(BASE+prefix+'/health',timeout=5) as r:
+                  d=json.load(r)
+                  assert r.status==200 and d['live'] is False and d['deployment']=='review-only'
+              req=urllib.request.Request(BASE+prefix+'/api/car02',data=b'not json',method='POST')
+              try: urllib.request.urlopen(req,timeout=5)
+              except urllib.error.HTTPError as e:
+                  d=json.load(e)
+                  assert e.code==503 and d['code']=='CAR02_NOT_RELEASED'
+              else: raise AssertionError('CAR02 MUST remain locked')
+          try: urllib.request.urlopen(BASE+'/api/reservations',timeout=5)
+          except urllib.error.HTTPError as e: assert e.code==404
+          else: raise AssertionError('Legacy path must not be handled')
+          print('R52 DENO HTTP LOCKED SMOKE: 5 PASS; no DB, secrets, or third-party services needed')
+          PY
