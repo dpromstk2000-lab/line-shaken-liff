@@ -1,0 +1,87 @@
+name: DPRO CAR02 R53 Supabase Edge locked package QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r53-bundle-deno-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout R52 FIX1 source and existing CAR02 modules
+        uses: actions/checkout@v4
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Rebuild and SHA256-verify the exact R53 Edge review package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,shutil,re
+          src=Path('car02-edge-entry-r52.ts').read_text(encoding='utf-8')
+          changes=[
+           ('R52 Deno/Supabase Edge','R53 Deno/Supabase Edge'),
+           ("from './car02-edge-boundary-r51.mjs'", "from './lib/car02-edge-boundary-r51.mjs'"),
+           ("import('./car02-unified-runtime-r50.mjs')", "import('./lib/car02-unified-runtime-r50.mjs')"),
+           ("application_name:'dpro_car02_edge_r52'", "application_name:'dpro_car02_edge_r53'"),
+           ("export default {fetch(request:Request){return route(request)}};", "Deno.serve((request:Request)=>route(request));")
+          ]
+          for old,new in changes:
+           assert src.count(old)==1,(old,src.count(old))
+           src=src.replace(old,new)
+          p=Path('/tmp/car02-r53-package'); (p/'lib').mkdir(parents=True,exist_ok=True)
+          (p/'index.ts').write_text(src,encoding='utf-8')
+          (p/'deno.json').write_text('{\n  "compilerOptions": {\n    "lib": ["deno.ns", "dom", "dom.iterable", "esnext"],\n    "strict": false\n  }\n}\n',encoding='utf-8')
+          for fn in ['car02-api.mjs', 'car02-auth-providers-r46.mjs', 'car02-core.mjs', 'car02-edge-boundary-r51.mjs', 'car02-identity-r44.mjs', 'car02-pg-adapter.mjs', 'car02-pg-photo-view-r48.mjs', 'car02-private-photo-view-r48.mjs', 'car02-runtime-r45.mjs', 'car02-runtime-verified-r46.mjs', 'car02-unified-runtime-r50.mjs']:
+           shutil.copyfile(fn,p/'lib'/fn)
+          for fn,digest in {'deno.json': '76a993f4bde914c2457ba1fae9507cb2265331ec0310415caab4b6dc8a3a3dd3', 'index.ts': '17149f991a1680e9d9c6b701ebecf365e0ceada09c0efe3bc5b4916a7cc8ed4e', 'lib/car02-api.mjs': '9b410e2635cfc0fefb92688bb93a9ac8d73c6e281e97c5dd619ef5f16bb8464b', 'lib/car02-auth-providers-r46.mjs': '3721b463b714b6d62a9d7d4899c7eeeca65037dc247a955b064127a5191da856', 'lib/car02-core.mjs': '7c0c7c7175fd86f051be8403dd3b99a563b4252f4b35381cd5cf5c627a279cde', 'lib/car02-edge-boundary-r51.mjs': '16428a476ee000890584cde5e0e26563736ee54511db5e6e1492cf460d44749e', 'lib/car02-identity-r44.mjs': '83baa424c7b5142ec925729e3ceb4c57f07cf428512fe373d1e0595146a49304', 'lib/car02-pg-adapter.mjs': 'cb4c83ddac1205c5855aacbb803fcb3492d46b6101f496140996daf6231d2ed4', 'lib/car02-pg-photo-view-r48.mjs': 'c0d2bb2fa658df2123a08ba0f4e7e58acb768b6597a539633f1de427f3ae4db0', 'lib/car02-private-photo-view-r48.mjs': 'ceb502ab8fced990802a9cf4712190a61418aa80dee0b2029ac213f3b1839df5', 'lib/car02-runtime-r45.mjs': 'bc5eddad1531db6ac8588b1d04de3aec2caad79a56659d866cbc1cac59f5219f', 'lib/car02-runtime-verified-r46.mjs': '0ea9d563ab68ec613571d8af69f1a3e0b5a48ec573123290bddc3a52a9a764ae', 'lib/car02-unified-runtime-r50.mjs': '1922cce6473a35d9180e198da82ff2bcc12fb6ce85f6c1c966b30b6c63e13892'}.items():
+           file=p/fn
+           assert file.is_file(), 'missing R53 source '+fn
+           actual=hashlib.sha256(file.read_bytes()).hexdigest()
+           assert actual==digest, ('R53 SOURCE DRIFT',fn,digest,actual)
+          assert 'const CAR02_RELEASE_LOCK=true' in src
+          assert 'Deno.serve((request:Request)=>route(request))' in src
+          assert not re.search(r'^import .+npm:pg',src,re.M)
+          print('R53 FULL REVIEW PACKAGE: 13 SOURCE SHA256 MATCH; built from existing repo without production changes')
+          PY
+      - name: Deno typecheck the complete R53 review package
+        run: deno check /tmp/car02-r53-package/index.ts
+      - name: Run locked R53 Deno.serve runtime with no external network privilege
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno run --no-check --allow-net=127.0.0.1:8000 /tmp/car02-r53-package/index.ts > /tmp/car02-r53.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl --silent --output /dev/null http://127.0.0.1:8000/dpro-car02-stage/health; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/car02-r53.log; exit 1; fi
+            sleep 1
+          done
+          python3 - <<'PY'
+          import json,urllib.request,urllib.error
+          base='http://127.0.0.1:8000'; checks=0
+          for prefix in ('/dpro-car02-stage','/functions/v1/dpro-car02-stage'):
+            with urllib.request.urlopen(base+prefix+'/health',timeout=5) as r:
+              body=json.load(r)
+              assert r.status==200 and body['live'] is False and body['deployment']=='review-only'
+              checks+=1
+            for method,payload in [('GET',None),('POST',b'invalid-json')]:
+              req=urllib.request.Request(base+prefix+'/api/car02',data=payload,method=method)
+              try: urllib.request.urlopen(req,timeout=5)
+              except urllib.error.HTTPError as e:
+                data=json.load(e)
+                assert e.code==503 and data['code']=='CAR02_NOT_RELEASED'
+                checks+=1
+              else: raise AssertionError('CAR02 must remain locked')
+          for path in ('/api/reservations','/api/car02','/dpro-car02-stage/api/reservations'):
+            try: urllib.request.urlopen(base+path,timeout=5)
+            except urllib.error.HTTPError as e:
+              assert e.code==404
+              checks+=1
+            else: raise AssertionError('Legacy/unauthorized path exposed')
+          print(f'R53 LOCKED SUPABASE EDGE COMPAT SMOKE: {checks} PASS, no DB, no credentials, no deployments')
+          PY
