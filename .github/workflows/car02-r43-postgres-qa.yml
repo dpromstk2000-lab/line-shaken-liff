@@ -48,3 +48,5 @@ jobs:
         run: node pg17-integration.mjs
       - name: R45 HTTP + identity + real PostgreSQL transaction integration (CI fake credentials only)
         run: node pg17-http-integration-r45.mjs
+      - name: R46 verified LINE and staff membership PostgreSQL QA (disposable CI only)
+        run: node pg17-staff-integration-r46.mjs
