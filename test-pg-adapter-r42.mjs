@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {createCar02PgAdapter} from './car02-pg-adapter.mjs';
+import {createCar02Service} from './car02-core.mjs';
+const id='11111111-1111-4111-8111-111111111111', cid='22222222-2222-4222-8222-222222222222',vid='33333333-3333-4333-8333-333333333333';
+const calls=[];let valid=true,failInsert=false,release=0;
+const pool={async connect(){return{release(){release++},async query(q,p=[]){calls.push({q,p});if(q.startsWith('SELECT EXISTS'))return{rows:[{shop_ok:valid,customer_ok:valid,vehicle_ok:valid,reservation_ok:valid}]};if(q.startsWith('SELECT request_digest'))return{rows:[]};if(q.startsWith('INSERT INTO public.ksh_car02_work_orders')){if(failInsert)throw Error('mock DB insert failed');return {rows:[{id,shop_code:'street_house_kitsuki',customer_id:cid,vehicle_id:vid,reservation_id:null,status:'draft',state_version:1}]}};if(q.startsWith('SELECT * FROM public.ksh_car02_work_orders'))return {rows:[{id,shop_code:'street_house_kitsuki',customer_id:cid,vehicle_id:vid,status:'draft',state_version:1}]};return{rows:[]}}}}};
+const db=createCar02PgAdapter(pool),svc=createCar02Service(db);let actor={verified:true,subject:'staff1',shopCode:'street_house_kitsuki',role:'staff'},shop='street_house_kitsuki';
+const created=await svc.create({actor,shop,customerId:cid,vehicleId:vid,key:'create-unique-0001'});
+assert.equal(created.id,id);assert.ok(calls.some(x=>x.q==='COMMIT'));assert.ok(calls.some(x=>x.q.includes('ksh_car02_events')));
+const got=await svc.get({actor,shop,id});assert.equal(got.version,1);
+valid=false;await assert.rejects(svc.create({actor,shop,customerId:cid,vehicleId:vid,key:'create-unique-0002'}),{code:'CAR02_REFERENCE_SCOPE_MISMATCH'});assert.equal(calls.at(-1).q,'ROLLBACK');
+valid=true;failInsert=true;await assert.rejects(svc.create({actor,shop,customerId:cid,vehicleId:vid,key:'create-unique-0003'}),/mock DB insert failed/);assert.equal(calls.at(-1).q,'ROLLBACK');
+await assert.rejects(svc.create({actor:{...actor,verified:false},shop,customerId:cid,vehicleId:vid,key:'create-unique-0004'}),{code:'CAR02_UNAUTHORIZED'});
+assert.equal(release,4);console.log('PASS: create, lookup, audit-event, tenant references, rollback on scope and insert errors, auth, cleanup');
