@@ -1,4 +1,4 @@
-name: DPRO CAR02 R53 Supabase Edge locked package QA
+name: DPRO CAR02 R53 Supabase Edge locked package QA (FIX1)
 on:
   workflow_dispatch:
 permissions:
@@ -53,7 +53,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          deno run --no-check --allow-net=127.0.0.1:8000 /tmp/car02-r53-package/index.ts > /tmp/car02-r53.log 2>&1 &
+          # Keep the SHA256-verified 13-file R53 release-review package byte-for-byte unchanged.
+          # Create a temporary CI-only entry with local-only bind; no outward network scope.
+          python3 - <<'PY_LOCAL_BIND'
+          from pathlib import Path
+          import hashlib
+          pkg=Path('/tmp/car02-r53-package')
+          entry=pkg/'index.ts'
+          src=entry.read_text(encoding='utf-8')
+          old="Deno.serve((request:Request)=>route(request));"
+          replacement="Deno.serve({hostname:'127.0.0.1',port:8000},(request:Request)=>route(request));"
+          assert src.count(old)==1, 'R53_DENOSERVE_ENTRY_DRIFT'
+          dest=pkg/'smoke-entry.ts'
+          dest.write_text(src.replace(old,replacement),encoding='utf-8')
+          expected='17149f991a1680e9d9c6b701ebecf365e0ceada09c0efe3bc5b4916a7cc8ed4e'
+          assert hashlib.sha256(entry.read_bytes()).hexdigest()==expected, 'R53_REVIEW_SOURCE_CHANGED'
+          assert dest.read_text(encoding='utf-8').count("hostname:'127.0.0.1'")==1
+          print('R53 FIX1: immutable review package intact; smoke server restricted to 127.0.0.1:8000')
+          PY_LOCAL_BIND
+          deno check /tmp/car02-r53-package/smoke-entry.ts
+          deno run --no-check --allow-net=127.0.0.1:8000 /tmp/car02-r53-package/smoke-entry.ts > /tmp/car02-r53.log 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           for i in $(seq 1 40); do
