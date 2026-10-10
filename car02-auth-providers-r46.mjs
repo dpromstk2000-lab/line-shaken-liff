@@ -61,10 +61,10 @@ export function createLineCustomerResolverR46({pool}={}) {
     if(!nonBlank(shopCode)||!nonBlank(lineSub))fail();
     // Two rows mean an ambiguous LINE link: fail-closed, never select the first.
     const result=await pool.query(`SELECT id,shop_code,line_user_id,status FROM public.ksh_demo_customers
-      WHERE shop_code=$1 AND line_user_id=$2 AND status IS NOT NULL AND status NOT IN ('削除済み','inactive','deleted') LIMIT 2`,[shopCode,lineSub]);
+      WHERE shop_code=$1 AND line_user_id=$2 AND status='LINE連携済み' LIMIT 2`,[shopCode,lineSub]);
     if(result.rows?.length!==1)fail();
     const r=result.rows[0];
-    if(!uuid(r.id)||r.shop_code!==shopCode||r.line_user_id!==lineSub)fail();
+    if(!uuid(r.id)||r.shop_code!==shopCode||r.line_user_id!==lineSub||r.status!=='LINE連携済み')fail();
     return {active:true,customerId:r.id,shopCode:r.shop_code,lineSub:r.line_user_id};
   };
 }
