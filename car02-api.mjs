@@ -27,7 +27,7 @@ export function createCar02Api({service,authenticate,releaseEnabled,allowedOrigi
   if(requestOrigin){if(!allowedOrigins.includes(requestOrigin))return block('CAR02_ORIGIN_DENIED',403);origin=requestOrigin;}
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'Cache-Control':'no-store','Vary':'Origin',
     ...(origin?{'Access-Control-Allow-Origin':origin}:{}) ,'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers':'Authorization,Content-Type,Idempotency-Key'}});
+    'Access-Control-Allow-Headers':'Authorization,Content-Type,Idempotency-Key,X-Line-ID-Token'}});
   if(!['GET','POST'].includes(req.method))return block('CAR02_METHOD_DENIED',405,origin);
   const url=new URL(req.url);
   if(url.search) return block('CAR02_QUERY_PARAMS_DENIED',400,origin);
