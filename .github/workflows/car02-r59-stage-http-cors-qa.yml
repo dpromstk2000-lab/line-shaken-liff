@@ -1,0 +1,88 @@
+name: DPRO CAR02 R59 Stage HTTP CORS QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  r59-stage-http-cors:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validate locked R58 staging over HTTPS without credentials
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import ssl
+          import sys
+          import urllib.error
+          import urllib.request
+
+          BASE = 'https://cbknucemarcpbscirzyv.supabase.co/functions/v1/dpro-car02-stage'
+          ORIGIN = 'https://dpromstk2000-lab.github.io'
+          LOCKED = {'ok': False, 'code': 'CAR02_NOT_RELEASED'}
+          passed = 0
+
+          def call(path, method='GET', headers=None):
+              url = BASE + path
+              req = urllib.request.Request(url, headers=headers or {}, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=15, context=ssl.create_default_context()) as resp:
+                      status, raw, hdr = resp.status, resp.read(16384), resp.headers
+              except urllib.error.HTTPError as err:
+                  status, raw, hdr = err.code, err.read(16384), err.headers
+              assert len(raw) < 16384, 'RESPONSE_TOO_LARGE'
+              try:
+                  data = json.loads(raw) if raw else None
+              except ValueError:
+                  data = {'non_json': raw[:60].decode('utf-8', 'replace')}
+              return status, data, hdr
+
+          def check(name, path, method='GET', headers=None, status=None, expected=None, allow_origin=None):
+              global passed
+              code, body, response_headers = call(path, method, headers)
+              assert code == status, f'{name}: HTTP {code}, expected {status}, body={body}'
+              if expected is not None:
+                  assert body == expected, f'{name}: unexpected body {body}'
+              observed = response_headers.get('Access-Control-Allow-Origin')
+              assert observed == allow_origin, f'{name}: CORS origin={observed!r} expected={allow_origin!r}'
+              assert response_headers.get('Access-Control-Allow-Credentials') is None, f'{name}: credentials exposed'
+              passed += 1
+              print(f'PASS R59 {passed}: {name} (HTTP {code})')
+              return response_headers
+
+          check('health stays review-only', '/health', status=200,
+                expected={'ok': True, 'service': 'DPRO CAR02 isolated staging gateway',
+                          'deployment': 'review-only', 'live': False})
+          check('without Origin API stays locked', '/api/car02', status=503, expected=LOCKED)
+          check('allow-listed origin reads health', '/health', headers={'Origin': ORIGIN},
+                status=200, allow_origin=ORIGIN,
+                expected={'ok': True, 'service': 'DPRO CAR02 isolated staging gateway',
+                          'deployment': 'review-only', 'live': False})
+          check('allow-listed origin sees lock only', '/api/car02', headers={'Origin': ORIGIN},
+                status=503, expected=LOCKED, allow_origin=ORIGIN)
+          preflight = check('authorized preflight allowed', '/api/car02', method='OPTIONS', status=204,
+                headers={'Origin': ORIGIN, 'Access-Control-Request-Method': 'POST',
+                         'Access-Control-Request-Headers': 'authorization,content-type,idempotency-key'},
+                allow_origin=ORIGIN)
+          assert 'x-line-id-token' in preflight.get('Access-Control-Allow-Headers','').lower()
+          assert 'POST' in preflight.get('Access-Control-Allow-Methods','')
+          check('unknown web origin denied', '/api/car02', status=403,
+                headers={'Origin': 'https://malicious.invalid'},
+                expected={'ok': False, 'code': 'CAR02_ORIGIN_DENIED'})
+          check('foreign preflight header denied', '/api/car02', method='OPTIONS', status=403,
+                headers={'Origin': ORIGIN, 'Access-Control-Request-Method': 'POST',
+                         'Access-Control-Request-Headers': 'X-Admin-Bypass'},
+                expected={'ok':False,'code':'CAR02_PREFLIGHT_HEADERS_DENIED'},allow_origin=ORIGIN)
+          check('legacy reservation API not exposed', '/api/reservations', status=404,
+                headers={'Origin': ORIGIN})
+          check('query bypass not exposed', '/api/car02?release=1', status=404,
+                headers={'Origin': ORIGIN})
+          check('photo endpoint stays locked',
+                '/api/car02/photos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                status=503, expected=LOCKED, headers={'Origin': ORIGIN}, allow_origin=ORIGIN)
+          print(f'R59 STAGE LIVE HTTP CORS QA: {passed} PASS; no secrets, no writes, release remains locked')
+          PY
