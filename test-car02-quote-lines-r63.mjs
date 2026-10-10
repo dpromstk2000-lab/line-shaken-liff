@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {validateQuoteRowsR63,R63_MAX_ITEMS,R63_MAX_YEN_PER_LINE} from './car02-quote-lines-r63.mjs';
+const f=(name='作業工賃',price='1000')=>({name,price});
+const good=rows=>{const r=validateQuoteRowsR63(rows);assert.equal(r.ok,true);return r};
+test('R63 one-item quote tax and total match legacy math',()=>{assert.deepEqual(good([f('補機ベルト交換','9800')]),{ok:true,items:[{name:'補機ベルト交換',price:9800}],subtotal:9800,tax:980,total:10780})});
+test('R63 multi-line aggregation computes one tax per quote with truncation',()=>{const r=good([f('部品','1001'),f('作業工賃','999'),f('点検','55')]);assert.equal(r.subtotal,2055);assert.equal(r.tax,205);assert.equal(r.total,2260);assert.equal(r.items.length,3)});
+test('R63 zero yen item accepted',()=>{assert.equal(good([f('無料点検','0')]).total,0)});
+test('R63 rejects blank array and 11-item array',()=>{assert.equal(validateQuoteRowsR63([]).ok,false);assert.equal(validateQuoteRowsR63(Array(11).fill(f())).ok,false);assert.equal(R63_MAX_ITEMS,10)});
+test('R63 accepts exactly ten rows',()=>{assert.equal(good(Array(10).fill(f())).items.length,10)});
+test('R63 rejects blank and oversized item labels',()=>{for(const n of [' ', 'a'.repeat(161),null]){const r=validateQuoteRowsR63([f(n,'10')]);assert.equal(r.ok,false);assert.equal(r.field,'name')}});
+test('R63 strips outer whitespace safely',()=>{assert.equal(good([f(' 部品 ','19')]).items[0].name,'部品')});
+test('R63 rejects unsafe price variants',()=>{for(const p of ['',' ','-1','1.5','1e4','0100','+10','NaN','Infinity','１００','1,000','100000001']){const r=validateQuoteRowsR63([f('部品',p)]);assert.equal(r.ok,false,p);assert.equal(r.field,'price')}});
+test('R63 exact yen limit accepted and finite total',()=>{const r=good([f('部品',String(R63_MAX_YEN_PER_LINE))]);assert.equal(r.total,110000000)});
+test('R63 rejects invalid row object',()=>{assert.equal(validateQuoteRowsR63([null]).ok,false);assert.equal(validateQuoteRowsR63('foo').ok,false)});
+test('R63 error points to exact item',()=>{const r=validateQuoteRowsR63([f('部品','300'),f('工賃','invalid')]);assert.equal(r.ok,false);assert.equal(r.index,1)});
+test('R63 HTML remains mock-only, maintains R62 locked GET and separate page',()=>{const s=readFileSync(new URL('./CAR02_R63_WORKFLOW_REVIEW.html',import.meta.url),'utf8');assert.match(s,/car02-stage-status-r63\.mjs/);assert.match(s,/import \{validateQuoteRowsR63,R63_MAX_ITEMS\}/);assert.match(s,/<meta name="robots" content="noindex,nofollow">/);assert.match(s,/id="quoteRows"/);assert.match(s,/!confirm\('体験用の報告/);assert.match(s,/R63 REVIEW/);assert.doesNotMatch(s,/(?:localStorage|sessionStorage|IndexedDB|WebSocket)\s*\./)});

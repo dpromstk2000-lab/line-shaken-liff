@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {CAR02_R63_STAGE,CAR02_R63_PATH,r63TrustedPage,checkCar02R63Stage} from './car02-stage-status-r63.mjs';
+const exact='https://dpromstk2000-lab.github.io'+CAR02_R63_PATH;
+const loc=u=>new URL(u);
+const json=(status,data)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8'}});
+const HEALTH={ok:true,service:'DPRO CAR02 isolated staging gateway',deployment:'review-only',live:false};
+const CLOSED={ok:false,code:'CAR02_NOT_RELEASED'};
+test('R63 exact origin/path are trusted',()=>assert.equal(r63TrustedPage(loc(exact)),true));
+test('R63 R62 page, another function, query and hash are not trusted',()=>{for(const bad of [exact.replace('R63','R62'),exact+'?mode=live',exact+'#test',exact.replace('github.io','github.io.evil'),exact.replace('https://','http://')])assert.equal(r63TrustedPage(loc(bad)),false,bad)});
+test('R63 wrong page makes no requests',async()=>{let touched=0;const r=await checkCar02R63Stage({locationLike:loc(exact+'?x=1'),fetchImpl:async()=>{touched++;throw Error('network')}});assert.equal(r.ok,false);assert.equal(touched,0)});
+test('R63 only issues two locked GET requests',async()=>{const calls=[];const fn=async(u,o)=>{calls.push({u,o});return u.endsWith('/health')?json(200,HEALTH):json(503,CLOSED)};const r=await checkCar02R63Stage({locationLike:loc(exact),fetchImpl:fn});assert.deepEqual(r,{ok:true,locked:true,code:'R63_REVIEW_ONLY_LOCKED',networkCalls:2});assert.equal(calls.length,2);for(const x of calls){assert.equal(x.o.method,'GET');assert.equal(x.o.credentials,'omit');assert.equal(x.o.cache,'no-store');assert.equal(x.o.redirect,'error');assert.equal(x.o.referrerPolicy,'no-referrer');assert.equal(x.o.mode,'cors');assert.equal(x.o.body,undefined);assert.ok(x.u.startsWith(CAR02_R63_STAGE+'/'))}});
+test('R63 stage health live=true is rejected before second request',async()=>{let n=0;const r=await checkCar02R63Stage({locationLike:loc(exact),fetchImpl:async()=>{n++;return json(200,{...HEALTH,live:true})}});assert.equal(r.ok,false);assert.equal(r.networkCalls,1);assert.equal(n,1)});
+test('R63 returns failure if lock is removed',async()=>{let n=0;const r=await checkCar02R63Stage({locationLike:loc(exact),fetchImpl:async u=>{n++;return u.endsWith('/health')?json(200,HEALTH):json(200,{ok:true})}});assert.equal(r.ok,false);assert.equal(n,2)});
+test('R63 does not accept unexpected extra health fields',async()=>{const r=await checkCar02R63Stage({locationLike:loc(exact),fetchImpl:async()=>json(200,{...HEALTH,extra:true})});assert.equal(r.ok,false)});
+test('R63 GET failed network never discloses errors',async()=>{const r=await checkCar02R63Stage({locationLike:loc(exact),fetchImpl:async()=>{throw Error('PRIVATE_SECRET')}});assert.equal(r.ok,false);assert.doesNotMatch(JSON.stringify(r),/PRIVATE_SECRET/)});
