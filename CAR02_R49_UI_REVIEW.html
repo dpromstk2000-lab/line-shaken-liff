@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>DPRO CAR02｜整備報告・見積承認 操作体験 R49</title>
+<style>
+:root{--bg:#f4f6f8;--ink:#1b2533;--sub:#566473;--line:#d7dfe5;--gold:#ffcf29;--night:#0b131b;--green:#087d53;--muted:#eef2f5;--focus:#1773bf;font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;color:var(--ink)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-size:16px;line-height:1.6}button,input,textarea{font:inherit}button{cursor:pointer;transition:filter .15s}button:hover:not(:disabled){filter:brightness(.95)}button:disabled{cursor:not-allowed;opacity:.4}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+header{background:var(--night);color:#fff}header .bar{max-width:1200px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;gap:12px}header b{font-size:19px;letter-spacing:.05em}header small{display:block;font-weight:500;color:#b8c3cb;font-size:12px}.logo{display:flex;align-items:center;gap:12px}.mark{display:grid;place-items:center;background:var(--gold);color:#000;font-weight:900;width:44px;height:44px;border-radius:8px}.preview-chip{border:1px solid #65727c;border-radius:30px;padding:6px 11px;font-size:12px;white-space:nowrap}
+.notice{background:#fff1cc;border-bottom:2px solid #cf9b00;color:#603f00;text-align:center;padding:12px 15px;font-weight:800;font-size:15px}main{max-width:1200px;margin:auto;padding:26px 20px 50px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap}.eyebrow{letter-spacing:.13em;color:#655500;font-weight:800;font-size:12px}.hero h1{font-size:clamp(26px,3vw,39px);margin:4px 0 8px;line-height:1.35}.hero p{color:var(--sub);margin:0;max-width:760px}.mode-box{border:1px solid var(--line);padding:8px;background:#fff;border-radius:12px;display:flex;gap:5px}.mode-box button{padding:10px 15px;border:0;border-radius:8px;background:transparent;color:var(--ink);font-weight:800;white-space:nowrap}.mode-box button[aria-pressed="true"]{background:var(--night);color:#fff}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:20px}.step{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;font-weight:750;display:flex;align-items:center;gap:9px;font-size:14px}.step .num{border-radius:999px;background:#e5eaf0;width:26px;height:26px;display:grid;place-items:center;flex-shrink:0}.step.done .num{background:#d1efe2;color:#056344}.step.current{border-color:#e0b413;background:#fff9e6}.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(320px,1fr);gap:18px}.stack{display:flex;flex-direction:column;gap:16px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(10,32,49,.035);padding:20px}.panel h2{font-size:19px;margin:0 0 14px}.panel h3{font-size:15px;margin:12px 0 6px}.muted{color:var(--sub);font-size:14px}.kv{display:grid;grid-template-columns:130px 1fr;gap:5px 12px;margin:0}.kv dt{color:var(--sub);font-size:14px}.kv dd{margin:0;font-weight:700;overflow-wrap:anywhere}.status{border-radius:99px;font-size:13px;padding:5px 10px;background:#e7edf3;font-weight:800;display:inline-block}.status.pending{background:#fff2c8;color:#624600}.status.approved,.status.completed{background:#d7efe2;color:#086340}.status.declined{background:#ffdedb;color:#9b2222}.flex{display:flex;align-items:center;justify-content:space-between;gap:10px}.form-field{display:block;font-weight:800;margin:11px 0 6px;font-size:14px}textarea,input{display:block;width:100%;border:1px solid #aebbc8;border-radius:9px;padding:11px 12px;background:#fff;color:var(--ink);min-height:46px}textarea{resize:vertical;min-height:95px}.two{display:grid;grid-template-columns:1.25fr .75fr;gap:12px}.btn{background:#ffcc1c;border:1px solid #d5a800;color:#181818;font-weight:850;border-radius:8px;padding:12px 16px;min-height:48px}.btn.dark{background:#14222e;border-color:#14222e;color:#fff}.btn.green{background:#078454;border-color:#078454;color:#fff}.btn.light{background:#fff;border-color:#bfccd6}.btn.danger{background:#fff;border-color:#b63a31;color:#aa2118}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.actions button{flex:1;min-width:140px}.info{border-radius:10px;padding:12px 14px;background:#f1f5f7;font-size:14px;color:#425360}.total{margin-top:12px;padding:14px;background:#fff8dd;border:1px solid #ecd99b;border-radius:10px;display:flex;justify-content:space-between;align-items:center;font-weight:750}.total strong{font-size:25px;font-variant-numeric:tabular-nums}.event{padding:11px 0;border-bottom:1px solid #e5eaee;display:grid;grid-template-columns:70px 1fr;gap:8px}.event:last-child{border-bottom:0}.event small{color:var(--sub)}.event b{display:block;font-size:14px}.restrict{border:1px dashed #bcc8d2;background:#f8fafb;border-radius:12px;padding:20px;color:var(--sub);text-align:center}.activity{margin-top:16px;border-radius:9px;background:#e9f5ee;padding:12px 14px;color:#146141;font-weight:700;min-height:50px}.activity.error{background:#ffebe8;color:#922a22}.gone{display:none!important}.customerPanel{border:2px solid #85cba7}.help{font-size:13px;color:var(--sub);margin-top:6px}.sticky{position:sticky;top:16px}footer{text-align:center;color:#687887;font-size:13px;padding:25px 14px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.sticky{position:static}.steps{grid-template-columns:repeat(2,1fr)}.panel{padding:17px}}
+@media(max-width:500px){main{padding:18px 12px 35px}.bar{padding:11px 12px!important}.preview-chip{font-size:11px}.logo b{font-size:16px}.kv{grid-template-columns:100px 1fr}.two{grid-template-columns:1fr}.mode-box{width:100%;justify-content:space-between}.mode-box button{flex:1}}
+</style>
+</head>
+<body>
+<header><div class="bar"><div class="logo"><div class="mark">DC</div><div><b>DPRO CAR02</b><small>整備報告 × 追加見積 × お客様承認</small></div></div><span class="preview-chip">操作体験版 R49</span></div></header>
+<div class="notice">【制作・検証用】実際の顧客・車両情報は入力しないでください。データ保存・LINE送信・本番承認は行いません。</div>
+<main>
+<div class="hero"><div><div class="eyebrow">STREET HOUSE / WORKFLOW REVIEW</div><h1>整備の状況も、追加費用も。<br>わかりやすく、安心に。</h1><p>整備士の報告から追加見積の提示、お客様の承認・完了までを、画面を切り替えながら一通り体験できます。</p></div><div class="mode-box" role="group" aria-label="体験する利用者"><button id="staffTab" aria-pressed="true">店舗スタッフ</button><button id="customerTab" aria-pressed="false">お客様</button></div></div>
+<div class="steps" aria-label="整備フロー"><div class="step" id="step0"><span class="num">1</span>点検報告</div><div class="step" id="step1"><span class="num">2</span>見積提示</div><div class="step" id="step2"><span class="num">3</span>お客様確認</div><div class="step" id="step3"><span class="num">4</span>作業完了</div></div>
+<div class="layout"><div class="stack">
+<section class="panel"><div class="flex"><h2>車両・整備案件</h2><span id="status" class="status">下書き</span></div><dl class="kv"><dt>対象車両</dt><dd>DEMO VEHICLE / 体験用</dd><dt>管理番号</dt><dd>CAR02-R49-001</dd><dt>データ保存</dt><dd>ブラウザ内メモリのみ（画面更新でリセット）</dd><dt>現在の版</dt><dd id="version">1</dd></dl></section>
+<section class="panel" id="staffPanel"><h2>整備士の入力</h2><p class="muted">点検内容を保存してから、必要な追加作業と金額を提示できます。</p><label class="form-field" for="observation">点検結果・お客様への説明</label><textarea id="observation" maxlength="10000">ベルトの劣化を確認しました。安全のため交換をご提案します。</textarea><div class="info">写真は最大3枚の非公開保存を想定しています。R49操作体験では画像アップロードは行いません。</div><div class="actions"><button id="saveReport" class="btn dark">点検報告を保存（体験）</button></div><h3>追加作業の見積</h3><div class="two"><div><label class="form-field" for="itemName">作業項目</label><input id="itemName" value="補機ベルト交換" maxlength="160"></div><div><label class="form-field" for="itemPrice">税込前の金額（円）</label><input id="itemPrice" type="number" inputmode="numeric" min="0" max="100000000" step="1" value="9800"></div></div><div class="total"><span>合計（税込10%参考）</span><strong id="total">¥10,780</strong></div><div class="actions"><button id="presentQuote" class="btn">追加見積を提示（体験）</button><button id="finish" class="btn green">承認後の作業完了（体験）</button></div><p class="help">※金額は架空の例です。実際の見積・請求・通知は発生しません。</p></section>
+<section class="panel customerPanel gone" id="customerPanel"><h2>お客様の確認画面</h2><div class="info" id="customerNotice">店舗から追加見積が提示されると、ここに承認内容が表示されます。</div><div id="quotePreview" class="gone"><h3>ご提案内容</h3><div id="quoteSummary"></div><div class="total"><span>追加見積（税込）</span><strong id="customerTotal">—</strong></div><label class="form-field" for="declineReason">見送る理由（見送りの場合）</label><textarea id="declineReason" placeholder="例：今回は交換を見送ります"></textarea></div><div class="actions"><button id="approve" class="btn green">追加見積を承認（体験）</button><button id="decline" class="btn danger">今回は見送る（体験）</button></div><p class="help">※操作はブラウザ内の架空データのみ変更します。LINE送信はありません。</p></section>
+<section class="panel"><h2>操作ガイド</h2><div class="info">① スタッフで「点検報告を保存」→ ②「追加見積を提示」→ ③ 上部を「お客様」に切り替えて「承認」→ ④「店舗スタッフ」に戻り「作業完了」。いつでもデモをリセットできます。</div><div class="actions"><button class="btn light" id="reset">デモを最初からやり直す</button></div></section>
+</div><div class="stack"><section class="panel sticky"><div class="flex"><h2>進行状況・履歴</h2><span class="status">DEMO</span></div><div class="info">操作ごとに状態が変化し、履歴が追加されます。実際のDBとは接続していません。</div><div id="events" aria-label="操作履歴"></div><div id="feedback" class="activity" role="status" aria-live="polite">画面を確認してください。</div></section><section class="panel"><h2>セキュリティ方針</h2><p class="muted">本番版では、ログイン本人確認、店舗権限、整備案件の所属確認、非公開写真保存、見積承認履歴の保護をサーバー側で検証します。</p><div class="restrict">R49プレビューは完全オフラインの模擬APIです。<br>認証キー・本番DB・LINE APIには接続しません。</div></section></div></div>
+</main><footer>DPRO CAR02 R49 REVIEW · デモ専用 · noindex / no production access</footer>
+<script type="module">
+// DPRO CAR02 R49 — browser-side transport contract (no credentials stored).
+// REVIEW/QA ONLY. The server-side R44/R46 release and identity gates remain authoritative.
+// Starts CLOSED. This module alone does not activate live CAR02 endpoints.
+const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MIME=new Set(['image/png','image/jpeg','image/webp']);
+const MAX_PHOTO=5*1024*1024;
+class Car02ClientError extends Error{
+  constructor(code,status=0){super(code);this.name='Car02ClientError';this.code=code;this.status=status;}
+}
+const reject=(code,status=0)=>{throw new Car02ClientError(code,status)};
+const validId=x=>typeof x==='string'&&ID.test(x);
+const isPlain=x=>x!==null&&typeof x==='object'&&Object.getPrototypeOf(x)===Object.prototype;
+const exactKeys=(x,keys)=>isPlain(x)&&Object.keys(x).every(k=>keys.includes(k));
+const trimToken=x=>typeof x==='string'&&x.length>=8&&x.length<=8192&&x.trim()===x&&!/\s/.test(x);
+function baseOrigin(apiOrigin){
+  let u;try{u=new URL(apiOrigin)}catch{reject('CAR02_API_ORIGIN_INVALID')}
+  if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash||u.pathname!=='/'||!u.hostname)reject('CAR02_API_ORIGIN_INVALID');
+  return u.origin;
+}
+const methodKeys={
+  report:['observation','photos','expectedVersion'],
+  quote:['items','expectedVersion'],
+  decision:['decision','reason','expectedVersion'],
+  complete:['expectedVersion'],
+  create:['customerId','vehicleId','reservationId']
+};
+function validPayload(action,data){
+  if(!exactKeys(data,methodKeys[action]))reject('CAR02_INPUT_INVALID');
+  if(action==='create'&&(!validId(data.customerId)||!validId(data.vehicleId)||(data.reservationId!=null&&!validId(data.reservationId))))reject('CAR02_REFERENCE_INVALID');
+  if(action==='report'&&(!Number.isSafeInteger(data.expectedVersion)||data.expectedVersion<1||typeof data.observation!=='string'||!data.observation.trim()||data.observation.length>10000||!Array.isArray(data.photos)||data.photos.length>3||!data.photos.every(validId)))reject('CAR02_REPORT_INVALID');
+  if(action==='quote'&&(!Number.isSafeInteger(data.expectedVersion)||data.expectedVersion<1||!Array.isArray(data.items)||data.items.length<1||data.items.length>30||data.items.some(x=>!exactKeys(x,['name','price'])||typeof x.name!=='string'||!x.name.trim()||x.name.length>160||!Number.isSafeInteger(x.price)||x.price<0||x.price>100_000_000)))reject('CAR02_QUOTE_INVALID');
+  if(action==='decision'&&(!Number.isSafeInteger(data.expectedVersion)||data.expectedVersion<1||!['approved','declined'].includes(data.decision)||(data.decision==='declined'&&(!data.reason||typeof data.reason!=='string'||!data.reason.trim()||data.reason.length>2000))))reject('CAR02_DECISION_INVALID');
+  if(action==='complete'&&(!Number.isSafeInteger(data.expectedVersion)||data.expectedVersion<1))reject('CAR02_VERSION_REQUIRED');
+}
+function safeCode(v){return typeof v==='string'&&/^CAR02_[A-Z0-9_]{2,60}$/.test(v)?v:'CAR02_HTTP_ERROR'}
+async function readJson(resp){
+ const ct=resp.headers?.get('content-type')||'';
+ if(!ct.toLowerCase().includes('application/json'))reject('CAR02_RESPONSE_INVALID');
+ const size=Number(resp.headers.get('content-length')||0);
+ if(size>256_000)reject('CAR02_RESPONSE_TOO_LARGE');
+ const raw=await resp.text();
+ if(raw.length>256_000)reject('CAR02_RESPONSE_TOO_LARGE');
+ let data;try{data=JSON.parse(raw)}catch{reject('CAR02_RESPONSE_INVALID')}
+ if(!isPlain(data))reject('CAR02_RESPONSE_INVALID');
+ if(!resp.ok||data.ok!==true)reject(safeCode(data.code),resp.status);
+ if(!Object.hasOwn(data,'data'))reject('CAR02_RESPONSE_INVALID');
+ return data.data;
+}
+async function readPhoto(resp){
+ if(!resp.ok)reject('CAR02_PHOTO_UNAVAILABLE',resp.status);
+ const mime=(resp.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+ if(!MIME.has(mime))reject('CAR02_PHOTO_INVALID');
+ const length=Number(resp.headers.get('content-length')||0);
+ if(length>MAX_PHOTO)reject('CAR02_PHOTO_TOO_LARGE');
+ let bytes;
+ if(resp.body?.getReader){
+  const reader=resp.body.getReader(),chunks=[];let n=0;
+  try{for(;;){const{done,value}=await reader.read();if(done)break;n+=value?.byteLength||0;
+    if(n>MAX_PHOTO){await reader.cancel().catch(()=>{});reject('CAR02_PHOTO_TOO_LARGE')}
+    chunks.push(value);
+  }}finally{reader.releaseLock()}
+  bytes=new Uint8Array(n);let p=0;for(const c of chunks){bytes.set(c,p);p+=c.byteLength}
+ }else{bytes=new Uint8Array(await resp.arrayBuffer());if(bytes.length>MAX_PHOTO)reject('CAR02_PHOTO_TOO_LARGE')}
+ if(bytes.length<4)reject('CAR02_PHOTO_INVALID');
+ if(mime==='image/png'&&!(bytes.length>=8&&[137,80,78,71,13,10,26,10].every((x,i)=>bytes[i]===x)))reject('CAR02_PHOTO_INVALID');
+ if(mime==='image/jpeg'&&!(bytes[0]===255&&bytes[1]===216&&bytes[2]===255))reject('CAR02_PHOTO_INVALID');
+ if(mime==='image/webp'&&!(bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP'))reject('CAR02_PHOTO_INVALID');
+ return{bytes,mimeType:mime};
+}
+function createCar02BrowserClientR49({apiOrigin,credentials,fetchImpl=fetch,cryptoImpl=crypto,connectionEnabled=false}={}){
+ const origin=baseOrigin(apiOrigin);
+ if(typeof credentials!=='function'||typeof fetchImpl!=='function'||typeof cryptoImpl?.randomUUID!=='function')throw Error('CAR02_BROWSER_DEPENDENCIES_REQUIRED');
+ // An opt-in UI flag is NOT a security gate. Backend release gate must be enabled too.
+ async function request(method,path,{data,requestId,isPhoto=false}={}){
+  if(connectionEnabled!==true)reject('CAR02_BROWSER_CONNECTION_CLOSED');
+  if(!/^\/api\/car02(?:\/[a-z0-9-]+)*$/i.test(path))reject('CAR02_ROUTE_INVALID');
+  let c;try{c=await credentials()}catch{reject('CAR02_IDENTITY_REQUIRED')}
+  if(!c||!['staff','customer'].includes(c.kind)||!trimToken(c.token))reject('CAR02_IDENTITY_REQUIRED');
+  const h=new Headers({'Accept':isPhoto?'image/png,image/jpeg,image/webp':'application/json'});
+  if(c.kind==='staff')h.set('Authorization','Bearer '+c.token);
+  else h.set('X-Line-ID-Token',c.token);
+  if(data!==undefined){h.set('Content-Type','application/json');
+    const k=requestId===undefined?'car02-'+cryptoImpl.randomUUID():requestId;
+    if(typeof k!=='string'||k.length<12||k.length>150||!/^[a-z0-9-]+$/i.test(k))reject('CAR02_IDEMPOTENCY_INVALID');
+    h.set('Idempotency-Key',k);
+  }
+  let response;
+  try{response=await fetchImpl(origin+path,{method,headers:h,body:data===undefined?undefined:JSON.stringify(data),redirect:'error',cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(12000)})}
+  catch{reject('CAR02_CONNECTION_FAILED')}
+  if(!response||typeof response.status!=='number')reject('CAR02_CONNECTION_FAILED');
+  return isPhoto?readPhoto(response):readJson(response);
+ }
+ const getId=id=>{if(!validId(id))reject('CAR02_ID_INVALID');return id};
+ return Object.freeze({
+  get: async id=>request('GET','/api/car02/'+getId(id)),
+  history: async id=>request('GET','/api/car02/'+getId(id)+'/history'),
+  create:async (data,requestId)=>{validPayload('create',data);return request('POST','/api/car02',{data,requestId})},
+  saveReport:async (id,data,requestId)=>{validPayload('report',data);return request('POST','/api/car02/'+getId(id)+'/report',{data,requestId})},
+  presentQuote:async (id,data,requestId)=>{validPayload('quote',data);return request('POST','/api/car02/'+getId(id)+'/quote',{data,requestId})},
+  decision:async (id,data,requestId)=>{validPayload('decision',data);return request('POST','/api/car02/'+getId(id)+'/decision',{data,requestId})},
+  complete:async (id,data,requestId)=>{validPayload('complete',data);return request('POST','/api/car02/'+getId(id)+'/complete',{data,requestId})},
+  photo:async id=>request('GET','/api/car02/photos/'+getId(id),{isPhoto:true})
+ });
+}
+
+// CAR02 R49: IN-MEMORY QA MOCK. Never transmits requests. No real accounts or personal data.
+const SHOP='street_house_kitsuki';
+const ORDER='11111111-1111-4111-8111-111111111111';
+const C='22222222-2222-4222-8222-222222222222';
+const V='33333333-3333-4333-8333-333333333333';
+const CAR02_R49_DEMO_IDS=Object.freeze({orderId:ORDER,customerId:C,vehicleId:V});
+function createCar02MockTransportR49(){
+ let state,processed;
+ const initial=()=>({id:ORDER,shop:SHOP,customerId:C,vehicleId:V,status:'draft',version:1,revision:0,observation:'',photos:[],quote:null,decision:null,events:[{type:'created',actor:'demo:staff',time:'10:00'}]});
+ const reset=()=>{state=initial();processed=new Map();};reset();
+ const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
+ const ok=data=>json({ok:true,data});const fail=(code,status=400)=>json({ok:false,code},status);
+ const snapshot=()=>structuredClone(state);
+ const event=(type,role)=>state.events.push({type,actor:'demo:'+role,time:new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit'}).format(new Date())});
+ async function fetchImpl(input,opts={}){
+  const url=new URL(input),m=opts.method||'GET',path=url.pathname;
+  if(url.origin!=='https://car02-stage.invalid'||url.search)return fail('CAR02_ROUTE_INVALID',400);
+  let role=null;
+  if(opts.headers?.get('Authorization')==='Bearer demo-staff-token')role='staff';
+  if(opts.headers?.get('X-Line-ID-Token')==='demo-customer-token'){
+   if(role)return fail('CAR02_UNAUTHORIZED',401);
+   role='customer';
+  }
+  if(!role)return fail('CAR02_UNAUTHORIZED',401);
+  if(m==='GET'&&path===`/api/car02/${ORDER}`)return ok(snapshot());
+  if(m==='GET'&&path===`/api/car02/${ORDER}/history`)return ok(structuredClone(state.events));
+  if(m!=='POST')return fail('CAR02_NOT_FOUND',404);
+  const key=opts.headers?.get('Idempotency-Key')||'';
+  if(key.length<12)return fail('CAR02_IDEMPOTENCY_REQUIRED',422);
+  if(processed.has(key))return ok(structuredClone(processed.get(key)));
+  let data;try{data=JSON.parse(opts.body)}catch{return fail('CAR02_JSON_INVALID',400)}
+  if(path===`/api/car02/${ORDER}/report`){
+   if(role!=='staff')return fail('CAR02_UNAUTHORIZED',403);
+   if(state.status!=='draft'||state.version!==data.expectedVersion)return fail('CAR02_VERSION_CONFLICT',409);
+   if(typeof data.observation!=='string'||!data.observation.trim()||!Array.isArray(data.photos)||data.photos.length)return fail('CAR02_REPORT_INVALID',422);
+   state.observation=data.observation.trim();state.version++;event('report_saved',role);
+  }else if(path===`/api/car02/${ORDER}/quote`){
+   if(role!=='staff')return fail('CAR02_UNAUTHORIZED',403);
+   if(state.status!=='draft'||state.version!==data.expectedVersion)return fail('CAR02_VERSION_CONFLICT',409);
+   if(!state.observation)return fail('CAR02_REPORT_REQUIRED',409);
+   const subtotal=data.items.reduce((n,x)=>n+x.price,0);const tax=Math.floor(subtotal*.1);
+   state.quote={revision:++state.revision,items:data.items,observation:state.observation,photos:[],subtotal,tax,total:subtotal+tax};
+   state.status='pending';state.version++;event('quote_presented',role);
+  }else if(path===`/api/car02/${ORDER}/decision`){
+   if(role!=='customer')return fail('CAR02_UNAUTHORIZED',403);
+   if(state.status!=='pending'||state.version!==data.expectedVersion)return fail('CAR02_VERSION_CONFLICT',409);
+   state.decision={value:data.decision,reason:data.reason||'',revision:state.revision};state.status=data.decision;state.version++;event('quote_'+data.decision,role);
+  }else if(path===`/api/car02/${ORDER}/complete`){
+   if(role!=='staff')return fail('CAR02_UNAUTHORIZED',403);
+   if(state.status!=='approved'||state.version!==data.expectedVersion)return fail('CAR02_VERSION_CONFLICT',409);
+   state.status='completed';state.version++;event('completed',role);
+  }else return fail('CAR02_NOT_FOUND',404);
+  const result=snapshot();processed.set(key,result);return ok(result);
+ }
+ return Object.freeze({fetchImpl,reset,inspect:snapshot});
+}
+
+const $=id=>document.getElementById(id);const mock=createCar02MockTransportR49();let role='staff',caseData=null,busy=false;
+let mockSeq=0;
+const client=createCar02BrowserClientR49({apiOrigin:'https://car02-stage.invalid/',connectionEnabled:true,
+ cryptoImpl:{randomUUID:()=>`00000000-0000-4000-8000-${String(++mockSeq).padStart(12,'0')}`},
+ credentials:()=>({kind:role,token:role==='staff'?'demo-staff-token':'demo-customer-token'}),fetchImpl:mock.fetchImpl});
+const labels={draft:'下書き',pending:'承認待ち',approved:'承認済み',declined:'見送り',completed:'作業完了'};
+const el=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=String(text);return x};
+const money=x=>'¥'+new Intl.NumberFormat('ja-JP').format(x);
+function info(text,bad=false){$('feedback').textContent=text;$('feedback').classList.toggle('error',bad)}
+function setRole(r){role=r;$('staffTab').setAttribute('aria-pressed',String(r==='staff'));$('customerTab').setAttribute('aria-pressed',String(r==='customer'));render()}
+async function reload(){caseData=await client.get(CAR02_R49_DEMO_IDS.orderId);render()}
+function render(){if(!caseData)return;
+ const d=caseData,staff=role==='staff',pending=d.status==='pending';
+ $('staffPanel').classList.toggle('gone',!staff);$('customerPanel').classList.toggle('gone',staff);
+ $('status').textContent=labels[d.status]||d.status;$('status').className='status '+d.status;$('version').textContent='V'+d.version;
+ $('saveReport').disabled=busy||d.status!=='draft';$('presentQuote').disabled=busy||d.status!=='draft'||!d.observation;
+ $('finish').disabled=busy||d.status!=='approved';$('approve').disabled=busy||!pending;$('decline').disabled=busy||!pending;
+ $('observation').disabled=busy||d.status!=='draft';$('itemName').disabled=busy||d.status!=='draft';$('itemPrice').disabled=busy||d.status!=='draft';
+ if(d.observation)$('observation').value=d.observation;
+ $('customerNotice').textContent=pending?'点検結果を確認し、追加費用をご判断ください。':d.status==='approved'?'承認ありがとうございます。店舗が作業完了を登録します。':d.status==='completed'?'作業完了になりました。':'追加見積の提示待ちです。';
+ $('quotePreview').classList.toggle('gone',!d.quote);$('quoteSummary').replaceChildren();
+ if(d.quote){$('quoteSummary').append(el('p',d.quote.observation));for(const it of d.quote.items)$('quoteSummary').append(el('p',`${it.name}　${money(it.price)}`));$('customerTotal').textContent=money(d.quote.total)}
+ const active=d.status==='draft'?0:d.status==='pending'?2:d.status==='approved'||d.status==='declined'?2:3;
+ for(let i=0;i<4;i++){$('step'+i).classList.toggle('current',i===active);$('step'+i).classList.toggle('done',i<active)}
+ $('events').replaceChildren();for(const e of [...d.events].reverse()){const line=el('div');line.className='event';line.append(el('small',e.time||'—'));const details=el('div');const title=el('b',({created:'案件を作成',report_saved:'点検報告を保存',quote_presented:'追加見積を提示',quote_approved:'お客様が承認',quote_declined:'お客様が見送り',completed:'整備作業が完了'})[e.type]||'履歴');details.append(title,el('small',e.actor==='demo:staff'?'店舗スタッフ（デモ）':'お客様（デモ）'));line.append(details);$('events').append(line)}
+}
+async function act(fn,success){if(busy)return;busy=true;render();try{caseData=await fn();info(success);render()}catch(e){info('操作できません：'+(e.code||'CAR02_DEMO_ERROR'),true)}finally{busy=false;render()}}
+$('staffTab').addEventListener('click',()=>{setRole('staff');info('店舗スタッフの画面に切り替えました。')});
+$('customerTab').addEventListener('click',()=>{setRole('customer');info('お客様の画面に切り替えました。')});
+$('itemPrice').addEventListener('input',()=>{const n=Number($('itemPrice').value)||0;$('total').textContent=money(n+Math.floor(n*.1))});
+$('saveReport').addEventListener('click',()=>act(()=>client.saveReport(caseData.id,{observation:$('observation').value,photos:[],expectedVersion:caseData.version}), '点検報告を保存しました（デモ）。次に追加見積を提示できます。'));
+$('presentQuote').addEventListener('click',()=>act(()=>client.presentQuote(caseData.id,{items:[{name:$('itemName').value,price:Number($('itemPrice').value)}],expectedVersion:caseData.version}), '追加見積を提示しました（デモ）。お客様の画面に切り替えてください。'));
+$('approve').addEventListener('click',()=>{if(!confirm('追加見積を承認する操作を体験しますか？（実際には承認・送信されません）'))return;act(()=>client.decision(caseData.id,{decision:'approved',reason:'',expectedVersion:caseData.version}),'追加見積を承認しました（デモ）。スタッフ画面で完了登録できます。')});
+$('decline').addEventListener('click',()=>act(()=>client.decision(caseData.id,{decision:'declined',reason:$('declineReason').value,expectedVersion:caseData.version}),'追加見積を見送りました（デモ）。'));
+$('finish').addEventListener('click',()=>act(()=>client.complete(caseData.id,{expectedVersion:caseData.version}),'作業を完了しました（デモ）。'));
+$('reset').addEventListener('click',async()=>{mock.reset();role='staff';$('staffTab').setAttribute('aria-pressed','true');$('customerTab').setAttribute('aria-pressed','false');$('observation').value='ベルトの劣化を確認しました。安全のため交換をご提案します。';$('itemName').value='補機ベルト交換';$('itemPrice').value='9800';$('declineReason').value='';$('total').textContent=money(10780);await reload();info('体験用データをリセットしました。')});
+await reload();
+</script>
+</body></html>
