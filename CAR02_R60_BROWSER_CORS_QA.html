@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>DPRO CAR02｜R60 ブラウザ通信・安全診断</title>
+<style>
+:root{color-scheme:light;--bg:#f3f4f5;--ink:#172027;--sub:#4e5a61;--gold:#efbe2d;--line:#d9dfe3;--dark:#11171d;--good:#096b42;--bad:#a32121;--white:#fff}
+*{box-sizing:border-box}html{font-family:system-ui,-apple-system,'Yu Gothic','Meiryo',sans-serif;font-size:17px}body{margin:0;background:var(--bg);color:var(--ink);line-height:1.7;overflow-x:hidden}
+header{background:var(--dark);color:white;border-bottom:5px solid var(--gold)}.wrap{width:min(100% - 32px,980px);margin:auto}.top{padding:22px 0 24px}header .eyebrow{font-size:.77rem;letter-spacing:.15em;color:var(--gold);font-weight:800;margin:0 0 5px}
+h1{font-size:clamp(1.35rem,4vw,2rem);line-height:1.4;margin:0;font-weight:850}header p{margin:8px 0 0;color:#d4d9dd;font-size:.92rem}
+main{padding:24px 0 52px}.card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:22px;margin:0 0 18px;box-shadow:0 2px 9px rgba(10,18,22,.035)}
+.row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;justify-content:space-between}.stamp{display:inline-block;font-size:.83rem;font-weight:800;border-radius:999px;background:#e9edf0;padding:4px 12px;color:#37434b}.stamp.pass{background:#e7f5ec;color:var(--good)}.stamp.fail{background:#fceaea;color:var(--bad)}
+h2{font-size:1.18rem;line-height:1.45;margin:0 0 12px}.lead{font-size:.94rem;color:var(--sub);margin:8px 0 0}.small{color:var(--sub);font-size:.86rem}
+.info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.info>div{background:#f6f8f9;border:1px solid #e8eced;border-radius:9px;padding:10px 14px;min-width:0}.info strong{display:block;font-size:.77rem;color:var(--sub)}.info span{display:block;font-size:.86rem;overflow-wrap:anywhere}
+button{background:var(--gold);border:1px solid #c49a1a;color:#171717;border-radius:8px;font:inherit;font-size:1rem;font-weight:800;padding:13px 23px;min-height:51px;cursor:pointer}button:hover:not([disabled]){background:#f7ce50}button:focus-visible{outline:3px solid #3578ad;outline-offset:3px}button[disabled]{cursor:wait;opacity:.6}
+.summary{margin:15px 0 0;padding:12px 15px;background:#f6f8f9;border-radius:9px;min-height:52px;font-weight:700}table{border-collapse:collapse;width:100%;margin-top:12px;font-size:.9rem}th,td{text-align:left;padding:13px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f1f3f4;font-size:.85rem}td:nth-child(2),td:nth-child(3){white-space:nowrap}.ok{font-weight:800;color:var(--good)}.no{font-weight:800;color:var(--bad)}.muted{color:var(--sub)}
+a{color:#155a8b;overflow-wrap:anywhere}footer{color:var(--sub);text-align:center;font-size:.78rem;padding:0 16px 35px}.warning{border-left:4px solid #cda222;background:#fff9e7;padding:11px 14px;border-radius:4px;font-size:.89rem;margin:14px 0 0}
+@media(max-width:640px){.wrap{width:min(100% - 24px,980px)}.card{padding:16px}.info{grid-template-columns:1fr}table{font-size:.82rem}th,td{padding:10px 6px}td:nth-child(2),td:nth-child(3){white-space:normal}.warning{font-size:.84rem}}
+</style>
+</head>
+<body>
+<header><div class="wrap top"><p class="eyebrow">DPRO CAR02 / STREET HOUSE WANGAN</p><h1>R60 ブラウザ通信・安全診断</h1><p>GitHub Pages ⇄ Supabase Edge（契約前・公開停止）</p></div></header>
+<main class="wrap">
+<section class="card"><div class="row"><h2>診断環境</h2><span class="stamp" id="env-badge">未確認</span></div>
+<p class="lead">実際のブラウザから、受付停止と通信制限が正しく機能しているか検査します。</p>
+<div class="info"><div><strong>現在のページ</strong><span id="page-origin"></span></div><div><strong>対象</strong><span>CAR02 専用ステージングV2（受付停止）</span></div></div>
+<p class="warning">本診断は読み取り専用です。お客様の情報・パスワード・LINEトークンは入力しません。POSTやDB更新も実行しません。</p></section>
+<section class="card"><div class="row"><h2>通信テスト（全4項目）</h2><span class="stamp" id="overall">未実行</span></div>
+<p class="small">実行すると4件のGETリクエストを送信します。接続元が正規のGitHub Pagesでない場合は、一切通信しません。</p>
+<button id="run" type="button">安全診断を実行する</button>
+<p class="summary" id="summary" role="status" aria-live="polite">まだ診断していません。</p>
+<table><thead><tr><th scope="col">確認項目</th><th scope="col">期待</th><th scope="col">結果</th></tr></thead><tbody id="checks">
+<tr><td>ステージング稼働</td><td>200</td><td class="muted">未実行</td></tr>
+<tr><td>整備受付の停止</td><td>503</td><td class="muted">未実行</td></tr>
+<tr><td>ブラウザ事前通信</td><td>503</td><td class="muted">未実行</td></tr>
+<tr><td>非公開写真の保護</td><td>503</td><td class="muted">未実行</td></tr>
+</tbody></table><p class="small" id="last-run"></p></section>
+<section class="card"><h2>判定の見方</h2><p>4件すべて合格した場合、ブラウザから正しくステージングに接続でき、かつ受付が停止したままであることを確認できます。<strong>本番公開・正式認証・写真保存が完成したことを意味するものではありません。</strong></p><p class="small">GitHub Actions側の検証：<a href="https://github.com/dpromstk2000-lab/line-shaken-liff/actions/runs/38055344123" target="_blank" rel="noopener noreferrer">R59実HTTP QA（10/10）</a></p></section>
+</main><footer>DPRO CAR02 / R60 検証専用　—　契約前ロック維持・秘密鍵不要</footer>
+<script type="module">
+import {isCar02R60TrustedPage,runCar02BrowserCorsR60} from './car02-browser-cors-r60.mjs';
+const $=id=>document.getElementById(id);
+const safe=isCar02R60TrustedPage(window.location);
+$('page-origin').textContent=window.location.origin + window.location.pathname;
+$('env-badge').textContent=safe?'正規Pages':'検証不可の接続元';
+$('env-badge').className='stamp '+(safe?'pass':'fail');
+if(!safe){$('run').disabled=true;$('summary').textContent='GitHub Pagesの指定URLで開いてください。安全のため通信を実行しません。';}
+$('run').addEventListener('click',async()=>{
+  if(!safe)return;
+  $('run').disabled=true;$('overall').textContent='実行中';$('overall').className='stamp';
+  $('summary').textContent='Supabaseステージングの応答を確認しています…';
+  try{
+    const result=await runCar02BrowserCorsR60({locationLike:window.location});
+    $('overall').textContent=result.ok?'4/4 合格':'要確認';
+    $('overall').className='stamp '+(result.ok?'pass':'fail');
+    $('summary').textContent=result.ok?'4件すべて合格。契約前の受付停止も維持されています。':'通信または判定に不一致があります。公開設定を変更せず、結果画面を共有してください。';
+    $('checks').replaceChildren();
+    for(const c of result.checks){
+      const tr=document.createElement('tr');
+      const title=document.createElement('td');title.textContent=c.title;
+      const expected=document.createElement('td');expected.textContent=String(c.expectedStatus);
+      const observed=document.createElement('td');observed.textContent=c.ok?'合格（'+c.observedStatus+'）':'要確認（'+(c.observedStatus??'接続失敗')+'）';observed.className=c.ok?'ok':'no';
+      tr.append(title,expected,observed);$('checks').append(tr);
+    }
+    $('last-run').textContent='最終確認：'+new Date().toLocaleString('ja-JP')+' ／送信 '+result.networkCalls+'件（GETのみ）';
+  }catch{$('overall').textContent='要確認';$('overall').className='stamp fail';$('summary').textContent='診断が完了しませんでした。画面を共有してください。';}
+  finally{$('run').disabled=false;}
+});
+</script>
+</body></html>
