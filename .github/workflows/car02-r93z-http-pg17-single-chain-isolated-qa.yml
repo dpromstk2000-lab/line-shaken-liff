@@ -1,0 +1,95 @@
+name: DPRO CAR02 R93Z HTTP Protocol and Real PG17 Single Chain Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93z-storage-http-real-postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout approved read-only QA sources
+        uses: actions/checkout@v5
+      - name: Verify unchanged locked production source and contract prerequisites
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
+          test "$(git hash-object car02-r93v-idempotency-http-bridge-isolated.mjs)" = c70e2be2d7d7d10261367b4b2e0baa3246dad53b
+          test "$(git hash-object car02-r93w-durable-http-reservation-isolated.mjs)" = 9d9d29e9c9ec3a6c2cbc5590f57a4345f34321c7
+          test "$(git hash-object car02-r93x-verified-storage-lifecycle-isolated.mjs)" = 8ee4a3a639431a1f1c54dfabe8192e4f70894381
+          test "$(git hash-object car02-r93x-pg-ready-port-isolated.mjs)" = fcd7772ef57aca33fea075e9027939cb9f38f8a1
+          test "$(git hash-object car02-r93y-qa-storage-http-fixture.mjs)" = 3d9c89538b25d14e37c0937b33b0ce8b6eee30b9
+          node car02-r93z-workflow-readonly-guard.mjs
+          node car02-r93t-release-preflight.mjs > /tmp/car02-r93z-gates.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const a=JSON.parse(readFileSync("/tmp/car02-r93z-gates.json","utf8"));if(a.releaseDecision!=="NO_GO"||a.migrationDecision!=="HOLD"||a.unsafeCount!==0)process.exit(1);console.log("R93Z_RELEASE_NO_GO_HOLD_PASS")'
+      - name: Execute new and prior local regressions without network
+        run: |
+          set -euo pipefail
+          node --check test-car02-r93z-http-fixture-real-pg17.mjs
+          node --check test-car02-r93z-contract.mjs
+          node --check test-car02-r93z-workflow-guard.mjs
+          node --check car02-r93z-workflow-readonly-guard.mjs
+          node --test test-car02-r93z-contract.mjs test-car02-r93z-workflow-guard.mjs test-car02-r93y-http-protocol.mjs test-car02-r93y-r93x-http-integration.mjs test-car02-r93y-contract.mjs test-car02-r93x-storage-unit.mjs test-car02-r93x-source-contract.mjs | tee /tmp/car02-r93z-local.log
+          grep -Fq '# fail 0' /tmp/car02-r93z-local.log
+      - name: Install disposable Node PostgreSQL driver
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Create disposable PostgreSQL 17 test database
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r93z-schema.log
+          grep -Fxq R93R_DISPOSABLE_PG17_FIXTURE_READY /tmp/car02-r93z-schema.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r93z-intents.log
+          grep -Fxq R93S_DISPOSABLE_DURABLE_INTENT_SCHEMA_READY /tmp/car02-r93z-intents.log
+      - name: Real PG17 combined with isolated Storage HTTP fixture end to end
+        env:
+          R93Z_DISPOSABLE_PG17_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93z-http-fixture-real-pg17.mjs | tee /tmp/car02-r93z-driver.log
+          grep -Fq R93Z_REAL_PG17_HTTP_STORAGE_PROTOCOL_E2E_PASS /tmp/car02-r93z-driver.log
+          grep -Fq '# tests 20' /tmp/car02-r93z-driver.log
+          grep -Fq '# pass 20' /tmp/car02-r93z-driver.log
+          grep -Fq '# fail 0' /tmp/car02-r93z-driver.log
+      - name: Remove disposable database and test evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r93q_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r93q_qa_ci') THEN 'R93Z_DISPOSABLE_DB_REMOVED' ELSE 'R93Z_DB_LEAK' END" | grep -Fx R93Z_DISPOSABLE_DB_REMOVED
+          rm -f /tmp/car02-r93z-*.log /tmp/car02-r93z-gates.json
+      - name: Final R93Z immutable read-only safety gate
+        run: |
+          set -euo pipefail
+          node car02-r93z-workflow-readonly-guard.mjs
+          echo R93Z_READONLY_GUARD_PASS
