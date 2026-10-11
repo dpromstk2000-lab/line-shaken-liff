@@ -1,0 +1,31 @@
+name: DPRO CAR02 R82 Private Photo Upload Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r82-private-upload-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout review-only source
+        uses: actions/checkout@v5
+      - name: Syntax-check R82 adapter and tests
+        run: |
+          node --check car02-private-photo-upload-http-r82.mjs
+          node --check test-car02-private-photo-upload-http-r82.mjs
+          node --check test-car02-photo-upload-regression-r82.mjs
+      - name: Run R82 isolated HTTP boundary security tests
+        run: node --test test-car02-private-photo-upload-http-r82.mjs
+      - name: Verify no deployment wiring and original release lock
+        run: node --test test-car02-photo-upload-regression-r82.mjs
+      - name: Keep R47 private storage and R48 read-side regressions
+        run: node --test test-car02-private-photo-r47.mjs test-car02-private-photo-view-r48.mjs
+      - name: Retain R80 and R81 security regression gates
+        run: |
+          node --test test-car02-integration-audit-r80.mjs test-car02-initial-owner-r81.mjs
+          node car02-integration-audit-r80.mjs > /tmp/car02-r82-prerelease.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r82-prerelease.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R82 review-only: NO_GO + HOLD preserved")'
+      - name: Clear temporary findings
+        if: always()
+        run: rm -f /tmp/car02-r82-prerelease.json
