@@ -1,0 +1,117 @@
+name: DPRO CAR02 R94B Disposable Backup and Restore QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r94b-disposable-backup-restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout read-only approved sources
+        uses: actions/checkout@v5
+      - name: Confirm release lock and GitHub source baseline
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-r94a-full-staging-pipeline-isolated.mjs)" = 0a39e131bc05f7707ef4df261d062963b2d8486b
+          test "$(git hash-object R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql)" = 1b962d3d1531b0f20b9bdaa313aef1534a1a57db
+          test "$(git hash-object R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql)" = 8d856beb6cd0de3446a7328a6b2e151ede55cb3a
+          node car02-r94b-workflow-readonly-guard.mjs
+          node car02-r93t-release-preflight.mjs > /tmp/car02-r94b-release.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const a=JSON.parse(readFileSync("/tmp/car02-r94b-release.json","utf8"));if(a.releaseDecision!=="NO_GO"||a.migrationDecision!=="HOLD"||a.unsafeCount!==0)process.exit(1);console.log("R94B_RELEASE_NO_GO_HOLD_PASS")'
+      - name: Offline syntax and negative security tests
+        run: |
+          set -euo pipefail
+          node --check car02-r94b-disposable-backup-restore.mjs
+          node --check car02-r94b-workflow-readonly-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs | tee /tmp/car02-r94b-units.log
+          grep -Fq '# fail 0' /tmp/car02-r94b-units.log
+      - name: Install isolated Node PostgreSQL test driver
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Create source fixture inside disposable PostgreSQL 17
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r94b-schema.log
+          grep -Fxq R93R_DISPOSABLE_PG17_FIXTURE_READY /tmp/car02-r94b-schema.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r94b-intent.log
+          grep -Fxq R93S_DISPOSABLE_DURABLE_INTENT_SCHEMA_READY /tmp/car02-r94b-intent.log
+      - name: Seed realistic staging photo and cleanup lifecycle
+        env:
+          R94B_DISPOSABLE_BACKUP_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node car02-r94b-disposable-backup-restore.mjs seed | tee /tmp/car02-r94b-seed.log
+          grep -Fxq R94B_DISPOSABLE_SOURCE_SEED_AND_GUARDS_PASS /tmp/car02-r94b-seed.log
+      - name: Backup source database with container native pg_dump
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec "$CID" pg_dump -U postgres -d car02_r93q_qa_ci --format=custom --no-owner > /tmp/car02-r94b-disposable.dump
+          test -s /tmp/car02-r94b-disposable.dump
+          docker exec -i "$CID" pg_restore -U postgres --list < /tmp/car02-r94b-disposable.dump | grep -Fq 'car02_r93q_qa'
+          echo R94B_DISPOSABLE_PG_DUMP_CREATED
+      - name: Restore into distinct empty disposable database
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r94b_restore_ci;'
+          docker exec -i "$CID" pg_restore -U postgres -d car02_r94b_restore_ci --exit-on-error --single-transaction --no-owner < /tmp/car02-r94b-disposable.dump
+          echo R94B_RESTORED_INTO_DISTINCT_DISPOSABLE_DATABASE
+      - name: Verify data, constraints, immutable receipts and outbox after restore
+        env:
+          R94B_DISPOSABLE_BACKUP_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node car02-r94b-disposable-backup-restore.mjs verify | tee /tmp/car02-r94b-verify.log
+          grep -Fxq R94B_DISPOSABLE_BACKUP_RESTORE_VERIFIED_PASS /tmp/car02-r94b-verify.log
+      - name: Remove disposable source, restored DB and dump
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r94b_restore_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r93q_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname IN ('car02_r94b_restore_ci','car02_r93q_qa_ci')) THEN 'R94B_DISPOSABLE_DBS_REMOVED' ELSE 'R94B_DB_LEAK' END" | grep -Fx R94B_DISPOSABLE_DBS_REMOVED
+          rm -f /tmp/car02-r94b-disposable.dump /tmp/car02-r94b-*.log /tmp/car02-r94b-release.json
+      - name: Final immutable read-only release gate
+        run: |
+          set -euo pipefail
+          node car02-r94b-workflow-readonly-guard.mjs
+          echo R94B_NO_PRODUCTION_MUTATION_PASS
