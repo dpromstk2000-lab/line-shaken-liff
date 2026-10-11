@@ -1,0 +1,64 @@
+name: DPRO CAR02 R93V Isolated Idempotency HTTP Port QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93v-verified-intent-http-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout read-only approved sources
+        uses: actions/checkout@v5
+      - name: Verify release lock and unchanged approved modules
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-private-photo-r47.mjs)" = 'e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d'
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = '76e4e8cae27599f27e3d887118148718c32ebb80'
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = '6614f2ed1933aa787576cb8074cb7d4bc704efa0'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = '78f8b0f80fcc1f89d15fd25e4593c660cd197ea3'
+          test "$(git hash-object car02-r93u-staging-upload-route-isolated.mjs)" = 'e2ede7669936280256b96504837d421ec6cd5d60'
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = '64e907008448264512594573cdcdcd8773c4c29d'
+          node car02-r93t-release-preflight.mjs > /tmp/car02-r93v-release-gates.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/car02-r93v-release-gates.json","utf8"));if(x.openCount!==6||x.unsafeCount!==0||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93V_R93T_SIX_LEGACY_GAPS_STILL_OPEN")'
+      - name: Run R93V request key and R93U R82 actual-source QA
+        run: |
+          set -euo pipefail
+          node --check car02-r93v-idempotency-http-bridge-isolated.mjs
+          node --check test-car02-r93v-idempotency-http.mjs
+          node --check test-car02-r93v-r93u-integration.mjs
+          node --check test-car02-r93v-source-contract.mjs
+          node --test test-car02-r93v-idempotency-http.mjs test-car02-r93v-r93u-integration.mjs test-car02-r93v-source-contract.mjs | tee /tmp/car02-r93v-result.txt
+          grep -Fq R93V_R93U_SOURCE_COMPOSITION_PASS /tmp/car02-r93v-result.txt
+          grep -Fq R93V_SOURCE_INTEGRITY_NO_PRODUCTION_WIRING_PASS /tmp/car02-r93v-result.txt
+      - name: Preserve accepted R93U and R93T read-only regression
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93u-staging-route.mjs test-car02-r93u-r82-source-integration.mjs test-car02-r93u-audit-contract.mjs
+          node --test test-car02-r93t-audit-unit.mjs test-car02-r93t-github-current-contract.mjs
+          echo R93V_PREVIOUS_APPROVED_SOURCE_TESTS_PASS
+      - name: Remove temporary test summaries
+        if: always()
+        run: rm -f /tmp/car02-r93v-release-gates.json /tmp/car02-r93v-result.txt
+      - name: Enforce final read-only deploy denial
+        run: |
+          node --input-type=module <<'R93V_GUARD'
+          import {readFileSync} from 'node:fs';
+          const yaml=readFileSync('.github/workflows/car02-r93v-idempotency-port-isolated-qa.yml','utf8');
+          const marker=['      - name: Enforce final read-only','deploy denial'].join(' ');
+          const i=yaml.indexOf(marker);
+          if(i<0||yaml.indexOf(marker,i+marker.length)!==-1||yaml.indexOf('\n      - name: ',i+marker.length)!==-1)
+            throw Error('R93V_GUARD_NOT_LAST');
+          const before=yaml.slice(0,i);
+          const uses=[...before.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:curl|wget)\s+.*(?:supabase|workers\.dev)/i,
+            /\b(?:npm\s+publish|git\s+push)\b/i];
+          if(uses.length!==1||uses[0]!=='actions/checkout@v5'||
+            !before.includes('contents: read')||forbidden.some(r=>r.test(before)))
+            throw Error('R93V_WORKFLOW_NOT_READONLY');
+          console.log('R93V_NO_PRODUCTION_MUTATION_PASS');
+          R93V_GUARD
