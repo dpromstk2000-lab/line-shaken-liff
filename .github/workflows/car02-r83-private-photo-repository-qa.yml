@@ -1,0 +1,60 @@
+name: DPRO CAR02 R83 Private Photo Repository Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r83-photo-repository-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_ci_only_not_production
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout QA source without secrets
+        uses: actions/checkout@v5
+      - name: Validate R83 Node syntax
+        run: |
+          node --check car02-pg-photo-repository-r83.mjs
+          node --check test-car02-pg-photo-repository-r83.mjs
+          node --check test-car02-r83-safety.mjs
+      - name: R83 isolated repository and security tests
+        run: node --test test-car02-pg-photo-repository-r83.mjs test-car02-r83-safety.mjs
+      - name: Create a disposable PostgreSQL 17 database only
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE car02_r83_qa_ci;'
+      - name: Create disposable R13-shaped QA fixture
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r83_qa_ci -v ON_ERROR_STOP=1 < R83_PG17_QA_FIXTURE_ONLY.sql
+      - name: Assert PG17 tenant boundaries, access restrictions, row locks and rollback
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r83_qa_ci -v ON_ERROR_STOP=1 < R83_PG17_QA_ASSERT.sql
+      - name: Reject a production-named database (expected failure)
+        run: |
+          if docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < R83_PG17_QA_FIXTURE_ONLY.sql > /tmp/r83-must-deny.txt 2>&1; then
+            echo 'R83 ERROR: unapproved database name was accepted'; exit 1
+          fi
+          grep -q 'CAR02_R83_ISOLATION_REQUIRED' /tmp/r83-must-deny.txt
+          echo 'R83 PASS: disposable database guard blocks production-named database'
+      - name: Retain R82 R47 R48 R80 R81 tests
+        run: |
+          node --test test-car02-private-photo-upload-http-r82.mjs test-car02-photo-upload-regression-r82.mjs \
+            test-car02-private-photo-r47.mjs test-car02-private-photo-view-r48.mjs \
+            test-car02-integration-audit-r80.mjs test-car02-initial-owner-r81.mjs
+      - name: Preserve NO_GO HOLD and never unlock live gateway
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/r83-release-review.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/r83-release-review.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R83 isolated QA: live NO_GO, migration HOLD")'
+      - name: Erase temporary result files
+        if: always()
+        run: rm -f /tmp/r83-must-deny.txt /tmp/r83-release-review.json
