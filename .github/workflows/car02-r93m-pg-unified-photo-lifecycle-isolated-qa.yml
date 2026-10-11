@@ -1,0 +1,83 @@
+name: DPRO CAR02 R93M PG Unified Photo Lifecycle Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93m-unified-photo-pg-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93m-qa-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout QA sources read only
+        uses: actions/checkout@v5
+      - name: Verify immutable source baseline and release lock
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-r93l-pg-compensation-isolated.mjs)" = 1beee3abaed956d3712ff26b19d4bc225fa44a9e
+          test "$(git hash-object car02-r93k-r83-repository-bridge-isolated.mjs)" = 492b2cf638489be03b5026398d44dc263c3b02f0
+          ! grep -Eq 'car02-r93m-pg-photo-lifecycle|createR93MIsolatedPgPhotoLifecycle' car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs car02-private-photo-r47.mjs
+          node car02-integration-audit-r80.mjs >/tmp/car02-r93m-gate.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/car02-r93m-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93M_NO_GO_HOLD_PASS")'
+      - name: R93M source contract and scoped transaction unit QA
+        run: |
+          set -euo pipefail
+          node --check car02-r93m-pg-photo-lifecycle-isolated.mjs
+          node --check test-car02-r93m-pg-photo-lifecycle.mjs
+          node --check test-car02-r93m-sql-contract.mjs
+          node --check test-car02-r93m-r93h-port-integration.mjs
+          node --input-type=module -e 'import{R93M_CONTRACT as x}from"./car02-r93m-pg-photo-lifecycle-isolated.mjs";if(x.productionReady!==false||x.liveWiring!==false||x.productionMigrationApproved!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1)'
+          node --test test-car02-r93m-pg-photo-lifecycle.mjs test-car02-r93m-sql-contract.mjs test-car02-r93m-r93h-port-integration.mjs
+      - name: Preserve R93L R93K and existing photo contracts
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93l-pg-compensation.mjs test-car02-r93l-r93k-bridge.mjs test-car02-r93l-sql-contract.mjs
+          node --test test-car02-r93k-r83-repository-bridge.mjs test-car02-r93k-http-integration.mjs test-car02-r93k-source-contract.mjs
+          node --test test-car02-r93h-upload-compensation.mjs test-car02-r93h-safety.mjs test-car02-r93i-r47-safe-bridge.mjs test-car02-r93i-compat-contract.mjs test-car02-r93j-http-memory-pipeline.mjs test-car02-r93j-safety.mjs test-car02-pg-photo-repository-r83.mjs
+      - name: Verify actual disposable PostgreSQL 17 lifecycle and rollback
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93m_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93m_qa_ci -v ON_ERROR_STOP=1 < R93M_PG17_UNIFIED_PHOTO_LIFECYCLE_QA_ONLY.sql | tee /tmp/r93m-pg-result.txt
+          grep -Fx R93M_PG17_UNIFIED_LIFECYCLE_AND_ROLLBACK_PASS /tmp/r93m-pg-result.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93m_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93m_qa') IS NULL THEN 'R93M_ROLLBACK_CONFIRMED' ELSE 'R93M_SCHEMA_LEAK' END" | grep -Fx R93M_ROLLBACK_CONFIRMED
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93l_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93l_qa_ci -v ON_ERROR_STOP=1 < R93L_PG17_ATOMIC_COMPENSATION_QA_ONLY.sql | tee /tmp/r93m-r93l-pg-result.txt
+          grep -Fx R93L_PG17_REAL_TRANSACTION_AND_ROLLBACK_PASS /tmp/r93m-r93l-pg-result.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93l_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93l_qa') IS NULL THEN 'R93L_ROLLBACK_CONFIRMED' ELSE 'R93L_SCHEMA_LEAK' END" | grep -Fx R93L_ROLLBACK_CONFIRMED
+      - name: Reaffirm no production mutation
+        run: |
+          node --input-type=module <<'R93M_GUARD'
+          import{readFileSync}from'node:fs';
+          const own=['      - name: Reaffirm','no production mutation'].join(' ');
+          const src=readFileSync('.github/workflows/car02-r93m-pg-unified-photo-lifecycle-isolated-qa.yml','utf8');
+          const i=src.indexOf(own),j=src.indexOf('\n      - name: ',i+own.length);
+          if(i<0||j<=i||src.indexOf(own,i+own.length)!==-1)throw Error('R93M_GUARD_STRUCTURE_INVALID');
+          const checked=src.slice(0,i)+src.slice(j+1);
+          const code=readFileSync('car02-r93m-pg-photo-lifecycle-isolated.mjs','utf8');
+          const allowed=[...checked.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/];
+          if(allowed.length!==1||allowed[0]!=='actions/checkout@v5'||
+             !checked.includes('contents: read')||forbidden.some(p=>p.test(checked+'\n'+code)))
+            throw Error('R93M_UNSAFE_PRODUCTION_PATH');
+          console.log('R93M_NO_PRODUCTION_MUTATION_PASS');
+          R93M_GUARD
+      - name: Remove ephemeral QA files
+        if: always()
+        run: rm -f /tmp/car02-r93m-gate.json /tmp/r93m-pg-result.txt /tmp/r93m-r93l-pg-result.txt
