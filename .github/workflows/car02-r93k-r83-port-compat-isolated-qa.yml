@@ -1,0 +1,60 @@
+name: DPRO CAR02 R93K R83 Repository Port Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93k-r83-port-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93k-readonly-qa
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout reviewed sources without production credentials
+        uses: actions/checkout@v5
+      - name: Require release lock and migration HOLD
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/r93k-gate.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/r93k-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93K_NO_GO_HOLD_LOCKED")'
+      - name: Verify unchanged R83 R93H R93I and R82 published sources
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-pg-photo-repository-r83.mjs)" = 546b56e6dceddac767532d2309d4098d2feeed4c
+          test "$(git hash-object car02-r93h-upload-compensation-isolated.mjs)" = f0ea15a824a01119694b5231f6b1746978c6e0fd
+          test "$(git hash-object car02-r93i-r47-safe-bridge-isolated.mjs)" = dfac7fcccb33c0142075560d77486380894f8e18
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          ! grep -Eq 'car02-r93k-r83-repository-bridge|createR93KIsolatedR83RepositoryBridge' car02-private-photo-r47.mjs car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs
+          node --check car02-r93k-r83-repository-bridge-isolated.mjs
+          node --check test-car02-r93k-r83-repository-bridge.mjs
+          node --check test-car02-r93k-http-integration.mjs
+          node --check test-car02-r93k-source-contract.mjs
+          node --input-type=module -e 'import{R93K_CONTRACT as x}from"./car02-r93k-r83-repository-bridge-isolated.mjs";if(x.liveWiring!==false||x.productionReady!==false||x.transactionalAdapterNotYetImplemented!==true||x.r83AndR93hDatabaseNamesCurrentlyIncompatible!==true||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1)'
+      - name: R93K R83 port translation HTTP integration and source contract QA
+        run: node --test test-car02-r93k-r83-repository-bridge.mjs test-car02-r93k-http-integration.mjs test-car02-r93k-source-contract.mjs
+      - name: Preserve R82 R83 R93H R93I and R93J regressions
+        run: |
+          node --test test-car02-r93j-http-memory-pipeline.mjs test-car02-r93j-safety.mjs test-car02-r93i-r47-safe-bridge.mjs test-car02-r93i-compat-contract.mjs test-car02-r93h-upload-compensation.mjs test-car02-r93h-safety.mjs test-car02-private-photo-upload-http-r82.mjs test-car02-pg-photo-repository-r83.mjs
+      - name: PostgreSQL 17 disposable existing outbox rollback regression only
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93H_UPLOAD_UNCERTAIN_ATOMIC_COMPENSATION_PG17_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93h_qa') IS NULL THEN 'R93H_ROLLBACK_CONFIRMED' ELSE 'R93H_SCHEMA_LEAK' END" | grep -Fx R93H_ROLLBACK_CONFIRMED
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93G_PHOTO_TOMBSTONE_ATOMIC_OUTBOX_PG17_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93g_qa') IS NULL THEN 'R93G_ROLLBACK_CONFIRMED' ELSE 'R93G_SCHEMA_LEAK' END" | grep -Fx R93G_ROLLBACK_CONFIRMED
+      - name: Clear temporary release evidence
+        if: always()
+        run: rm -f /tmp/r93k-gate.json
