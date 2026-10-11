@@ -1,0 +1,53 @@
+name: DPRO CAR02 R81 Initial Owner Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r81-initial-owner-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local_ci_only_not_production
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout review-only repository
+        uses: actions/checkout@v5
+      - name: Test isolated bootstrap guard and two-person approval logic
+        run: |
+          node --check car02-initial-owner-r81.mjs
+          node --check test-car02-initial-owner-r81.mjs
+          node --test test-car02-initial-owner-r81.mjs
+      - name: Create disposable PostgreSQL 17 QA database
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE car02_r81_qa_ci;'
+      - name: Create disposable prerequisites and isolated audit table
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r81_qa_ci -v ON_ERROR_STOP=1 < R81_PG17_QA_FIXTURE.sql
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r81_qa_ci -v ON_ERROR_STOP=1 < R81_INITIAL_OWNER_BOOTSTRAP_QA_ONLY.sql
+      - name: Check RLS, privilege isolation, SQL constraints
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r81_qa_ci -v ON_ERROR_STOP=1 < R81_PG17_QA_ASSERT.sql
+      - name: Prove production-named DB rejects R81 schema
+        run: |
+          if docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < R81_INITIAL_OWNER_BOOTSTRAP_QA_ONLY.sql > /tmp/car02-r81-expected-denial.txt 2>&1; then
+            echo 'R81 FAIL: production-named DB unexpectedly accepted QA migration'; exit 1
+          fi
+          grep -q 'CAR02_R81_ISOLATION_REQUIRED' /tmp/car02-r81-expected-denial.txt
+          echo 'R81 PASS: disposable PG17 schema only; production-name rejected'
+      - name: Retain previous R80 NO-GO / HOLD gate
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/car02-r80-review-r81.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r80-review-r81.json"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R81 REVIEW ONLY — R80 release lock retained")'
+      - name: Erase temporary review results
+        if: always()
+        run: rm -f /tmp/car02-r81-expected-denial.txt /tmp/car02-r80-review-r81.json
