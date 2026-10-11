@@ -37,7 +37,7 @@ export function createCar02StaffPermissionsR70({pool,shopCode,verifyTargetIdenti
       let verified;
       try{verified=await verifyTargetIdentity({userSub:targetSub})}catch{fail('CAR02_IDENTITY_REJECTED')}
       if(verified?.verified!==true||verified?.userSub!==targetSub||verified?.active!==true||
-        verified?.isAnonymous===true)fail('CAR02_IDENTITY_REJECTED');
+        verified?.isAnonymous!==false)fail('CAR02_IDENTITY_REJECTED');
     }
     let client,started=false;
     try{
