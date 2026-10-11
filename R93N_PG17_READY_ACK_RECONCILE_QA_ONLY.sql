@@ -54,6 +54,10 @@ INSERT INTO car02_r93n_qa.photos VALUES
 INSERT INTO car02_r93n_qa.cleanup_jobs SELECT id,shop_code,storage_path
  FROM car02_r93n_qa.photos WHERE id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 -- This function is TEST-ONLY; production DB access policies are not implemented here.
+-- R93N V1.1: Use numbered parameters to avoid column/argument shadowing.
+-- PostgreSQL SQL functions resolve an unqualified column name such as
+-- storage_path before an identically named SQL-function argument. Without $8,
+-- p.storage_path=storage_path degenerates to a tautology and accepts wrong paths.
 CREATE FUNCTION car02_r93n_qa.qa_prove_ready(
  photo uuid,shop text,ord uuid,report uuid,actor uuid,role_name text,
  bucket text,storage_path text,mime text,nbytes bigint,digest text)
@@ -62,11 +66,11 @@ RETURNS boolean LANGUAGE sql STABLE SET search_path=car02_r93n_qa,pg_catalog AS 
  SELECT 1 FROM car02_r93n_qa.photos p
  JOIN car02_r93n_qa.reports r ON r.id=p.report_id AND r.shop_code=p.shop_code
  JOIN car02_r93n_qa.work_orders o ON o.id=r.order_id AND o.shop_code=p.shop_code
- JOIN car02_r93n_qa.staff s ON s.shop_code=p.shop_code AND s.staff_id=actor
- WHERE p.id=photo AND p.shop_code=shop AND p.order_id=ord AND p.report_id=report
- AND o.id=ord AND o.status='draft' AND s.role=role_name AND s.active IS TRUE
- AND p.storage_bucket=bucket AND p.storage_path=storage_path
- AND p.mime_type=mime AND p.byte_size=nbytes AND p.sha256=digest AND p.upload_state='ready'
+ JOIN car02_r93n_qa.staff s ON s.shop_code=p.shop_code AND s.staff_id=$5
+ WHERE p.id=$1 AND p.shop_code=$2 AND p.order_id=$3 AND p.report_id=$4
+ AND o.id=$3 AND o.status='draft' AND s.role=$6 AND s.active IS TRUE
+ AND p.storage_bucket=$7 AND p.storage_path=$8
+ AND p.mime_type=$9 AND p.byte_size=$10 AND p.sha256=$11 AND p.upload_state='ready'
  AND NOT EXISTS (SELECT 1 FROM car02_r93n_qa.cleanup_jobs j WHERE j.photo_id=p.id)
  );
 $$;

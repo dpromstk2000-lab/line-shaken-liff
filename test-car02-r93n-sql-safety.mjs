@@ -6,8 +6,8 @@ for(const item of [
  'car02_r93n_qa_ci',"current_setting('server_version_num')::int<170000",'to_regclass(\'public.ksh_car02_photos\') IS NOT NULL',
  'CREATE SCHEMA car02_r93n_qa', 'REVOKE ALL ON SCHEMA', 'REVOKE ALL ON ALL FUNCTIONS',
  'CREATE FUNCTION car02_r93n_qa.qa_prove_ready', 'AND p.upload_state=\'ready\'',
- 'AND s.active IS TRUE','AND s.role=role_name','AND p.storage_path=storage_path',
- 'AND p.byte_size=nbytes','AND p.sha256=digest','NOT EXISTS (SELECT 1 FROM car02_r93n_qa.cleanup_jobs',
+ 'AND s.active IS TRUE','AND s.role=$6','AND p.storage_path=$8',
+ 'AND p.byte_size=$10','AND p.sha256=$11','NOT EXISTS (SELECT 1 FROM car02_r93n_qa.cleanup_jobs',
  'COMMIT;', 'BEGIN;', 'ROLLBACK;', 'DROP SCHEMA car02_r93n_qa CASCADE;',
  'R93N_PG17_FRESH_COMMIT_ACK_RECONCILIATION_PASS',
  'R93N_CROSS_SHOP_ACCEPTED','R93N_INACTIVE_STAFF_ACCEPTED','R93N_WRONG_ROLE_ACCEPTED',
@@ -22,4 +22,22 @@ test('SQL commits setup then opens new read transaction',()=>{
  let i=sql.indexOf('REVOKE ALL ON ALL FUNCTIONS');let c=sql.indexOf('COMMIT;',i);
  let b=sql.indexOf('BEGIN;',c);let x=sql.indexOf('DO $$ DECLARE',b);
  assert.ok(i>=0&&c>i&&b>c&&x>b);
+});
+
+// Regression for R93N GitHub run #1: a column and same-named function argument
+// must never be compared without a numbered/qualified parameter.
+test('all eleven R93N SQL function args use explicit positional bindings',()=>{
+ const body=sql.split('CREATE FUNCTION car02_r93n_qa.qa_prove_ready(',2)[1].split('$$;',1)[0];
+ const expected=[
+  'p.id=$1','p.shop_code=$2','p.order_id=$3','p.report_id=$4',
+  's.staff_id=$5','s.role=$6','p.storage_bucket=$7','p.storage_path=$8',
+  'p.mime_type=$9','p.byte_size=$10','p.sha256=$11'
+ ];
+ for(const expr of expected) assert.ok(body.includes(expr),`argument not explicitly bound: ${expr}`);
+ assert.doesNotMatch(body,/p\.storage_path\s*=\s*storage_path\b/i);
+});
+test('path mismatch is an explicit SQL negative test and cannot be a column tautology',()=>{
+ assert.ok(sql.includes("'different/path.jpg'"));
+ assert.ok(sql.includes('R93N_PATH_MISMATCH_ACCEPTED'));
+ assert.match(sql,/p\.storage_path\s*=\s*\$8\b/);
 });
