@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {QA_ITEMS,qaProgress,qaSafeId,REQUIRED_RELEASE,REQUIRED_MIGRATION} from './car02-r89-acceptance-model.mjs';
+const safe=QA_ITEMS.filter(x=>x.safe),blocked=QA_ITEMS.filter(x=>!x.safe);
+test('R89 checklist has 8 independent view-only checks',()=>{assert.equal(safe.length,8);assert.equal(QA_ITEMS.length,11);});
+test('R89 all checklist IDs unique and machine-safe',()=>{assert.equal(new Set(QA_ITEMS.map(x=>x.id)).size,QA_ITEMS.length);assert.ok(QA_ITEMS.every(x=>/^[a-z0-9_]{3,40}$/.test(x.id)));});
+test('R89 each checklist label describes manual review in Japanese',()=>assert.ok(QA_ITEMS.every(x=>x.label.length>15)));
+test('R89 blocked gates cannot be checked',()=>assert.ok(blocked.every(x=>!qaSafeId(x.id))));
+test('R89 unknown key can never be checked',()=>{assert.equal(qaSafeId('production_activate'),false);assert.equal(qaSafeId('__proto__'),false)});
+test('R89 initial progress counts no manual checks',()=>assert.deepEqual({...qaProgress(new Set())},{checked:0,total:8,pending:8,releaseDecision:'NO_GO',migrationDecision:'HOLD',productionReady:false,blockedGates:3}));
+test('R89 2/8 progress counts only permitted checks',()=>{const r=qaProgress(new Set([safe[0].id,safe[1].id,blocked[0].id,'extra']));assert.equal(r.checked,2);assert.equal(r.pending,6)});
+test('R89 all safe tasks checked never changes NO_GO gate',()=>{const r=qaProgress(new Set(QA_ITEMS.map(x=>x.id)));assert.equal(r.checked,8);assert.equal(r.productionReady,false);assert.equal(r.releaseDecision,'NO_GO');assert.equal(r.migrationDecision,'HOLD')});
+test('R89 missing or malicious input does not error',()=>{for(const x of [null,{},'test',NaN,42,undefined]){const r=qaProgress(x);assert.equal(r.checked,0)}});
+test('R89 template elements and constants cannot be reassigned',()=>{assert.ok(Object.isFrozen(QA_ITEMS));assert.ok(QA_ITEMS.every(Object.isFrozen));assert.equal(REQUIRED_RELEASE,'NO_GO');assert.equal(REQUIRED_MIGRATION,'HOLD')});
