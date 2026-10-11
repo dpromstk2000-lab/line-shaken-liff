@@ -1,0 +1,30 @@
+name: DPRO CAR02 R92 Company PC Start Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r92-company-pc-start-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout isolated repository with no production credentials
+        uses: actions/checkout@v5
+      - name: Check R92 start page and test script syntax
+        run: |
+          test -f CAR02_R92_COMPANY_PC_START.html
+          node --check test-car02-r92-navigation.mjs
+          node --check test-car02-r92-safety.mjs
+      - name: Test R92 navigation and release-safety gates
+        run: node --test test-car02-r92-navigation.mjs test-car02-r92-safety.mjs
+      - name: Keep R90 R91 record and triage regressions
+        run: |
+          node --test test-car02-r90-record.mjs test-car02-r90-ui-safety.mjs
+          node --test test-car02-r91-triage-model.mjs test-car02-r91-ui-safety.mjs
+      - name: Preserve existing release decision and migration hold
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/car02-r92-gate.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r92-gate.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R92 QA only — NO_GO and HOLD retained")'
+      - name: Remove temporary static gate result
+        if: always()
+        run: rm -f /tmp/car02-r92-gate.json
