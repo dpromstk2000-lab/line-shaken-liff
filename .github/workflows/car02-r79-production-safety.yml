@@ -1,0 +1,23 @@
+name: DPRO CAR02 R79 Production NO-GO Guard
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r79-review-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout review-only sources
+        uses: actions/checkout@v4
+      - name: Verify Node test runtime
+        run: node --version
+      - name: Run R79 fail-closed tests
+        run: node --test test-car02-release-audit-r79.mjs
+      - name: Validate safety gate against checked-in source
+        run: |
+          node car02-release-audit-r79.mjs R79_EVIDENCE_SNAPSHOT.json car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs > r79-review-result.json
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync("r79-review-result.json")); if(r.safetyOk!==true || r.releaseDecision!=="NO_GO" || r.migrationDecision!=="HOLD" || r.automaticApproval!==false) process.exit(1); console.log("R79_PASS: REVIEW_ONLY, NO_GO, migration HOLD; static evidence only")'
+      - name: Delete temporary evidence copy
+        if: always()
+        run: rm -f r79-review-result.json
