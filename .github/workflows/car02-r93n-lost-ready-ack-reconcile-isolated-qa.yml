@@ -1,0 +1,75 @@
+name: DPRO CAR02 R93N Lost Ready ACK Reconcile Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93n-ready-ack-reconcile-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93n-qa-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout approved QA sources without write credentials
+        uses: actions/checkout@v5
+      - name: Verify closed release gates and unchanged R93M baseline
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-r93m-pg-photo-lifecycle-isolated.mjs)" = 1d844296ae0af12dac95391db07a4060d2fd49ff
+          test "$(git hash-object car02-r93h-upload-compensation-isolated.mjs)" = f0ea15a824a01119694b5231f6b1746978c6e0fd
+          ! grep -Eq 'car02-r93n-ready-ack-reconcile|createR93NIsolatedReadyAckReconciler' car02-private-photo-r47.mjs car02-unified-runtime-r50.mjs car02-edge-boundary-r51.mjs car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/car02-r93n-release-review.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/car02-r93n-release-review.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93N_NO_GO_HOLD_PASS")'
+      - name: Run new reconciliation and full R93M regression
+        run: |
+          set -euo pipefail
+          node --check car02-r93n-ready-ack-reconcile-isolated.mjs
+          node --check test-car02-r93n-ready-ack-reconcile.mjs
+          node --check test-car02-r93n-r93h-actual-upload-integration.mjs
+          node --check test-car02-r93n-sql-safety.mjs
+          node --input-type=module -e 'import{R93N_CONTRACT as c}from"./car02-r93n-ready-ack-reconcile-isolated.mjs";if(c.productionReady!==false||c.liveWiring!==false||c.releaseDecision!=="NO_GO"||c.migrationDecision!=="HOLD"||c.requiresOriginalR93MConnectionInFuture!==true)process.exit(1);console.log("R93N_REVIEW_ONLY_PASS")'
+          node --test test-car02-r93n-ready-ack-reconcile.mjs test-car02-r93n-r93h-actual-upload-integration.mjs test-car02-r93n-sql-safety.mjs
+          node --test test-car02-r93m-pg-photo-lifecycle.mjs test-car02-r93m-r93h-port-integration.mjs test-car02-r93m-sql-contract.mjs
+      - name: Exercise committed PostgreSQL 17 ready record from a separate transaction
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93n_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93n_qa_ci -v ON_ERROR_STOP=1 < R93N_PG17_READY_ACK_RECONCILE_QA_ONLY.sql | tee /tmp/car02-r93n-pg-result.txt
+          grep -Fx R93N_PG17_FRESH_COMMIT_ACK_RECONCILIATION_PASS /tmp/car02-r93n-pg-result.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93n_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93n_qa') IS NULL THEN 'R93N_SCHEMA_CLEANED' ELSE 'R93N_SCHEMA_LEAK' END" | grep -Fx R93N_SCHEMA_CLEANED
+      - name: Remove temporary QA evidence
+        if: always()
+        run: rm -f /tmp/car02-r93n-release-review.json /tmp/car02-r93n-pg-result.txt
+      - name: Confirm no production mutation actions or privileged credentials
+        run: |
+          node --input-type=module <<'R93N_GUARD'
+          import{readFileSync}from'node:fs';
+          const src=readFileSync('.github/workflows/car02-r93n-lost-ready-ack-reconcile-isolated-qa.yml','utf8');
+          const own=['      - name: Confirm no production','mutation actions or privileged credentials'].join(' ');
+          const start=src.indexOf(own);
+          if(start<0||src.indexOf(own,start+own.length)!==-1||
+             src.indexOf('\n      - name: ',start+own.length)!==-1)throw Error('R93N_GUARD_MUST_BE_LAST_STEP');
+          const inspected=src.slice(0,start);
+          const source=readFileSync('car02-r93n-ready-ack-reconcile-isolated.mjs','utf8');
+          const actions=[...inspected.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/];
+          if(actions.length!==1||actions[0]!=='actions/checkout@v5'||
+             !inspected.includes('contents: read')||forbidden.some(p=>p.test(inspected+'\n'+source)))
+            throw Error('R93N_FORBIDDEN_PRODUCTION_ACTION');
+          console.log('R93N_NO_PRODUCTION_MUTATION_PASS');
+          R93N_GUARD
