@@ -1,0 +1,41 @@
+name: DPRO CAR02 R88 Accessible Staff Review Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r88-accessible-staff-ui-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout QA only without production credentials
+        uses: actions/checkout@v5
+      - name: Ensure R88 and frozen predecessors are present
+        run: |
+          test -f CAR02_R88_STAFF_REVIEW.html
+          test -f car02-staff-review-app-r88.mjs
+          test -f test-car02-r88-a11y-contract.mjs
+          test -f test-car02-r88-release-safety.mjs
+          test -f CAR02_R87_STAFF_REVIEW.html
+          test -f car02-staff-review-app-r87.mjs
+          test -f car02-staff-review-model-r86.mjs
+          test -f car02-edge-entry-r52.ts
+          test -f car02-unified-runtime-r50.mjs
+      - name: JavaScript syntax and isolated R88 access and safety contracts
+        run: |
+          node --check car02-staff-review-app-r88.mjs
+          node --check test-car02-r88-a11y-contract.mjs
+          node --check test-car02-r88-release-safety.mjs
+          node --test test-car02-r88-a11y-contract.mjs test-car02-r88-release-safety.mjs
+      - name: Preserve R86-R87 UI and R85 server authorization regressions
+        run: |
+          node --test test-car02-staff-review-model-r86.mjs test-car02-staff-review-contract-r86.mjs test-car02-r86-safety.mjs
+          node --test test-car02-r87-layout-contract.mjs test-car02-r87-model-regression.mjs
+          node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: Enforce NO-GO and HOLD from R80 audit
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/car02-r88-static-gates.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r88-static-gates.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R88 REVIEW ONLY: NO_GO + HOLD retained")'
+      - name: Delete review-only temporary result
+        if: always()
+        run: rm -f /tmp/car02-r88-static-gates.json
