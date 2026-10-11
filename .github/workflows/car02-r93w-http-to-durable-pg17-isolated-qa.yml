@@ -1,0 +1,109 @@
+name: DPRO CAR02 R93W HTTP to Durable PG17 Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93w-http-durable-pg17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout approved files without production credentials
+        uses: actions/checkout@v5
+      - name: Verify original production lock and source hashes
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93u-staging-upload-route-isolated.mjs)" = e2ede7669936280256b96504837d421ec6cd5d60
+          test "$(git hash-object car02-r93v-idempotency-http-bridge-isolated.mjs)" = c70e2be2d7d7d10261367b4b2e0baa3246dad53b
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
+          node car02-r93t-release-preflight.mjs > /tmp/car02-r93w-gates.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const v=JSON.parse(readFileSync("/tmp/car02-r93w-gates.json","utf8"));if(v.openCount!==6||v.unsafeCount!==0||v.integrationReady!==false||v.releaseDecision!=="NO_GO"||v.migrationDecision!=="HOLD")process.exit(1);console.log("R93W_SIX_LEGACY_GAPS_STILL_OPEN")'
+      - name: Run R93W actual-source contract and HTTP unit QA
+        run: |
+          set -euo pipefail
+          node --check car02-r93w-durable-http-reservation-isolated.mjs
+          node --check test-car02-r93w-port-unit.mjs
+          node --check test-car02-r93w-http-composition.mjs
+          node --check test-car02-r93w-source-contract.mjs
+          node --check test-car02-r93w-real-pg17-http.mjs
+          node --test test-car02-r93w-port-unit.mjs test-car02-r93w-http-composition.mjs test-car02-r93w-source-contract.mjs | tee /tmp/car02-r93w-node.txt
+          grep -Fq 'R93W_APPROVED_SOURCE_GUARD_PASS' /tmp/car02-r93w-node.txt
+      - name: Preserve accepted R93V and R93S static regressions
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93v-idempotency-http.mjs test-car02-r93v-r93u-integration.mjs test-car02-r93v-source-contract.mjs
+          node --test test-car02-r93s-durable-intent.mjs test-car02-r93s-sql-contract.mjs
+      - name: Install temporary PostgreSQL driver without install scripts
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Initialize disposable PG17 fixture only
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r93w-base.txt
+          grep -Fxq R93R_DISPOSABLE_PG17_FIXTURE_READY /tmp/car02-r93w-base.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r93w-intents.txt
+          grep -Fxq R93S_DISPOSABLE_DURABLE_INTENT_SCHEMA_READY /tmp/car02-r93w-intents.txt
+      - name: Verify real HTTP through R93S PostgreSQL reserve transactions
+        env:
+          R93W_DISPOSABLE_DRIVER_QA: 'yes'
+          PGHOST: '127.0.0.1'
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93w-real-pg17-http.mjs | tee /tmp/car02-r93w-pg.txt
+          grep -Fq R93W_REAL_HTTP_TO_PG17_INTENT_PORT_PASS /tmp/car02-r93w-pg.txt
+      - name: Drop disposable PG17 test database and local QA results
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r93q_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r93q_qa_ci') THEN 'R93W_DISPOSABLE_DB_REMOVED' ELSE 'R93W_DB_NOT_REMOVED' END" | grep -Fx R93W_DISPOSABLE_DB_REMOVED
+          rm -f /tmp/car02-r93w-gates.json /tmp/car02-r93w-node.txt /tmp/car02-r93w-pg.txt /tmp/car02-r93w-base.txt /tmp/car02-r93w-intents.txt
+      - name: Verify no production writes or deploy authority
+        run: |
+          node --input-type=module <<'R93W_GUARD'
+          import {readFileSync} from 'node:fs';
+          const y=readFileSync('.github/workflows/car02-r93w-http-to-durable-pg17-isolated-qa.yml','utf8');
+          const name=['      - name: Verify no production','writes or deploy authority'].join(' ');
+          const pos=y.indexOf(name);
+          if(pos<0||y.indexOf(name,pos+name.length)!==-1||y.indexOf('\n      - name: ',pos+name.length)!==-1)
+           throw Error('R93W_GUARD_NOT_LAST');
+          const before=y.slice(0,pos);
+          const uses=[...before.matchAll(/^\s*uses:\s*(.+)$/gm)].map(z=>z[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+           /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+           /(?:^|\n)\s*environment\s*:/i,/\b(?:curl|wget)\s+.*(?:supabase|workers\.dev)/i,
+           /\b(?:npm\s+publish|git\s+push)\b/i];
+          if(uses.length!==1||uses[0]!=='actions/checkout@v5'||!before.includes('contents: read')||
+             forbidden.some(re=>re.test(before)))throw Error('R93W_UNSAFE_WORKFLOW');
+          console.log('R93W_NO_PRODUCTION_MUTATION_PASS');
+          R93W_GUARD
