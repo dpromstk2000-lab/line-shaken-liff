@@ -1,0 +1,54 @@
+name: DPRO CAR02 R93D Durable Cleanup Outbox Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93d-cleanup-outbox-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: only-for-ephemeral-github-runner
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout repository source (read only; no production secrets)
+        uses: actions/checkout@v5
+      - name: Validate original published release gates remain closed
+        run: |
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/r93d-release.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/r93d-release.json"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93D NO_GO and HOLD preserved")'
+      - name: Validate isolated worker syntax and SQL contract
+        run: |
+          node --check car02-r93d-cleanup-worker-isolated.mjs
+          node --check test-car02-r93d-cleanup-worker-isolated.mjs
+          node --check test-car02-r93d-sql-safety.mjs
+          node --test test-car02-r93d-cleanup-worker-isolated.mjs test-car02-r93d-sql-safety.mjs
+      - name: Preserve R93C policy security regressions
+        run: node --test test-car02-r93c-photo-cleanup-policy.mjs
+      - name: Exercise disposable PostgreSQL 17, never Supabase
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93D_DURABLE_CLEANUP_OUTBOX_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93D_OUTBOX_PG17_ASSERT_QA_ONLY.sql
+      - name: Re-run R83/R84 DB/photo and R85 staff isolation tests
+        run: |
+          node --test test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+          node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: Reaffirm never deploy from this workflow
+        run: |
+          node --input-type=module -e 'import fs from "node:fs";let x=fs.readFileSync(".github/workflows/car02-r93d-cleanup-outbox-isolated-qa.yml","utf8");if(/(^|\n)\s*deploy\s*:|wrangler deploy|supabase db push|supabase functions deploy/.test(x))process.exit(1);console.log("ISOLATED R93D: no deploy")'
+      - name: Remove local release evidence
+        if: always()
+        run: rm -f /tmp/r93d-release.json
