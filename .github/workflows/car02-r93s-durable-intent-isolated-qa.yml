@@ -1,0 +1,97 @@
+name: DPRO CAR02 R93S Durable Upload Intent Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93s-durable-intent-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout read-only approved sources
+        uses: actions/checkout@v5
+      - name: Verify R93Q and R93R approved baseline and release lock
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
+          test "$(git hash-object test-car02-r93r-real-pg-driver.mjs)" = fce3f79037d390ca192d8836c42e547b936c05b5
+          ! grep -Eq 'createR93SDurableUploadIntentQA|car02-r93s-durable-upload-intent' car02-private-photo-r47.mjs car02-unified-runtime-r50.mjs car02-edge-boundary-r51.mjs car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/car02-r93s-gates.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/car02-r93s-gates.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93S_NO_GO_HOLD_PASS")'
+      - name: Run R93S static QA and accepted R93Q/R93R static regressions
+        run: |
+          set -euo pipefail
+          node --check car02-r93s-durable-upload-intent-isolated.mjs
+          node --check test-car02-r93s-durable-intent.mjs
+          node --check test-car02-r93s-real-pg17-driver.mjs
+          node --check test-car02-r93s-sql-contract.mjs
+          node --test test-car02-r93s-durable-intent.mjs test-car02-r93s-sql-contract.mjs
+          node --test test-car02-r93r-driver-contract.mjs test-car02-r93q-single-schema-lifecycle.mjs test-car02-r93q-sql-contract.mjs
+      - name: Install isolated PostgreSQL driver without package scripts
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Initialize disposable PostgreSQL 17 only
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r93s-r93r-fixture.txt
+          grep -Fx R93R_DISPOSABLE_PG17_FIXTURE_READY /tmp/car02-r93s-r93r-fixture.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r93s-fixture.txt
+          grep -Fx R93S_DISPOSABLE_DURABLE_INTENT_SCHEMA_READY /tmp/car02-r93s-fixture.txt
+      - name: Run R93S actual Node PostgreSQL17 retry restart and concurrent driver QA
+        env:
+          R93S_DISPOSABLE_DRIVER_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93s-real-pg17-driver.mjs | tee /tmp/car02-r93s-driver-results.txt
+          grep -Fq 'R93S_REAL_PG17_DURABLE_INTENT_PASS' /tmp/car02-r93s-driver-results.txt
+      - name: Verify disposable DB removed and remove local files
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r93q_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r93q_qa_ci') THEN 'R93S_DISPOSABLE_DB_REMOVED' ELSE 'R93S_DB_LEAK' END" | grep -Fx R93S_DISPOSABLE_DB_REMOVED
+          rm -f /tmp/car02-r93s-gates.json /tmp/car02-r93s-r93r-fixture.txt /tmp/car02-r93s-fixture.txt /tmp/car02-r93s-driver-results.txt
+      - name: Verify no production writes secrets or deploy authority
+        run: |
+          node --input-type=module <<'R93S_GUARD'
+          import {readFileSync} from 'node:fs';
+          const source=readFileSync('.github/workflows/car02-r93s-durable-intent-isolated-qa.yml','utf8');
+          const own=['      - name: Verify no production','writes secrets or deploy authority'].join(' ');
+          const index=source.indexOf(own);
+          if(index<0||source.indexOf(own,index+own.length)!==-1||source.indexOf('\n      - name: ',index+own.length)!==-1)
+            throw Error('R93S_GUARD_MUST_BE_LAST');
+          const checked=source.slice(0,index);
+          const actions=[...checked.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:curl|wget)\s+.*(?:supabase|workers\.dev)/i];
+          if(actions.length!==1||actions[0]!=='actions/checkout@v5'||!checked.includes('contents: read')||
+             forbidden.some(re=>re.test(checked)))throw Error('R93S_UNSAFE_WORKFLOW');
+          console.log('R93S_NO_PRODUCTION_MUTATION_PASS');
+          R93S_GUARD
