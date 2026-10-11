@@ -18,7 +18,10 @@ export const R94B_SCHEMA_ACL_SQL = `
  ORDER BY schema_name,schema_owner,grantee,grantor,privilege_type,is_grantable`;
 
 export function normalizeR94BSchemaAcl(rows){
- assert.ok(Array.isArray(rows)&&rows.length>=2,'R94B_ACL_EMPTY_OR_MISSING');
+ // PostgreSQL can return one remaining privilege after a deliberate owner USAGE revoke.
+ // Accept that single row for validation, then FAIL CLOSED at R94B_OWNER_USAGE_MISSING.
+ // Truly empty ACLs remain invalid.
+ assert.ok(Array.isArray(rows)&&rows.length>0,'R94B_ACL_EMPTY_OR_MISSING');
  const a=rows.map(r=>{
   assert.equal(r.schema_name,'car02_r93q_qa','R94B_UNEXPECTED_SCHEMA');
   for(const name of ['schema_owner','grantee','grantor']){
