@@ -1,0 +1,45 @@
+name: DPRO CAR02 R93I R47 Compatibility Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93i-r47-compat-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout reviewed GitHub files without production credentials
+        uses: actions/checkout@v5
+      - name: Verify unchanged R47 production adapter and locked runtime
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          ! grep -Eq 'car02-r93i-r47-safe-bridge|createR93IIsolatedR47SafeBridge' car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs car02-private-photo-r47.mjs
+          node car02-integration-audit-r80.mjs >/tmp/r93i-release-gate.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/r93i-release-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93I_LOCKED_NO_GO_HOLD")'
+      - name: Validate R93I isolated bridge source and R93H provider
+        run: |
+          set -euo pipefail
+          node --check car02-r93i-r47-safe-bridge-isolated.mjs
+          node --check test-car02-r93i-r47-safe-bridge.mjs
+          node --check test-car02-r93i-compat-contract.mjs
+          node --input-type=module -e 'import{R93I_CONTRACT as c}from"./car02-r93i-r47-safe-bridge-isolated.mjs";if(c.productionReady!==false||c.liveWiring!==false||c.releaseDecision!=="NO_GO"||c.migrationDecision!=="HOLD"||c.r47LegacyStillUnchanged!==true)process.exit(1)'
+      - name: R93I R47 compatible surface and uncertainty compensation regression
+        run: node --test test-car02-r93i-r47-safe-bridge.mjs test-car02-r93i-compat-contract.mjs test-car02-r93h-upload-compensation.mjs test-car02-r93h-safety.mjs
+      - name: Preserve R93G tombstone and R93C through R93F regressions
+        run: node --test test-car02-r93g-photo-tombstone-policy.mjs test-car02-r93g-sql-contract.mjs test-car02-r93f-final-lease-fence.mjs test-car02-r93f-sql-safety.mjs test-car02-r93e-tombstone-binding.mjs test-car02-r93d-cleanup-worker-isolated.mjs test-car02-r93c-photo-cleanup-policy.mjs
+      - name: Preserve R82 R83 R84 and R85 isolation regressions
+        run: |
+          node --test test-car02-private-photo-upload-http-r82.mjs test-car02-photo-upload-regression-r82.mjs
+          node --test test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+          node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: Confirm no deploy, secrets or remote SQL actions
+        run: |
+          set -euo pipefail
+          grep -Fq 'contents: read' .github/workflows/car02-r93i-r47-compat-isolated-qa.yml
+          ! grep -Eq '^(  )?\s*environment:|\bwrangler deploy\b|\bsupabase db push\b|\bsupabase functions deploy\b' car02-r93i-r47-safe-bridge-isolated.mjs
+          node --input-type=module -e 'import{R93I_CONTRACT as c}from"./car02-r93i-r47-safe-bridge-isolated.mjs";if(c.deleteObjectImmediately!==false||c.requiresR93GSqlMigrationBeforeLive!==true||c.requiresRealAdapterReviewBeforeLive!==true)process.exit(1);console.log("R93I_NO_PRODUCTION_OPERATIONS")'
+      - name: Erase temporary QA gate record
+        if: always()
+        run: rm -f /tmp/r93i-release-gate.json
