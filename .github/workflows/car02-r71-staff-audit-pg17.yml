@@ -1,0 +1,49 @@
+name: DPRO CAR02 R71 Staff Audit PostgreSQL 17 QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r71-staff-audit-postgres17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: qa_only_local
+          POSTGRES_USER: postgres
+          POSTGRES_DB: car02_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d car02_qa"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: qa_only_local
+      PGDATABASE: car02_qa
+      CAR02_CI_EPHEMERAL_R71: '1'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated PostgreSQL client
+        run: npm install --no-save --ignore-scripts --no-audit pg@8
+      - name: Verify exact isolated QA inputs
+        shell: bash
+        run: |
+          for file in BASELINE_QA_ONLY.sql R13_MIGRATION_QA_ONLY.sql R46_STAFF_GRANTS_QA_ONLY.sql R70_STAFF_PERMISSION_AUDIT_QA_ONLY.sql car02-auth-providers-r46.mjs car02-staff-permissions-r70.mjs pg17-staff-audit-integration-r71.mjs; do
+            test -f "$file" || { echo "MISSING: $file"; exit 1; }
+          done
+          test "$PGDATABASE" = 'car02_qa'
+          test "$PGHOST" = '127.0.0.1'
+      - name: Run R71 staff audit on disposable PostgreSQL 17
+        run: node pg17-staff-audit-integration-r71.mjs
