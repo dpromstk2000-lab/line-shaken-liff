@@ -1,0 +1,86 @@
+name: DPRO CAR02 R93L PostgreSQL Atomic Compensation Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93l-pg-atomic-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93l-qa-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout reviewed QA sources read only
+        uses: actions/checkout@v5
+      - name: Keep R52 hard lock and R80 NO_GO HOLD
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/car02-r93l-gate.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/car02-r93l-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93L_NO_GO_HOLD_PASS")'
+      - name: Verify published R93K unchanged and R93L not wired
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-r93k-r83-repository-bridge-isolated.mjs)" = 492b2cf638489be03b5026398d44dc263c3b02f0
+          ! grep -Eq 'car02-r93l-pg-compensation|createR93LAtomicPgCompensationIsolated' car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs car02-private-photo-r47.mjs
+          node --check car02-r93l-pg-compensation-isolated.mjs
+          node --check test-car02-r93l-pg-compensation.mjs
+          node --check test-car02-r93l-r93k-bridge.mjs
+          node --check test-car02-r93l-sql-contract.mjs
+          node --input-type=module -e 'import{R93L_CONTRACT as x}from"./car02-r93l-pg-compensation-isolated.mjs";if(x.liveWiring!==false||x.productionReady!==false||x.migrationDecision!=="HOLD"||x.releaseDecision!=="NO_GO"||x.fullR83R93HLiveIntegrationComplete!==false)process.exit(1)'
+      - name: R93L transaction interface and R93K port integration tests
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93l-pg-compensation.mjs test-car02-r93l-r93k-bridge.mjs test-car02-r93l-sql-contract.mjs
+      - name: Preserve R93K compatibility regression tests
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93k-r83-repository-bridge.mjs test-car02-r93k-http-integration.mjs test-car02-r93k-source-contract.mjs
+          node --test test-car02-r93h-upload-compensation.mjs test-car02-r93h-safety.mjs test-car02-r93i-r47-safe-bridge.mjs test-car02-r93i-compat-contract.mjs test-car02-r93j-http-memory-pipeline.mjs test-car02-r93j-safety.mjs test-car02-pg-photo-repository-r83.mjs test-car02-private-photo-upload-http-r82.mjs test-car02-photo-upload-regression-r82.mjs
+      - name: Test real PostgreSQL 17 in a newly created disposable database only
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93l_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93l_qa_ci -v ON_ERROR_STOP=1 < R93L_PG17_ATOMIC_COMPENSATION_QA_ONLY.sql | tee /tmp/r93l-pg-result.txt
+          grep -Fx R93L_PG17_REAL_TRANSACTION_AND_ROLLBACK_PASS /tmp/r93l-pg-result.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93l_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93l_qa') IS NULL THEN 'R93L_ROLLBACK_CONFIRMED' ELSE 'R93L_SCHEMA_LEAK' END" | grep -Fx R93L_ROLLBACK_CONFIRMED
+      - name: Review-only workflow remains read-only and no deploy
+        run: |
+          node --input-type=module <<'R93L_GUARD'
+          import{readFileSync}from'node:fs';
+          const src=readFileSync('.github/workflows/car02-r93l-pg-atomic-compensation-isolated-qa.yml','utf8');
+          const own='      - name: '+['Review-only workflow remains','read-only and no deploy'].join(' ');
+          const pos=src.indexOf(own),end=src.indexOf('\n      - name: ',pos+own.length);
+          if(pos<0||end<0||src.indexOf(own,pos+own.length)!==-1)throw Error('R93L_GUARD_STRUCTURE');
+          const inspected=src.slice(0,pos)+src.slice(end+1);
+          const source=readFileSync('car02-r93l-pg-compensation-isolated.mjs','utf8');
+          const forbidden=[
+            /\bwrangler\s+deploy\b/i,
+            /\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,
+            /\bGITHUB_TOKEN\b/i,
+            /(?:^|\n)\s*environment\s*:/i,
+            /\bcontents\s*:\s*write\b/i,
+            /\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/,
+          ];
+          const actions=[...inspected.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          if(actions.length!==1||actions[0]!=='actions/checkout@v5'||
+             !inspected.includes('contents: read')||
+             forbidden.some(f=>f.test(inspected+'\n'+source)))throw Error('R93L_FORBIDDEN_LIVE_ACTION');
+          console.log('R93L_NO_PRODUCTION_MUTATIONS_PASS');
+          R93L_GUARD
+      - name: Remove temporary QA evidence
+        if: always()
+        run: rm -f /tmp/car02-r93l-gate.json /tmp/r93l-pg-result.txt
