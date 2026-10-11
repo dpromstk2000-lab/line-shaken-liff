@@ -1,0 +1,50 @@
+name: DPRO CAR02 R93T Pre-release Integration Gap Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93t-release-gaps-readonly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact approved source baseline as read-only
+        uses: actions/checkout@v5
+      - name: Verify production hard lock and source invariants
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node --check car02-r93t-release-readiness-audit.mjs
+          node --check car02-r93t-release-preflight.mjs
+          node --check test-car02-r93t-audit-unit.mjs
+          node --check test-car02-r93t-github-current-contract.mjs
+          node car02-r93t-release-preflight.mjs > /tmp/r93t-readiness-audit.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const a=JSON.parse(readFileSync("/tmp/r93t-readiness-audit.json","utf8"));if(a.releaseDecision!=="NO_GO"||a.migrationDecision!=="HOLD"||a.openCount!==6||a.unsafeCount!==0||a.integrationReady!==false)process.exit(1);console.log("R93T_SIX_PRE_RELEASE_GAPS_STILL_OPEN")'
+      - name: Test actual R47 R50 R51 R52 R82 R93Q R93S contract with no production traffic
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93t-audit-unit.mjs test-car02-r93t-github-current-contract.mjs
+          echo R93T_READONLY_SOURCE_AND_ROUTE_QA_PASS
+      - name: Clear temporary local QA report
+        if: always()
+        run: rm -f /tmp/r93t-readiness-audit.json
+      - name: Verify no production deploy authority in workflow
+        run: |
+          node --input-type=module <<'R93T_GUARD'
+          import {readFileSync} from 'node:fs';
+          const y=readFileSync('.github/workflows/car02-r93t-release-integration-gap-audit.yml','utf8');
+          const own=['      - name: Verify no production','deploy authority in workflow'].join(' ');
+          const at=y.indexOf(own);
+          if(at<0||y.indexOf(own,at+own.length)!==-1||y.indexOf('\n      - name: ',at+own.length)!==-1)
+            throw Error('R93T_GUARD_MUST_BE_LAST');
+          const checked=y.slice(0,at);
+          const uses=[...checked.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:curl|wget)\s+.*(?:supabase|workers\.dev)/i,
+            /\b(?:npm\s+publish|git\s+push)\b/i];
+          if(uses.length!==1||uses[0]!=='actions/checkout@v5'||
+            !checked.includes('contents: read')||forbidden.some(re=>re.test(checked)))
+             throw Error('R93T_WORKFLOW_NOT_READONLY');
+          console.log('R93T_NO_PRODUCTION_MUTATION_PASS');
+          R93T_GUARD
