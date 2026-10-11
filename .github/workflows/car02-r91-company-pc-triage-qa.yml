@@ -1,0 +1,38 @@
+name: DPRO CAR02 R91 Company PC Triage Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r91-company-pc-triage-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated QA source without production credentials
+        uses: actions/checkout@v5
+      - name: Validate required R89 R90 source and original CAR02 hard lock
+        run: |
+          test -f CAR02_R90_COMPANY_PC_RECORD.html
+          test -f car02-company-pc-record-r90.mjs
+          test -f car02-r89-acceptance-model.mjs
+          test -f car02-edge-entry-r52.ts
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Parse R91 scripts and all tests
+        run: |
+          node --check car02-r91-triage-model.mjs
+          node --check car02-r91-triage-app.mjs
+          node --check test-car02-r91-triage-model.mjs
+          node --check test-car02-r91-ui-safety.mjs
+      - name: New R91 offline review and tamper-rejection tests
+        run: node --test test-car02-r91-triage-model.mjs test-car02-r91-ui-safety.mjs
+      - name: R90 company-PC record roundtrip regression
+        run: node --test test-car02-r90-record.mjs test-car02-r90-ui-safety.mjs
+      - name: R89 company-PC checklist regression
+        run: node --test test-car02-r89-acceptance-model.mjs test-car02-r89-ui-safety.mjs
+      - name: Preserve R80 release NO_GO migration HOLD after R91
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/car02-r91-gate.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r91-gate.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R91 REVIEW ONLY: NO_GO / HOLD")'
+      - name: Delete temporary gate snapshot
+        if: always()
+        run: rm -f /tmp/car02-r91-gate.json
