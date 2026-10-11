@@ -1,0 +1,21 @@
+name: DPRO CAR02 R80 API Wiring NO-GO Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r80-integration-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout source without production credentials
+        uses: actions/checkout@v4
+      - name: R80 static wiring and fail-closed mutation tests
+        run: node --test test-car02-integration-audit-r80.mjs
+      - name: Produce review-only static findings
+        run: |
+          node car02-integration-audit-r80.mjs > r80-review-result.json
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync("r80-review-result.json","utf8"));if(r.staticEvidenceOk!==true||r.productionReady!==false||r.releaseDecision!=="NO_GO"||r.migrationDecision!=="HOLD"||r.blockers.length<7)process.exit(1);console.log("R80_PASS: static source review; NO_GO; integration gaps documented")'
+      - name: Remove generated review findings
+        if: always()
+        run: rm -f r80-review-result.json
