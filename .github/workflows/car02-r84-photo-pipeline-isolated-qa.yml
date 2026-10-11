@@ -1,0 +1,64 @@
+name: DPRO CAR02 R84 Photo Pipeline Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r84-photo-pipeline-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r84_disposable_ci_only_not_production
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout review-only source (no production secrets)
+        uses: actions/checkout@v5
+      - name: Ensure R84 is not wired into live R50 or R52
+        run: |
+          ! grep -Eq 'car02-photo-pipeline-isolated-r84|createCar02PhotoPipelineIsolatedR84' car02-unified-runtime-r50.mjs car02-edge-entry-r52.ts
+          grep -q 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          grep -q 'if(CAR02_RELEASE_LOCK)throw Error' car02-edge-entry-r52.ts
+      - name: Validate Node module syntax
+        run: |
+          node --check car02-photo-pipeline-isolated-r84.mjs
+          node --check test-car02-photo-pipeline-isolated-r84.mjs
+          node --check test-car02-r84-safety.mjs
+      - name: Test isolated R82-R47-R83 full simulated upload path
+        run: node --test test-car02-photo-pipeline-isolated-r84.mjs test-car02-r84-safety.mjs
+      - name: R83 concurrency and permission regression
+        run: node --test test-car02-pg-photo-repository-r83.mjs test-car02-r83-safety.mjs
+      - name: Create an ephemeral PostgreSQL 17 fixture
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE car02_r83_qa_ci;'
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r83_qa_ci -v ON_ERROR_STOP=1 < R83_PG17_QA_FIXTURE_ONLY.sql
+      - name: Re-run R83 PG17 tenant boundaries, locks and rollback QA
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d car02_r83_qa_ci -v ON_ERROR_STOP=1 < R83_PG17_QA_ASSERT.sql
+      - name: Verify production-named PG database is denied
+        run: |
+          if docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < R83_PG17_QA_FIXTURE_ONLY.sql > /tmp/r84-must-deny.txt 2>&1; then
+            echo 'R84 FAIL: production-named DB accepted isolated fixture'; exit 1
+          fi
+          grep -q 'CAR02_R83_ISOLATION_REQUIRED' /tmp/r84-must-deny.txt
+      - name: Prior R82, R47 and R48 regressions
+        run: |
+          node --test test-car02-private-photo-upload-http-r82.mjs test-car02-photo-upload-regression-r82.mjs \
+            test-car02-private-photo-r47.mjs test-car02-private-photo-view-r48.mjs
+      - name: Prior R80 and R81 release and identity regressions
+        run: |
+          node --test test-car02-integration-audit-r80.mjs test-car02-initial-owner-r81.mjs
+          node car02-integration-audit-r80.mjs > /tmp/r84-release.json
+          node --input-type=module -e 'import fs from "node:fs";const r=JSON.parse(fs.readFileSync("/tmp/r84-release.json","utf8"));if(r.staticEvidenceOk!==true||r.productionReady!==false||r.releaseDecision!=="NO_GO"||r.migrationDecision!=="HOLD")process.exit(1);console.log("R84 ISOLATED QA: NO_GO / HOLD retained")'
+      - name: Erase temporary QA results
+        if: always()
+        run: rm -f /tmp/r84-must-deny.txt /tmp/r84-release.json
