@@ -23,7 +23,7 @@ const fakeNetwork=async(url,opts={})=>{
  if(url===BASE+'/auth/v1/user'){
   identityChecks++;
   if(opts.headers?.Authorization!=='Bearer '+staffToken)throw Error('BAD_CI_STAFF');
-  return Response.json({id:S,aud:'authenticated'});
+  return Response.json({id:S,aud:'authenticated',is_anonymous:false});
  }
  if(url.startsWith(BASE+'/storage/v1/object/authenticated/ksh-car02-private-photos/')){
   storageReads++;

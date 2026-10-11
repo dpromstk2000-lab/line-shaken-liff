@@ -55,8 +55,9 @@ export function createSupabaseStaffTokenVerifierR46({supabaseUrl,anonKey,fetchIm
     // R69: a valid Supabase JWT alone is not sufficient for staff login.
     // Never authorize anonymous, deleted, or currently banned Auth users, even
     // when a stale CAR02 membership row still grants staff/owner rights.
-    if(user.is_anonymous===true || user.deleted_at)fail();
-    if(user.is_anonymous!==undefined && typeof user.is_anonymous!=='boolean')fail();
+    // R75: Only an explicit is_anonymous=false proves a non-anonymous staff identity.
+    // Missing, undefined, null or malformed flags must fail closed.
+    if(user.is_anonymous!==false || user.deleted_at)fail();
     if(user.banned_until!==undefined && user.banned_until!==null && user.banned_until!==''){
       if(typeof user.banned_until!=='string')fail();
       const until=Date.parse(user.banned_until);

@@ -62,9 +62,10 @@ test('R69 expired ban allows further authorization checks',async()=>{
   const x=makeVerifier({...profile,banned_until:new Date((NOW-60)*1000).toISOString()});
   assert.equal((await x.verify({accessToken:token})).sub,SUB);
 });
-test('R69 no optional fields maintains older Auth response compatibility',async()=>{
+test('R75 missing is_anonymous is rejected even when older Auth response omitted it',async()=>{
   const x=makeVerifier({id:SUB,aud:'authenticated'});
-  assert.equal((await x.verify({accessToken:token})).sub,SUB);
+  await assert.rejects(x.verify({accessToken:token}),/^Error: CAR02_IDENTITY_REJECTED$/);
+  assert.equal(x.calls(),1);
 });
 test('R69 banned profile rejected before membership lookup or DB query',async()=>{
   let db=0;

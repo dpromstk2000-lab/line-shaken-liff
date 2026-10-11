@@ -26,7 +26,7 @@ test('LINE verifier rejects network errors and bad HTTP status without leaking',
   await assert.rejects(lineVerifier(h)({idToken:'fake-line-token',clientId:CID}),/CAR02_IDENTITY_REJECTED/);
 });
 test('Supabase Auth verifies session using provider, not JWT payload alone',async()=>{
- const token=fakeJWT(claims);let n=0;const verify=staffVerifier(async(url,opts)=>{n++;assert.equal(url,'https://example.supabase.co/auth/v1/user');assert.equal(opts.headers.Authorization,'Bearer '+token);return reply({id:SUB,aud:'authenticated'})});
+ const token=fakeJWT(claims);let n=0;const verify=staffVerifier(async(url,opts)=>{n++;assert.equal(url,'https://example.supabase.co/auth/v1/user');assert.equal(opts.headers.Authorization,'Bearer '+token);return reply({id:SUB,aud:'authenticated',is_anonymous:false})});
  assert.deepEqual(await verify({accessToken:token}),{verified:true,sub:SUB,exp:3000});assert.equal(n,1);
 });
 test('Supabase Auth denies mismatched user ID even if provider returned 200',async()=>{
