@@ -2,6 +2,7 @@
 // Never connect to Supabase, existing studio data, or public Worker environments.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import {R94B_SCHEMA_ACL_SQL,normalizeR94BSchemaAcl} from './car02-r94b-schema-acl.mjs';
 import {createR93YInProcessStorageFixture,createR93YIsolatedStorageProtocol} from './car02-r93y-qa-storage-http-fixture.mjs';
 import {createCar02R94AFullStagingPipeline} from './car02-r94a-full-staging-pipeline-isolated.mjs';
 
@@ -50,8 +51,43 @@ async function snapshot(p){
  const {rows:funcs}=await p.query(`SELECT p.proname,pg_get_functiondef(p.oid) AS definition
  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname='car02_r93q_qa' ORDER BY p.proname`);
- const {rows:acls}=await p.query(`SELECT nspacl::text AS acl FROM pg_namespace WHERE nspname='car02_r93q_qa'`);
+ const acls=await snapshotAcl(p);
  return {tables,triggers,funcs,acls};
+}
+async function snapshotAcl(p){
+ const {rows}=await p.query(R94B_SCHEMA_ACL_SQL);
+ return normalizeR94BSchemaAcl(rows);
+}
+// Negative controls deliberately alter privileges ONLY inside a disposable DB transaction;
+// they prove the comparison detects privilege escalation and revocation. Always roll back.
+async function checkAclNegativeProbes(source,restored){
+ const baseline=await snapshotAcl(source);
+ const client=await restored.connect();
+ const checks=[
+  ['PUBLIC_USAGE_GRANT','GRANT USAGE ON SCHEMA car02_r93q_qa TO PUBLIC'],
+  ['OWNER_USAGE_REVOKE','REVOKE USAGE ON SCHEMA car02_r93q_qa FROM postgres']
+ ];
+ try{
+  for(const [name,sql] of checks){
+   await client.query('BEGIN');
+   try{
+    await client.query(sql);
+    // The comparison must fail on either changed rights or a missing owner right.
+    let rejected=false;
+    try{
+     const changed=await snapshotAcl(client); // uncommitted ACL is visible in this tx
+     assert.deepEqual(baseline,changed,`R94B_ACL_DIFFERENCE_${name}`);
+    }catch(error){
+     if(error.code==='ERR_ASSERTION' &&
+       (/R94B_ACL_DIFFERENCE_|R94B_OWNER_/.test(error.message)))rejected=true;
+     else throw error;
+    }
+    assert.ok(rejected,`R94B_ACL_NEGATIVE_UNDETECTED_${name}`);
+   }finally{await client.query('ROLLBACK');}
+  }
+ }finally{client.release();}
+ assert.deepEqual(await snapshotAcl(restored),baseline,'R94B_ACL_PROBE_LEFT_MUTATIONS');
+ console.log('R94B_ACL_NEGATIVE_2_2_PASS');
 }
 async function rejected(client,name,sql,params,sqlstates){
  await client.query('SAVEPOINT r94b_probe');
@@ -117,6 +153,7 @@ try{
   assert.equal(a.tables.cleanup_jobs.length,1);
   assert.deepEqual(a,b,'R94B_RESTORED_SCHEMA_DATA_OR_GUARDS_DIFFER');
   await checkInvariants(restored);
+  await checkAclNegativeProbes(source,restored);
   const after=await snapshot(restored);
   assert.deepEqual(after,b,'R94B_PROBES_MUTATED_RESTORED_DATA');
   console.log('R94B_DISPOSABLE_BACKUP_RESTORE_VERIFIED_PASS');
