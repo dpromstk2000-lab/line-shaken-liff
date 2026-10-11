@@ -1,0 +1,59 @@
+name: DPRO CAR02 R93J HTTP Memory Photo Integration Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93j-http-photo-isolated-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed code in read-only mode
+        uses: actions/checkout@v5
+      - name: Verify release NO_GO and database migration HOLD
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/car02-r93j-release-gate.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/car02-r93j-release-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93J_NO_GO_HOLD_PASS")'
+      - name: Verify upstream source identity and no production imports
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93i-r47-safe-bridge-isolated.mjs)" = dfac7fcccb33c0142075560d77486380894f8e18
+          test "$(git hash-object car02-r93h-upload-compensation-isolated.mjs)" = f0ea15a824a01119694b5231f6b1746978c6e0fd
+          ! grep -Eq 'car02-r93j-http-memory-pipeline|createR93JIsolatedHttpMemoryPipeline' car02-private-photo-r47.mjs car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs
+          node --check car02-r93j-http-memory-pipeline-isolated.mjs
+          node --check test-car02-r93j-http-memory-pipeline.mjs
+          node --check test-car02-r93j-safety.mjs
+          node --input-type=module -e 'import{R93J_CONTRACT as c}from"./car02-r93j-http-memory-pipeline-isolated.mjs";if(c.dbAccess!==false||c.networkAccess!==false||c.productionReady!==false||c.liveWiring!==false||c.releaseDecision!=="NO_GO"||c.migrationDecision!=="HOLD")process.exit(1);console.log("R93J_MEMORY_ONLY_PASS")'
+      - name: R93J HTTP integrated QA and R82 R93H R93I compatibility regressions
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93j-http-memory-pipeline.mjs test-car02-r93j-safety.mjs test-car02-private-photo-upload-http-r82.mjs test-car02-r93i-r47-safe-bridge.mjs test-car02-r93i-compat-contract.mjs test-car02-r93h-upload-compensation.mjs test-car02-r93h-safety.mjs
+      - name: Preserve established photo and staff authorization regression
+        run: |
+          set -euo pipefail
+          node --test test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+          node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: Confirm no deployment or production mutation step
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'R93J_GUARD'
+          import{readFileSync}from'node:fs';
+          const code=readFileSync('car02-r93j-http-memory-pipeline-isolated.mjs','utf8');
+          const workflow=readFileSync('.github/workflows/car02-r93j-http-photo-integration-isolated-qa.yml','utf8');
+          const own=['      - name: Confirm no',' deployment or production mutation step'].join('');
+          const offset=workflow.indexOf(own);
+          if(offset<0||workflow.indexOf(own,offset+own.length)>=0)process.exit(1);
+          const nextStep=workflow.indexOf('\n      - name: ',offset+own.length);
+          if(nextStep<0)process.exit(1);
+          const otherSteps=workflow.slice(0,offset)+workflow.slice(nextStep+1);
+          if(!otherSteps.includes('contents: read')||otherSteps.includes('contents: write')||!otherSteps.includes('actions/checkout@v5'))process.exit(1);
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+db\s+push\b/i,/\bsupabase\s+functions\s+deploy\b/i,/\bGITHUB_TOKEN\b/,/\bsecrets\s*\./,/\benvironment\s*:\s*production\b/i];
+          if(forbidden.some(x=>x.test(otherSteps+'\n'+code)))process.exit(1);
+          console.log('R93J_NO_DEPLOY_AND_NO_LIVE_CREDENTIALS_PASS');
+          R93J_GUARD
+      - name: Remove ephemeral QA read-only evidence
+        if: always()
+        run: rm -f /tmp/car02-r93j-release-gate.json
