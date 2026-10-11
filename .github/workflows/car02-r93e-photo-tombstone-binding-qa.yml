@@ -1,0 +1,49 @@
+name: DPRO CAR02 R93E Tombstone Identity Binding Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93e-photo-identity-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: only-for-ephemeral-github-runner
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Read reviewed source without production credentials
+        uses: actions/checkout@v5
+      - name: Confirm release lock and migration hold remain unchanged
+        run: |
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/r93e-readonly-gate.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/r93e-readonly-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93E NO_GO / HOLD preserved")'
+      - name: Confirm R93E is a new isolated module, not an R52 production import
+        run: |
+          node --check car02-r93e-tombstone-binding-isolated.mjs
+          node --check test-car02-r93e-tombstone-binding.mjs
+          test -f R93E_TOMBSTONE_IDENTITY_PG17_ASSERT_QA_ONLY.sql
+          node --input-type=module -e 'import {R93E_CONTRACT} from "./car02-r93e-tombstone-binding-isolated.mjs";if(R93E_CONTRACT.productionReady!==false||R93E_CONTRACT.liveWiring!==false||R93E_CONTRACT.releaseDecision!=="NO_GO"||R93E_CONTRACT.migrationDecision!=="HOLD")process.exit(1)'
+          ! grep -Eq 'car02-r93e-tombstone-binding|R93E' car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs
+      - name: R93E binding and R93C R93D regression tests
+        run: |
+          node --test test-car02-r93e-tombstone-binding.mjs test-car02-r93d-cleanup-worker-isolated.mjs test-car02-r93c-photo-cleanup-policy.mjs
+      - name: PostgreSQL 17 ephemeral photo tombstone binding assertions
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93D_DURABLE_CLEANUP_OUTBOX_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93E_TOMBSTONE_IDENTITY_PG17_ASSERT_QA_ONLY.sql
+      - name: Remove only ephemeral review evidence
+        if: always()
+        run: rm -f /tmp/r93e-readonly-gate.json
