@@ -1,0 +1,84 @@
+name: DPRO CAR02 R93P Unified Ready and Outbox Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93p-unified-ready-outbox-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93p-ci-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout isolated QA sources read only
+        uses: actions/checkout@v5
+      - name: Verify R93M R93N R93O unchanged and release gates closed
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-r93m-pg-photo-lifecycle-isolated.mjs)" = 1d844296ae0af12dac95391db07a4060d2fd49ff
+          test "$(git hash-object car02-r93n-ready-ack-reconcile-isolated.mjs)" = a349e870a96a22469274508465149200dceec26a
+          test "$(git hash-object car02-r93o-outbox-identity-guard-isolated.mjs)" = 9464ff6c4d58182fa22cad4151533371d678de1a
+          ! grep -Eq 'createR93PIsolatedReadyAckReconciler|car02-r93p-unified-commit-proof' car02-private-photo-r47.mjs car02-unified-runtime-r50.mjs car02-edge-boundary-r51.mjs car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/r93p-release-review.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/r93p-release-review.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93P_NO_GO_HOLD_PASS")'
+      - name: R93P integrated ready and outbox unit QA
+        run: |
+          set -euo pipefail
+          node --check car02-r93p-unified-commit-proof-isolated.mjs
+          node --check test-car02-r93p-unified-commit-proof.mjs
+          node --check test-car02-r93p-r93h-actual-upload-integration.mjs
+          node --check test-car02-r93p-sql-contract.mjs
+          node --input-type=module -e 'import{R93P_CONTRACT as c}from"./car02-r93p-unified-commit-proof-isolated.mjs";if(c.productionReady!==false||c.liveWiring!==false||c.releaseDecision!=="NO_GO"||c.migrationDecision!=="HOLD"||c.anyOutboxRowForPhotoBlocksReady!==true||c.proofRequiredAfterNormalAndLostAck!==true)process.exit(1);console.log("R93P_STRICT_RECHECK_PASS")'
+          node --test test-car02-r93p-unified-commit-proof.mjs test-car02-r93p-r93h-actual-upload-integration.mjs test-car02-r93p-sql-contract.mjs
+      - name: Preserve accepted R93M R93N R93O regressions
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93o-outbox-identity-guard.mjs test-car02-r93o-sql-contract.mjs
+          node --test test-car02-r93n-ready-ack-reconcile.mjs test-car02-r93n-r93h-actual-upload-integration.mjs test-car02-r93n-sql-safety.mjs
+          node --test test-car02-r93m-pg-photo-lifecycle.mjs test-car02-r93m-r93h-port-integration.mjs test-car02-r93m-sql-contract.mjs
+      - name: Verify R93P strict identity in disposable PostgreSQL 17
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93p_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93p_qa_ci -v ON_ERROR_STOP=1 < R93P_PG17_UNIFIED_READY_OUTBOX_QA_ONLY.sql | tee /tmp/r93p-pg-result.txt
+          grep -Fx R93P_PG17_UNIFIED_READY_AND_PHOTO_ID_OUTBOX_PASS /tmp/r93p-pg-result.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93p_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93p_qa') IS NULL THEN 'R93P_SCHEMA_CLEANED' ELSE 'R93P_SCHEMA_LEAK' END" | grep -Fx R93P_SCHEMA_CLEANED
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93o_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93o_qa_ci -v ON_ERROR_STOP=1 < R93O_PG17_OUTBOX_PHOTO_ID_VETO_QA_ONLY.sql | tee /tmp/r93p-r93o-result.txt
+          grep -Fx R93O_PG17_OUTBOX_PHOTO_ID_VETO_AND_ROLLBACK_PASS /tmp/r93p-r93o-result.txt
+      - name: Remove QA evidence
+        if: always()
+        run: rm -f /tmp/r93p-release-review.json /tmp/r93p-pg-result.txt /tmp/r93p-r93o-result.txt
+      - name: Verify isolated workflow has no write or deployment authority
+        run: |
+          node --input-type=module <<'R93P_GUARD'
+          import{readFileSync}from'node:fs';
+          const path='.github/workflows/car02-r93p-unified-ready-outbox-isolated-qa.yml';
+          const src=readFileSync(path,'utf8');
+          const marker=['      - name: Verify isolated workflow','has no write or deployment authority'].join(' ');
+          const pos=src.indexOf(marker);
+          if(pos<0||src.indexOf(marker,pos+marker.length)!==-1||src.indexOf('\n      - name: ',pos+marker.length)!==-1)
+            throw Error('R93P_GUARD_MUST_BE_LAST');
+          const checked=src.slice(0,pos);
+          const source=readFileSync('car02-r93p-unified-commit-proof-isolated.mjs','utf8');
+          const actions=[...checked.matchAll(/^\s*uses:\s*(.+)$/gm)].map(v=>v[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+           /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+           /(?:^|\n)\s*environment\s*:/i,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/];
+          if(actions.length!==1||actions[0]!=='actions/checkout@v5'||!checked.includes('contents: read')||
+             forbidden.some(re=>re.test(checked+'\n'+source)))throw Error('R93P_UNSAFE_WORKFLOW');
+          console.log('R93P_NO_PRODUCTION_MUTATION_PASS');
+          R93P_GUARD
