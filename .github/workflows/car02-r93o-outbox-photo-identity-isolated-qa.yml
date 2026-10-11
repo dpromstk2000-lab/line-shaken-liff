@@ -1,0 +1,78 @@
+name: DPRO CAR02 R93O Outbox Photo Identity Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93o-outbox-photo-identity-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93o-qa-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout isolated QA sources read only
+        uses: actions/checkout@v5
+      - name: Verify R93N fixed baseline and hard release gates
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-r93n-ready-ack-reconcile-isolated.mjs)" = a349e870a96a22469274508465149200dceec26a
+          test "$(git hash-object car02-r93m-pg-photo-lifecycle-isolated.mjs)" = 1d844296ae0af12dac95391db07a4060d2fd49ff
+          grep -Fq 'p.storage_path=$8' R93N_PG17_READY_ACK_RECONCILE_QA_ONLY.sql
+          ! grep -Eq 'car02-r93o-outbox-identity-guard|createR93OIsolatedOutboxIdentityGuard' car02-private-photo-r47.mjs car02-unified-runtime-r50.mjs car02-edge-boundary-r51.mjs car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs >/tmp/r93o-gates.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/r93o-gates.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93O_NO_GO_HOLD_PASS")'
+      - name: R93O new photo ID wide outbox veto unit tests
+        run: |
+          set -euo pipefail
+          node --check car02-r93o-outbox-identity-guard-isolated.mjs
+          node --check test-car02-r93o-outbox-identity-guard.mjs
+          node --check test-car02-r93o-sql-contract.mjs
+          node --test test-car02-r93o-outbox-identity-guard.mjs test-car02-r93o-sql-contract.mjs
+      - name: Preserve formally accepted R93N R93M regression
+        run: |
+          set -euo pipefail
+          node --test test-car02-r93n-ready-ack-reconcile.mjs test-car02-r93n-r93h-actual-upload-integration.mjs test-car02-r93n-sql-safety.mjs
+          node --test test-car02-r93m-pg-photo-lifecycle.mjs test-car02-r93m-r93h-port-integration.mjs test-car02-r93m-sql-contract.mjs
+      - name: Exercise disposable PostgreSQL 17 negative job identity cases
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93o_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93o_qa_ci -v ON_ERROR_STOP=1 < R93O_PG17_OUTBOX_PHOTO_ID_VETO_QA_ONLY.sql | tee /tmp/r93o-pg-results.txt
+          grep -Fx R93O_PG17_OUTBOX_PHOTO_ID_VETO_AND_ROLLBACK_PASS /tmp/r93o-pg-results.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93o_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93o_qa') IS NULL THEN 'R93O_ROLLBACK_CONFIRMED' ELSE 'R93O_SCHEMA_LEAK' END" | grep -Fx R93O_ROLLBACK_CONFIRMED
+      - name: Remove temporary QA evidence
+        if: always()
+        run: rm -f /tmp/r93o-gates.json /tmp/r93o-pg-results.txt
+      - name: Reaffirm workflow is limited to isolated review
+        run: |
+          node --input-type=module <<'R93O_GUARD'
+          import{readFileSync}from'node:fs';
+          const path='.github/workflows/car02-r93o-outbox-photo-identity-isolated-qa.yml';
+          const y=readFileSync(path,'utf8');
+          const own=['      - name: Reaffirm workflow','is limited to isolated review'].join(' ');
+          const marker=y.indexOf(own);
+          if(marker<0||y.indexOf(own,marker+own.length)!==-1||y.indexOf('\n      - name: ',marker+own.length)!==-1)
+            throw Error('R93O_GUARD_STRUCTURE');
+          const checked=y.slice(0,marker);
+          const source=readFileSync('car02-r93o-outbox-identity-guard-isolated.mjs','utf8');
+          const calls=[...checked.matchAll(/^\s*uses:\s*(.+)$/gm)].map(v=>v[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/];
+          if(calls.length!==1||calls[0]!=='actions/checkout@v5'||!checked.includes('contents: read')||
+            forbidden.some(p=>p.test(checked+'\n'+source)))throw Error('R93O_UNSAFE_WORKFLOW');
+          console.log('R93O_NO_PRODUCTION_MUTATION_PASS');
+          R93O_GUARD
