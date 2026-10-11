@@ -1,0 +1,55 @@
+name: DPRO CAR02 R93F Final Lease Fence Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93f-terminal-lease-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ephemeral-r93f-qa-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout read-only QA source
+        uses: actions/checkout@v5
+      - name: Preserve R52 hard lock and R80 NO_GO HOLD
+        run: |
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/car02-r93f-release-gate.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r93f-release-gate.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93F release NO_GO / DB HOLD preserved")'
+      - name: Ensure new QA module is not wired to production runtime
+        run: |
+          node --check car02-r93f-final-lease-fence-isolated.mjs
+          node --check test-car02-r93f-final-lease-fence.mjs
+          node --check test-car02-r93f-sql-safety.mjs
+          ! grep -Eq 'car02-r93f-final-lease-fence|R93F' car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs
+          node --input-type=module -e 'import {R93F_CONTRACT} from "./car02-r93f-final-lease-fence-isolated.mjs";if(R93F_CONTRACT.productionReady!==false||R93F_CONTRACT.liveWiring!==false||R93F_CONTRACT.releaseDecision!=="NO_GO"||R93F_CONTRACT.migrationDecision!=="HOLD")process.exit(1)'
+      - name: R93F new guards and R93C R93D R93E regression
+        run: |
+          node --test test-car02-r93f-final-lease-fence.mjs test-car02-r93f-sql-safety.mjs test-car02-r93e-tombstone-binding.mjs test-car02-r93d-cleanup-worker-isolated.mjs test-car02-r93c-photo-cleanup-policy.mjs
+      - name: Preserve R83 R84 photo isolation regression
+        run: node --test test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+      - name: Preserve R85 staff authorization regression
+        run: node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: Disposable PostgreSQL 17 only - no Supabase
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93D_DURABLE_CLEANUP_OUTBOX_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93D_OUTBOX_PG17_ASSERT_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93E_TOMBSTONE_IDENTITY_PG17_ASSERT_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93F_TERMINAL_LEASE_FENCE_PG17_ASSERT_QA_ONLY.sql
+      - name: Remove temporary non-secret review evidence
+        if: always()
+        run: rm -f /tmp/car02-r93f-release-gate.json
