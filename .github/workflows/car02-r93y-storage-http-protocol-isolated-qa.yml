@@ -1,0 +1,70 @@
+name: DPRO CAR02 R93Y Storage HTTP Protocol Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93y-http-storage-protocol-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout approved read-only QA sources
+        uses: actions/checkout@v5
+      - name: Check original production lock and approved source hashes
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93v-idempotency-http-bridge-isolated.mjs)" = c70e2be2d7d7d10261367b4b2e0baa3246dad53b
+          test "$(git hash-object car02-r93w-durable-http-reservation-isolated.mjs)" = 9d9d29e9c9ec3a6c2cbc5590f57a4345f34321c7
+          test "$(git hash-object car02-r93x-verified-storage-lifecycle-isolated.mjs)" = 8ee4a3a639431a1f1c54dfabe8192e4f70894381
+          test "$(git hash-object car02-r93x-pg-ready-port-isolated.mjs)" = fcd7772ef57aca33fea075e9027939cb9f38f8a1
+          node car02-r93t-release-preflight.mjs > /tmp/car02-r93y-gates.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const a=JSON.parse(readFileSync("/tmp/car02-r93y-gates.json","utf8"));if(a.releaseDecision!=="NO_GO"||a.migrationDecision!=="HOLD"||a.unsafeCount!==0)process.exit(1);console.log("R93Y_PRODUCTION_GATES_CLOSED_PASS")'
+      - name: Syntax checks and isolated Storage HTTP regression
+        run: |
+          set -euo pipefail
+          node --check car02-r93y-qa-storage-http-fixture.mjs
+          node --check test-car02-r93y-http-protocol.mjs
+          node --check test-car02-r93y-r93x-http-integration.mjs
+          node --check test-car02-r93y-contract.mjs
+          node --test test-car02-r93y-http-protocol.mjs test-car02-r93y-r93x-http-integration.mjs test-car02-r93y-contract.mjs test-car02-r93x-storage-unit.mjs test-car02-r93x-source-contract.mjs | tee /tmp/car02-r93y-tests.txt
+          grep -Fq '# tests 75' /tmp/car02-r93y-tests.txt
+          grep -Fq '# pass 75' /tmp/car02-r93y-tests.txt
+          grep -Fq '# fail 0' /tmp/car02-r93y-tests.txt
+          echo R93Y_IN_PROCESS_HTTP_CONTRACT_PASS
+      - name: Confirm no real Storage transport or production write authority
+        run: |
+          set -euo pipefail
+          test -z "$(grep -iE '\.supabase\.co|workers\.dev|serviceRoleKey|SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY' car02-r93y-qa-storage-http-fixture.mjs || true)"
+          grep -Fq "const ORIGIN='https://car02-storage-fixture.invalid'" car02-r93y-qa-storage-http-fixture.mjs
+          grep -Fq 'productionReady:false' car02-r93y-qa-storage-http-fixture.mjs
+          grep -Fq 'releaseDecision:' car02-r93y-qa-storage-http-fixture.mjs
+          echo R93Y_NO_REAL_STORAGE_NO_SECRETS_PASS
+      - name: Remove temporary local QA logs
+        if: always()
+        run: |
+          rm -f /tmp/car02-r93y-gates.json /tmp/car02-r93y-tests.txt
+      - name: Enforce final no-deploy read-only workflow guard
+        run: |
+          node --input-type=module <<'R93Y_FINAL_GUARD'
+          import {readFileSync} from 'node:fs';
+          const y=readFileSync('.github/workflows/car02-r93y-storage-http-protocol-isolated-qa.yml','utf8');
+          const mark=['      - name: Enforce final no-deploy',' read-only workflow guard'].join('');
+          const at=y.indexOf(mark);
+          if(at<0||y.indexOf(mark,at+mark.length)!==-1||y.indexOf('\n      - name: ',at+mark.length)!==-1)
+            throw Error('R93Y_GUARD_POSITION_INVALID');
+          const pre=y.slice(0,at);
+          const uses=[...pre.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+           /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+           /(?:^|\n)\s*environment\s*:/i,/\b(?:curl|wget)\s+.*(?:supabase|workers\.dev)/i,
+           /\b(?:git\s+push|npm\s+publish)\b/i];
+          if(uses.length!==1||uses[0]!=='actions/checkout@v5'||!pre.includes('contents: read')||
+             forbidden.some(x=>x.test(pre)))throw Error('R93Y_UNSAFE_WORKFLOW');
+          console.log('R93Y_NO_PRODUCTION_MUTATION_PASS');
+          R93Y_FINAL_GUARD
