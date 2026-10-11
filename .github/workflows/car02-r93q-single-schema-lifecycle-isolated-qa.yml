@@ -1,0 +1,73 @@
+name: DPRO CAR02 R93Q Single Schema Lifecycle Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93q-single-schema-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93q-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout QA sources with read-only repository permission
+        uses: actions/checkout@v5
+      - name: Preserve approved R93M and R93P and closed production gates
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-r93m-pg-photo-lifecycle-isolated.mjs)" = 1d844296ae0af12dac95391db07a4060d2fd49ff
+          test "$(git hash-object car02-r93p-unified-commit-proof-isolated.mjs)" = 36140ce9be0c5ba16e1e58e8ef0a386d8c44aca1
+          ! grep -Eq 'createR93QIsolatedPgPhotoLifecycle|car02-r93q-single-schema-lifecycle' car02-private-photo-r47.mjs car02-unified-runtime-r50.mjs car02-edge-boundary-r51.mjs car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/r93q-release.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/r93q-release.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93Q_NO_GO_HOLD_PASS")'
+      - name: Run R93Q single schema lifecycle and R93M and R93P regressions
+        run: |
+          set -euo pipefail
+          node --check car02-r93q-single-schema-lifecycle-isolated.mjs
+          node --check test-car02-r93q-single-schema-lifecycle.mjs
+          node --check test-car02-r93q-sql-contract.mjs
+          node --test test-car02-r93q-single-schema-lifecycle.mjs test-car02-r93q-sql-contract.mjs
+          node --test test-car02-r93m-pg-photo-lifecycle.mjs test-car02-r93m-r93h-port-integration.mjs test-car02-r93m-sql-contract.mjs
+          node --test test-car02-r93p-unified-commit-proof.mjs test-car02-r93p-r93h-actual-upload-integration.mjs test-car02-r93p-sql-contract.mjs
+      - name: Verify single disposable PostgreSQL 17 lifecycle and committed proof
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93Q_PG17_ONE_SCHEMA_LIFECYCLE_QA_ONLY.sql | tee /tmp/r93q-pg.txt
+          grep -Fx R93Q_PG17_ONE_SCHEMA_LIFECYCLE_FRESH_PROOF_AND_CLEANUP_PASS /tmp/r93q-pg.txt
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93q_qa') IS NULL THEN 'R93Q_SCHEMA_CLEANED' ELSE 'R93Q_SCHEMA_LEAK' END" | grep -Fx R93Q_SCHEMA_CLEANED
+      - name: Remove temporary isolated QA evidence
+        if: always()
+        run: rm -f /tmp/r93q-release.json /tmp/r93q-pg.txt
+      - name: Verify no production deploy or write authority
+        run: |
+          node --input-type=module <<'R93Q_GUARD'
+          import {readFileSync} from 'node:fs';
+          const y=readFileSync('.github/workflows/car02-r93q-single-schema-lifecycle-isolated-qa.yml','utf8');
+          const own=['      - name: Verify no production','deploy or write authority'].join(' ');
+          const pos=y.indexOf(own);
+          if(pos<0||y.indexOf(own,pos+own.length)!==-1||y.indexOf('\n      - name: ',pos+own.length)!==-1)
+            throw Error('R93Q_GUARD_MUST_BE_LAST');
+          const checked=y.slice(0,pos);
+          const source=readFileSync('car02-r93q-single-schema-lifecycle-isolated.mjs','utf8');
+          const calls=[...checked.matchAll(/^\s*uses:\s*(.+)$/gm)].map(x=>x[1].trim());
+          const forbidden=[/\bwrangler\s+deploy\b/i,/\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bsecrets\s*[.:]/i,/\bGITHUB_TOKEN\b/i,/\bcontents\s*:\s*write\b/i,
+            /(?:^|\n)\s*environment\s*:/i,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/];
+          if(calls.length!==1||calls[0]!=='actions/checkout@v5'||!checked.includes('contents: read')||
+             forbidden.some(re=>re.test(checked+'\n'+source)))throw Error('R93Q_UNSAFE_WORKFLOW');
+          console.log('R93Q_NO_PRODUCTION_MUTATION_PASS');
+          R93Q_GUARD
