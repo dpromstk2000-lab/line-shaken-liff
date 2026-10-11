@@ -1,0 +1,42 @@
+name: DPRO CAR02 R89 Company PC Checklist Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r89-checklist-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout review-only source without any production credentials
+        uses: actions/checkout@v5
+      - name: Verify correct R89 deployment-free file set
+        run: |
+          test -f CAR02_R89_STAFF_REVIEW.html
+          test -f car02-staff-review-app-r89.mjs
+          test -f car02-r89-acceptance-model.mjs
+          test -f test-car02-r89-acceptance-model.mjs
+          test -f test-car02-r89-ui-safety.mjs
+          test -f CAR02_R88_STAFF_REVIEW.html
+          test -f car02-staff-review-model-r86.mjs
+          test -f car02-edge-entry-r52.ts
+          test -f car02-unified-runtime-r50.mjs
+      - name: Syntax-check all R89 modules and isolated safety tests
+        run: |
+          node --check car02-staff-review-app-r89.mjs
+          node --check car02-r89-acceptance-model.mjs
+          node --check test-car02-r89-acceptance-model.mjs
+          node --check test-car02-r89-ui-safety.mjs
+      - name: Execute all R89 checklist and release safety tests
+        run: node --test test-car02-r89-acceptance-model.mjs test-car02-r89-ui-safety.mjs
+      - name: Preserve R87 and R88 user experience regression gates
+        run: |
+          node --test test-car02-r88-a11y-contract.mjs test-car02-r88-release-safety.mjs
+          node --test test-car02-r87-layout-contract.mjs test-car02-r87-model-regression.mjs
+      - name: Verify R79 and R80 hard NO-GO and HOLD plus unchanged R52 source
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/car02-r89-evidence.json
+          node --input-type=module -e 'import fs from "node:fs";const r=JSON.parse(fs.readFileSync("/tmp/car02-r89-evidence.json","utf8"));const edge=fs.readFileSync("car02-edge-entry-r52.ts","utf8");const uni=fs.readFileSync("car02-unified-runtime-r50.mjs","utf8");if(r.staticEvidenceOk!==true||r.productionReady!==false||r.releaseDecision!=="NO_GO"||r.migrationDecision!=="HOLD"||!edge.includes("const CAR02_RELEASE_LOCK=true")||uni.includes("car02-staff-review-app-r89.mjs"))process.exit(1);console.log("R89 PASS: isolated UI only; NO_GO and HOLD remain")'
+      - name: Erase review-only temporary JSON
+        if: always()
+        run: rm -f /tmp/car02-r89-evidence.json
