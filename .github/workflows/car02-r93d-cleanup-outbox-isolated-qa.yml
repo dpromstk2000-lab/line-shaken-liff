@@ -48,7 +48,37 @@ jobs:
           node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
       - name: Reaffirm never deploy from this workflow
         run: |
-          node --input-type=module -e 'import fs from "node:fs";let x=fs.readFileSync(".github/workflows/car02-r93d-cleanup-outbox-isolated-qa.yml","utf8");if(/(^|\n)\s*deploy\s*:|wrangler deploy|supabase db push|supabase functions deploy/.test(x))process.exit(1);console.log("ISOLATED R93D: no deploy")'
+          node --input-type=module <<'R93D_GUARD'
+          import {readFileSync} from 'node:fs';
+          const src = readFileSync('.github/workflows/car02-r93d-cleanup-outbox-isolated-qa.yml', 'utf8');
+          // Exclude this self-inspection block so forbidden-token examples cannot trigger a false positive.
+          const ownHeader = '      - name: ' + ['Reaffirm never', 'deploy from this workflow'].join(' ');
+          const afterHeader = '      - name: ' + ['Remove local release', 'evidence'].join(' ');
+          const start = src.indexOf(ownHeader);
+          // Exclude precisely this YAML step, stopping at the VERY NEXT step (not a later marker).
+          const next = src.slice(start + ownHeader.length).match(/\n      - name: /);
+          const end = next ? start + ownHeader.length + next.index : -1;
+          if (start < 0 || end <= start || src.indexOf(ownHeader, start + ownHeader.length) !== -1 ||
+              !src.slice(end + 1).startsWith(afterHeader + '\n'))
+            throw new Error('R93D_GUARD_STRUCTURE_INVALID');
+          const checked = src.slice(0, start) + src.slice(end);
+          const forbidden = [
+            /(?:^|\n)\s*(?:deploy|environment)\s*:/i,
+            /\bwrangler\s+deploy\b/i,
+            /\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/i,
+            /\bnpx\s+(?:wrangler|supabase)\b/i,
+            /\bsecrets\s*[.:]/i,
+            /\b(?:github\.token|GITHUB_TOKEN|GITHUB_PAT)\b/i
+          ];
+          const actions = checked.match(/^\s*uses:\s*.+$/gm) || [];
+          if (actions.length !== 1 || actions[0].trim() !== 'uses: actions/checkout@v5')
+            throw new Error('R93D_UNAPPROVED_ACTION');
+          if (forbidden.some(pattern => pattern.test(checked)))
+            throw new Error('R93D_FORBIDDEN_DEPLOY_STEP');
+          if (!checked.includes('contents: read') || checked.includes('contents: write'))
+            throw new Error('R93D_PERMISSIONS_CHANGED');
+          console.log('R93D isolated workflow guard PASS — no deploy commands, no secrets, no write permission');
+          R93D_GUARD
       - name: Remove local release evidence
         if: always()
         run: rm -f /tmp/r93d-release.json
