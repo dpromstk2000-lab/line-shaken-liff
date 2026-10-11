@@ -1,0 +1,40 @@
+{
+  "schema": "DPRO_CAR02_R93B_READONLY_EVIDENCE_V1",
+  "checkedAt": "2026-10-11T04:59:00Z",
+  "gitHead": "ce9013e05249240e25bc373ed3123d28ec9755c8",
+  "runId": 38112804868,
+  "pagesReadiness": "STATIC_PAGES_VERIFIED",
+  "testPass": 42,
+  "testFail": 0,
+  "sourceHashEvidence": {
+    "car02-edge-entry-r52.ts": "f0e31fb9f9d98524519d01dffd3489893d3d3302",
+    "car02-unified-runtime-r50.mjs": "76e4e8cae27599f27e3d887118148718c32ebb80",
+    "car02-edge-boundary-r51.mjs": "6614f2ed1933aa787576cb8074cb7d4bc704efa0",
+    "car02-initial-owner-r81.mjs": "61d61c503451511857a5b5c89adbc66f8b2ea6cc",
+    "car02-photo-pipeline-isolated-r84.mjs": "75282ba42c87debaf27c13d490bad6d80aa4e89b",
+    "car02-staff-access-http-r85.mjs": "1bd21520f3d17039af0415e34a7da13a92b3dcfd",
+    "car02-staff-permissions-r70.mjs": "f551977e831269bc3e31900b4cb71d0f8d1fa3fc",
+    "car02-private-photo-r47.mjs": "e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d",
+    "car02-pg-photo-repository-r83.mjs": "546b56e6dceddac767532d2309d4098d2feeed4c",
+    "R13_MIGRATION_QA_ONLY.sql": "5136872276b3403f036bae768410c937119398b2",
+    "R79_EVIDENCE_SNAPSHOT.json": "9dfb49832f738afd5e5cadfa421ddf9829d79ce6",
+    "car02-integration-audit-r80.mjs": "da751061b7e05bc74624307d55b593b4bb00caff",
+    "car02-r93-pages-readonly-audit.mjs": "188f066e9fb3bd96b0fd02b6f35cd97645196b19"
+  },
+  "baseline": {
+    "car02Tables": 0,
+    "car02PhotoBuckets": 0,
+    "liveBackupCompleted": false,
+    "separateRestoreVerified": false,
+    "releaseDecision": "NO_GO",
+    "migrationDecision": "HOLD_BACKUP_AND_RESTORE"
+  },
+  "verified": {
+    "releaseLockEnabled": true,
+    "staffHttpNotProductionWired": true,
+    "photoQaNotProductionWired": true,
+    "ownerBootstrapQaOnly": true,
+    "photoStorageSimulated": true,
+    "photoDbDisposable": true
+  }
+}
