@@ -1,0 +1,44 @@
+name: DPRO CAR02 R85 Staff Permission Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r85-staff-permission-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout review-only source with no privileged secrets
+        uses: actions/checkout@v5
+      - name: Prove existing R70 R50 R52 R51 and earlier release artifacts are present
+        run: |
+          test -f car02-staff-permissions-r70.mjs
+          test -f car02-unified-runtime-r50.mjs
+          test -f car02-edge-entry-r52.ts
+          test -f car02-edge-boundary-r51.mjs
+          test -f car02-initial-owner-r81.mjs
+          test -f car02-photo-pipeline-isolated-r84.mjs
+          test -f R79_EVIDENCE_SNAPSHOT.json
+      - name: Syntax-check isolated R85 implementation and tests
+        run: |
+          node --check car02-staff-access-http-r85.mjs
+          node --check test-car02-staff-access-http-r85.mjs
+          node --check test-car02-r85-r70-integration.mjs
+          node --check test-car02-r85-safety.mjs
+      - name: Test fail-closed HTTP boundary and full R70 transactional integration
+        run: node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs
+      - name: Enforce strict no-deploy release gate and locked canonical sources
+        run: node --test test-car02-r85-safety.mjs
+      - name: Regression-test R70 staff changes and R44/R46 server authentication
+        run: |
+          node --test test-car02-staff-permissions-r70.mjs test-car02-identity-r44.mjs test-car02-auth-providers-r46.mjs
+      - name: Regression-test R81 initial owner and R82-R84 photo security
+        run: |
+          node --test test-car02-initial-owner-r81.mjs test-car02-private-photo-upload-http-r82.mjs test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+      - name: Retain R80 release decision as NO_GO and migration as HOLD
+        run: |
+          node car02-integration-audit-r80.mjs > /tmp/car02-r85-gates.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r85-gates.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R85 PASS review-only; production NO_GO; DB migration HOLD")'
+      - name: Remove temporary release review result
+        if: always()
+        run: rm -f /tmp/car02-r85-gates.json
