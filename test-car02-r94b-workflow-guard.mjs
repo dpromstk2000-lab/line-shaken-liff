@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {verifyR94BWorkflow,EXPECTED_STEPS} from './car02-r94b-workflow-readonly-guard.mjs';
+const file=readFileSync('.github/workflows/car02-r94b-disposable-backup-restore-qa.yml','utf8');
+const bad=(patch,msg)=>assert.throws(()=>verifyR94BWorkflow(patch(file)),msg?new RegExp(msg):undefined);
+test('R94B: approved disposable manual workflow',()=>{
+ const res=verifyR94BWorkflow(file);
+ assert.equal(res.ok,true);assert.equal(res.steps,EXPECTED_STEPS.length);
+ assert.equal(res.releaseDecision,'NO_GO');assert.equal(res.migrationDecision,'HOLD');
+});
+test('R94B: refuse production database in pg_dump command',()=>bad(x=>x.replace('pg_dump -U postgres -d car02_r93q_qa_ci','pg_dump -U postgres -d production'),'R94B_MISSING_DISPOSABLE_DUMP'));
+test('R94B: refuse production restore destination',()=>bad(x=>x.replace('pg_restore -U postgres -d car02_r94b_restore_ci','pg_restore -U postgres -d production'),'R94B_MISSING_DISTINCT_RESTORE'));
+test('R94B: refuse write permission',()=>bad(x=>x.replace('contents: read','contents: write')));
+test('R94B: refuse deployment commands',()=>bad(x=>x.replace('echo R94B_NO_PRODUCTION_MUTATION_PASS','wrangler deploy')));
+test('R94B: refuse secrets access',()=>bad(x=>x.replace('echo R94B_NO_PRODUCTION_MUTATION_PASS','echo ${{ secrets.SUPABASE_KEY }}')));
+test('R94B: refuse arbitrary external calls',()=>bad(x=>x.replace('echo R94B_NO_PRODUCTION_MUTATION_PASS','curl https://example.com')));
+test('R94B: refuse auto triggers',()=>bad(x=>x.replace('  workflow_dispatch:', '  workflow_dispatch:\n  push:')));
+test('R94B: refuse appended malicious workflow step',()=>bad(x=>x.concat('\n      - name: Hidden new step\n        run: echo hidden\n')));
+test('R94B: refuse removing restore verification',()=>bad(x=>x.replace('R94B_DISPOSABLE_BACKUP_RESTORE_VERIFIED_PASS','RESTORE_NOT_CHECKED')));
+test('R94B: refuse removing artifact cleanup',()=>bad(x=>x.replace('rm -f /tmp/car02-r94b-disposable.dump','true # dump remains')));
+test('R94B: refuse removing DB cleanup',()=>bad(x=>x.replace(/R94B_DISPOSABLE_DBS_REMOVED/g,'R94B_DB_LEAK_UNCHECKED')));
+test('R94B: refuse no always-cleanup',()=>bad(x=>x.replace('if: always()','if: success()')));
+test('R94B: refuse wrong Postgres version',()=>bad(x=>x.replace('image: postgres:17','image: postgres:16')));
+test('R94B: refuse disabling source hard lock check',()=>bad(x=>x.replace('CAR02_RELEASE_LOCK=true','CAR02_RELEASE_LOCK=false')));
+test('R94B: refuse switching to non-atomic restore',()=>bad(x=>x.replace('--exit-on-error --single-transaction','--exit-on-error')));
