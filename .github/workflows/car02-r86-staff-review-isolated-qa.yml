@@ -1,0 +1,40 @@
+name: DPRO CAR02 R86 Staff Management UI Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r86-staff-ui-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout review-only repository; no production credentials
+        uses: actions/checkout@v5
+      - name: Verify R86 bundle and pre-existing release safeguards exist
+        run: |
+          test -f CAR02_R86_STAFF_REVIEW.html
+          test -f car02-staff-review-app-r86.mjs
+          test -f car02-staff-review-model-r86.mjs
+          test -f car02-staff-access-http-r85.mjs
+          test -f car02-edge-entry-r52.ts
+          test -f car02-unified-runtime-r50.mjs
+          test -f R79_EVIDENCE_SNAPSHOT.json
+      - name: Check R86 JS and test syntax
+        run: |
+          node --check car02-staff-review-app-r86.mjs
+          node --check car02-staff-review-model-r86.mjs
+          node --check test-car02-staff-review-model-r86.mjs
+          node --check test-car02-staff-review-contract-r86.mjs
+          node --check test-car02-r86-safety.mjs
+      - name: Prove isolated UI is local-only, pinned, and passes real R85 contract
+        run: node --test test-car02-staff-review-model-r86.mjs test-car02-staff-review-contract-r86.mjs test-car02-r86-safety.mjs
+      - name: Repeat R85 authorization boundary and transactional regressions
+        run: node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: Repeat R81 owner identity and R80 NO-GO evidence
+        run: |
+          node --test test-car02-initial-owner-r81.mjs test-car02-integration-audit-r80.mjs
+          node car02-integration-audit-r80.mjs > /tmp/car02-r86-release-review.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r86-release-review.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R86 UI QA ONLY — NO_GO / HOLD retained");'
+      - name: Remove temporary release evidence file
+        if: always()
+        run: rm -f /tmp/car02-r86-release-review.json
