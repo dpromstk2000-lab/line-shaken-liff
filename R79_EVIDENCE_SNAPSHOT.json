@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-11",
+  "operation": "READ_ONLY_METADATA_AGGREGATES",
+  "project_id": "cbknucemarcpbscirzyv",
+  "project_name": "liff-salon-reserve",
+  "project_status": "ACTIVE_HEALTHY",
+  "region": "ap-northeast-1",
+  "postgres_version": "17.6",
+  "database_bytes": 166907027,
+  "public_tables": 1396,
+  "baseline_tables_present": 4,
+  "expected_shop_rows": 1,
+  "auth_tables": 27,
+  "storage_tables": 8,
+  "installed_extensions": 10,
+  "storage_buckets_total": 47,
+  "storage_buckets_public": 9,
+  "storage_buckets_private": 38,
+  "storage_objects_metadata_records": 34,
+  "auth_users_aggregate_count": 6,
+  "car02_tables": 0,
+  "car02_functions": 0,
+  "car02_triggers": 0,
+  "car02_photo_bucket_count": 0,
+  "supabase_builtin_roles": 3,
+  "r75_gitHub_QA": {
+    "automated": 349,
+    "pg17": 61,
+    "pass": true
+  },
+  "r76_gitHub_restore_QA": {
+    "isolated": true,
+    "checks_passed": 6,
+    "checks_total": 6
+  },
+  "live_backup_completed": false,
+  "separate_production_restore_verified": false,
+  "release_decision": "NO_GO",
+  "migration_decision": "HOLD_BACKUP_AND_RESTORE",
+  "note": "Aggregate census only. Counts vary over time. No personal/customer/secret row values were accessed or saved.",
+  "edge_stage": {
+    "slug": "dpro-car02-stage",
+    "status": "ACTIVE",
+    "version": 2,
+    "CAR02_RELEASE_LOCK": true,
+    "contracted": false,
+    "goLiveApproved": false
+  }
+}
