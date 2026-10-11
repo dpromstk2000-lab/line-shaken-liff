@@ -1,0 +1,42 @@
+name: DPRO CAR02 R76 Backup Restore PostgreSQL 17 QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r76-backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: qa_only_local
+          POSTGRES_DB: car02_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d car02_qa"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: qa_only_local
+      PGDATABASE: car02_qa
+    steps:
+      - name: Checkout reviewed repository code
+        uses: actions/checkout@v4
+      - name: Confirm R76 files and isolation guard
+        run: |
+          test -f car02-r76-backup-restore-qa.sh
+          test -f car02-r76-database-manifest.sql
+          bash -n car02-r76-backup-restore-qa.sh
+          test "${PGHOST}" = '127.0.0.1'
+          test "${PGDATABASE}" = 'car02_qa'
+      - name: Run PostgreSQL 17 custom backup and disposable restore rehearsal
+        shell: bash
+        run: bash car02-r76-backup-restore-qa.sh
