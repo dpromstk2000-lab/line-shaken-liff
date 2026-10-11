@@ -1,0 +1,56 @@
+name: DPRO CAR02 R93BC Release Gaps and Cleanup Policy Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93bc-release-safety-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout read-only source without secrets
+        uses: actions/checkout@v5
+      - name: Verify original R93 evidence and source hashes against current GitHub files
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const ev=JSON.parse(readFileSync('R93B_SOURCE_EVIDENCE.json','utf8'));
+          let verified=0;
+          for(const [path,expected] of Object.entries(ev.sourceHashEvidence)){
+            const actual=execFileSync('git',['hash-object',path],{encoding:'utf8'}).trim();
+            if(actual!==expected)throw Error('R93BC_SOURCE_DRIFT: '+path);
+            verified++;
+          }
+          if(verified!==13)throw Error('R93BC_SOURCE_COUNT_INVALID');
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          const runtime=readFileSync('car02-unified-runtime-r50.mjs','utf8');
+          if(!entry.includes('const CAR02_RELEASE_LOCK=true'))throw Error('R93BC_RELEASE_UNLOCKED');
+          for(const forbidden of ['car02-staff-access-http-r85','car02-photo-pipeline-isolated-r84','car02-r93c-photo-cleanup-policy']){
+            if(runtime.includes(forbidden)||entry.includes(forbidden))throw Error('R93BC_UNAPPROVED_PRODUCTION_WIRING');
+          }
+          console.log('13 pinned GitHub blobs verified / R52 hard lock on / no production wiring');
+          NODE
+      - name: JavaScript syntax check (R93B and R93C only)
+        run: |
+          node --check car02-r93b-gate-evaluator.mjs
+          node --check car02-r93c-photo-cleanup-policy.mjs
+          node --check test-car02-r93b-gate-evaluator.mjs
+          node --check test-car02-r93c-photo-cleanup-policy.mjs
+      - name: 87 new read-only safety policy tests
+        run: node --test test-car02-r93b-gate-evaluator.mjs test-car02-r93c-photo-cleanup-policy.mjs
+      - name: Keep R83 and R84 photo isolation regressions
+        run: node --test test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+      - name: Keep R85 staff permission isolation regressions
+        run: node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs
+      - name: No GO, no migration, no DB or Worker mutation
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {evaluateR93BGates} from './car02-r93b-gate-evaluator.mjs';
+          const v=JSON.parse(readFileSync('R93B_SOURCE_EVIDENCE.json','utf8'));
+          const report=evaluateR93BGates(v);
+          if(report.productionReady!==false||report.releaseDecision!=='NO_GO'||report.migrationDecision!=='HOLD'||report.blockedCount!==8)
+            throw Error('R93BC_UNSAFE_RESULT');
+          console.log('R93BC REVIEW_ONLY: 8 production blockers / release NO_GO / migration HOLD');
+          NODE
