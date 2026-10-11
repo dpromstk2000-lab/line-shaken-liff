@@ -1,0 +1,58 @@
+name: DPRO CAR02 R93H Upload Failure Compensation Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r93h-upload-compensation-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93h-qa-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Read-only checkout of reviewed sources
+        uses: actions/checkout@v5
+      - name: Preserve CAR02 release lock and migration HOLD
+        run: |
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-integration-audit-r80.mjs > /tmp/r93h-release.json
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const x=JSON.parse(readFileSync("/tmp/r93h-release.json","utf8"));if(!x.staticEvidenceOk||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R93H_RELEASE_LOCK_AND_HOLD_PASS")'
+      - name: Verify R93H has no production wiring
+        run: |
+          node --check car02-r93h-upload-compensation-isolated.mjs
+          node --check test-car02-r93h-upload-compensation.mjs
+          node --check test-car02-r93h-safety.mjs
+          ! grep -Eq 'car02-r93h-upload-compensation|R93H' car02-edge-entry-r52.ts car02-edge-boundary-r51.mjs car02-unified-runtime-r50.mjs
+          grep -Fq 'if(uploadWasAccepted)await deleteObject(path);' car02-private-photo-r47.mjs
+          node --input-type=module -e 'import{R93H_CONTRACT as c}from"./car02-r93h-upload-compensation-isolated.mjs";if(c.liveWiring!==false||c.productionReady!==false||c.releaseDecision!=="NO_GO"||c.migrationDecision!=="HOLD")process.exit(1);console.log("R93H_REVIEW_ONLY_AND_R47_PENDING_REPLACEMENT")'
+      - name: R93H uncertainty compensation and security regression
+        run: node --test test-car02-r93h-upload-compensation.mjs test-car02-r93h-safety.mjs
+      - name: Prior R93G and R93C to R93F security regressions
+        run: |
+          node --test test-car02-r93g-photo-tombstone-policy.mjs test-car02-r93g-sql-contract.mjs test-car02-r93f-final-lease-fence.mjs test-car02-r93f-sql-safety.mjs test-car02-r93e-tombstone-binding.mjs test-car02-r93d-cleanup-worker-isolated.mjs test-car02-r93c-photo-cleanup-policy.mjs
+      - name: Prior R83 R84 private photo and R85 staff regressions
+        run: |
+          node --test test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+          node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+      - name: PostgreSQL 17 isolated upload rollback and R93G atomic outbox
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93H_UPLOAD_UNCERTAIN_ATOMIC_COMPENSATION_PG17_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93h_qa') IS NULL THEN 'R93H_ROLLBACK_CONFIRMED' ELSE 'R93H_SCHEMA_LEAK' END" | grep -Fx R93H_ROLLBACK_CONFIRMED
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < R93G_PHOTO_TOMBSTONE_ATOMIC_OUTBOX_PG17_QA_ONLY.sql
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -Atqc "SELECT CASE WHEN to_regnamespace('car02_r93g_qa') IS NULL THEN 'R93G_ROLLBACK_CONFIRMED' ELSE 'R93G_SCHEMA_LEAK' END" | grep -Fx R93G_ROLLBACK_CONFIRMED
+      - name: Clear ephemeral release evidence
+        if: always()
+        run: rm -f /tmp/r93h-release.json
