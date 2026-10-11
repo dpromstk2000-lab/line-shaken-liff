@@ -1,0 +1,42 @@
+name: DPRO CAR02 R87 Mobile and Preview History Isolated QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r87-mobile-preview-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout without production credentials
+        uses: actions/checkout@v5
+      - name: Verify expected R87 files and original R86 model
+        run: |
+          test -f CAR02_R87_STAFF_REVIEW.html
+          test -f car02-staff-review-app-r87.mjs
+          test -f test-car02-r87-layout-contract.mjs
+          test -f test-car02-r87-model-regression.mjs
+          test -f CAR02_R86_STAFF_REVIEW.html
+          test -f car02-staff-review-model-r86.mjs
+          test -f car02-edge-entry-r52.ts
+          test -f R79_EVIDENCE_SNAPSHOT.json
+      - name: Syntax-check safe R87 preview
+        run: |
+          node --check car02-staff-review-app-r87.mjs
+          node --check test-car02-r87-layout-contract.mjs
+          node --check test-car02-r87-model-regression.mjs
+      - name: R87 mobile layout security and preview-history contract
+        run: node --test test-car02-r87-layout-contract.mjs test-car02-r87-model-regression.mjs
+      - name: Retain R86 UI, R85 staff, R81 owner regressions
+        run: |
+          node --test test-car02-staff-review-model-r86.mjs test-car02-staff-review-contract-r86.mjs test-car02-r86-safety.mjs
+          node --test test-car02-staff-access-http-r85.mjs test-car02-r85-r70-integration.mjs test-car02-r85-safety.mjs
+          node --test test-car02-initial-owner-r81.mjs
+      - name: Retain R82 R83 R84 photo security and R80 NO-GO gate
+        run: |
+          node --test test-car02-private-photo-upload-http-r82.mjs test-car02-pg-photo-repository-r83.mjs test-car02-photo-pipeline-isolated-r84.mjs
+          node car02-integration-audit-r80.mjs > /tmp/car02-r87-no-go-check.json
+          node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/car02-r87-no-go-check.json","utf8"));if(x.staticEvidenceOk!==true||x.productionReady!==false||x.releaseDecision!=="NO_GO"||x.migrationDecision!=="HOLD")process.exit(1);console.log("R87 NO_GO + HOLD + isolated UI review only")'
+      - name: Remove temporary QA findings
+        if: always()
+        run: rm -f /tmp/car02-r87-no-go-check.json
