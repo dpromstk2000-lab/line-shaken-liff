@@ -1,0 +1,40 @@
+name: DPRO CAR02 R98 Offline Order Intake Worksheet QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r98-offline-order-intake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Checkout read-only main
+        uses: actions/checkout@v5
+      - name: Confirm immutable release lock and source baseline
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-r97-readonly-preflight.mjs > /tmp/car02-r98-baseline.json
+          grep -Fq '"releaseDecision": "NO_GO"' /tmp/car02-r98-baseline.json
+          grep -Fq '"migrationDecision": "HOLD"' /tmp/car02-r98-baseline.json
+      - name: Run R94B through R98 offline regression suite
+        run: |
+          set -euo pipefail
+          node --check car02-r98-intake-model.mjs
+          node --check car02-r98-intake-browser.mjs
+          node --check car02-r98-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs | tee /tmp/car02-r98-tests.log
+          grep -Fq '# fail 0' /tmp/car02-r98-tests.log
+      - name: Run R97 preflight and R98 workflow safety audit
+        run: |
+          set -euo pipefail
+          node car02-r98-workflow-guard.mjs
+          node car02-r97-readonly-preflight.mjs > /tmp/car02-r98-gates.json
+          grep -Fq 'R97_PRODUCT_READINESS_SOURCE_ONLY_NO_GO_HOLD_PASS' /tmp/car02-r98-gates.json
+          echo R98_PRODUCT_WORKSHEET_LOCAL_QA_PASS
+      - name: Final production lock assertion
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-r98-workflow-guard.mjs
+          echo R98_RELEASE_NO_GO_MIGRATION_HOLD
