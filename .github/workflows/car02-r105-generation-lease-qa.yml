@@ -1,0 +1,96 @@
+name: DPRO CAR02 R105 Disposable Generation Lease QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r105-disposable-generation-lease:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout immutable reviewed sources
+        uses: actions/checkout@v5
+      - name: Verify protected source hashes and release lock
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-r97-readonly-preflight.mjs > /tmp/car02-r105-preflight.log
+          grep -Fq 'R97_PRODUCT_READINESS_SOURCE_ONLY_NO_GO_HOLD_PASS' /tmp/car02-r105-preflight.log
+      - name: Run R94B through R105 offline regression
+        run: |
+          set -euo pipefail
+          node --check car02-r105-generation-lease-isolated.mjs
+          node --check car02-r105-pg17-lease-qa.mjs
+          node --check car02-r105-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs test-car02-r99-upload-boundary.mjs test-car02-r100-tenant-rls-qa.mjs test-car02-r101-session-reuse-qa.mjs test-car02-r102-early-ingress.mjs test-car02-r103-recovery-worker.mjs test-car02-r104-fenced-recovery.mjs test-car02-r105-generation-lease.mjs | tee /tmp/car02-r105-tests.log
+          grep -Fq '# fail 0' /tmp/car02-r105-tests.log
+          node car02-r105-workflow-guard.mjs
+      - name: Install isolated PostgreSQL driver
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Prepare disposable PG17 photo, intent, receipt and generation schemas
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r105-r93r.log
+          grep -Fxq R93R_DISPOSABLE_PG17_FIXTURE_READY /tmp/car02-r105-r93r.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r105-r93s.log
+          grep -Fxq R93S_DISPOSABLE_DURABLE_INTENT_SCHEMA_READY /tmp/car02-r105-r93s.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R103_PG17_CLEANUP_RECEIPTS_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r105-r103.log
+          grep -Fxq R103_DISPOSABLE_RECEIPTS_READY /tmp/car02-r105-r103.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R105_PG17_LEASE_GENERATION_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r105-schema.log
+          grep -Fxq R105_DISPOSABLE_GENERATION_FIXTURE_READY /tmp/car02-r105-schema.log
+      - name: Challenge stale generation takeover and receipt finalization
+        env:
+          R105_DISPOSABLE_GENERATION_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node car02-r105-pg17-lease-qa.mjs | tee /tmp/car02-r105-driver.log
+          grep -Fxq R105_PARALLEL_CLAIM_SINGLE_OWNER_PASS /tmp/car02-r105-driver.log
+          grep -Fxq R105_TENANT_AND_TOKEN_FORGERY_DENIED_PASS /tmp/car02-r105-driver.log
+          grep -Fxq R105_EXPIRED_OLD_WORKER_CANNOT_OVERWRITE_PASS /tmp/car02-r105-driver.log
+          grep -Fxq R105_RETRY_TO_TERMINAL_DONE_PASS /tmp/car02-r105-driver.log
+          grep -Fxq R105_MISSING_OBJECT_IDEMPOTENT_RECOVERY_PASS /tmp/car02-r105-driver.log
+          grep -Fxq R105_DISPOSABLE_GENERATION_LEASE_QA_PASS /tmp/car02-r105-driver.log
+      - name: Always remove disposable DB and logs
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r93q_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r93q_qa_ci') THEN 'R105_DISPOSABLE_DB_REMOVED' ELSE 'R105_DB_LEAK' END" | grep -Fxq R105_DISPOSABLE_DB_REMOVED
+          rm -f /tmp/car02-r105-*.log
+      - name: Confirm NO_GO and HOLD
+        run: |
+          set -euo pipefail
+          node car02-r105-workflow-guard.mjs
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R105_PRODUCTION_NO_GO_MIGRATION_HOLD
