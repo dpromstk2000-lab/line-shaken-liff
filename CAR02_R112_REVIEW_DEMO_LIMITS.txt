@@ -1,0 +1,21 @@
+DPRO CAR02 R112 — Japanese readonly demo for quarantined photo cleanup inbox, 2026-10-12.
+STATUS: SYNTHETIC OFFLINE DEMO. NO PRODUCTION CONNECTION. NO CUSTOMER RECORDS.
+R111: GitHub Actions #1 SUCCESS 403/403: https://github.com/dpromstk2000-lab/line-shaken-liff/actions/runs/38211449610
+
+THE DEMO:
+- Displays precisely the R111 PUBLIC KEYS, 8 fields, from 11 fabricated records.
+- Clickable filters (all/escalated/unreviewed), reason selector, job-ID search, paging, details, reset.
+- Accessible labels, visible focus, high-contrast Japanese UI, responsive desktop/mobile.
+- Case details include only sanitized synthetic ID/reason/timestamps/counters.
+- Does not download or request real data: no fetch/XHR, storage credentials, API, LINE, Supabase, or server-side DB.
+- No tenant switch; server-side RLS remains mandatory for real deployment.
+- Not an authenticated owner app. GitHub Pages demo can be publicly viewable; never put customer data in static files.
+- Release is locked (NO_GO/HOLD). This candidate does not make the real R111 API production-ready.
+
+FUTURE GATES:
+1) Company PC human QA and acceptance evidence; not represented by browser mock verification.
+2) Production-design review of backend identity mapping, DB query, RLS role and audit.
+3) Storage authorization policy, durable cleanup/retention compliance, and restore tests.
+4) Owner/administrator signoff of production tenant setup and UI accessibility.
+
+NO deployment to Supabase, Cloudflare, LINE, actual customer data or production Storage is authorized.
