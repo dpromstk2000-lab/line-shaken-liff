@@ -1,0 +1,36 @@
+DPRO CAR02 R107 - Supabase Storage compatibility decision / 2026-10-12
+STATUS: REVIEW_ONLY / NO_GO / migration HOLD. NOT A DEPLOYABLE COMPONENT.
+
+EVIDENCE SOURCES (public provider docs; not a live project capability test):
+https://supabase.com/docs/guides/storage/management/delete-objects
+https://supabase.com/docs/guides/storage/uploads/standard-uploads
+https://supabase.com/docs/guides/storage/security/access-control
+
+What is documented:
+- Supabase storage.from(bucket).remove([path]) deletes objects by path, and Storage API must handle object deletions (SQL metadata deletion is not a substitute).
+- Standard upload can use upsert:true / x-upsert to replace objects at an existing path; default non-upsert fails when the path exists. Concurrent upsert writes can replace existing object content.
+- Storage authorization depends on permissions/policies. A high-privilege server credential can invalidate assumptions made for less-privileged users.
+- The documentation checked does NOT establish that the CAR02 deployment supports an atomic (path, version, SHA256) conditional deletion operation. Absence of evidence is NOT evidence that no platform API exists.
+
+R106's deleteIfMatch is an in-process mock. It is NOT proven interoperable with production Supabase Storage. A HEAD/read followed by remove(path) is NOT atomic: a replacement between calls can be deleted incorrectly.
+
+R107 immutable-path candidate:
+1) Backend assigns a new unpredictable object identifier; tenant/order/report scope is server validated.
+2) Every write uses create-only semantics; no upsert/update or alternate writer may overwrite those paths.
+3) A durable unique path reservation and never-reuse tombstone must survive retry, crash and recovery across all deployments; the R107 in-memory model is NOT sufficient.
+4) Delete authorization is limited to one audited component and correct tenant; private bucket plus policy review.
+5) Real staging environment must verify unauthorized overwrite attempts, concurrent writes, delete/retry, lost acknowledgments and object existence independent of metadata.
+6) If any writer can replace a key or real delete semantics cannot be proven, DO NOT call standard remove(path) as a version-bound delete. Keep it blocked pending reviewed provider-specific alternative.
+
+OPEN GATES (all UNVERIFIED):
+ATOMIC_VERSION_CONDITIONAL_DELETE_NOT_PROVEN_ON_REAL_SUPABASE
+IMMUTABLE_PATH_ENFORCEMENT_ACROSS_ALL_WRITERS_NOT_PROVEN
+EXCLUSIVE_DELETE_AUTHORITY_AND_RLS_NOT_PROVEN
+DURABLE_PATH_TOMBSTONE_AND_NO_REUSE_NOT_PROVEN
+R47_IMMEDIATE_DELETE_ON_AMBIGUOUS_FAILURE_REMAINS
+STAGING_SUPABASE_WRITE_READ_DELETE_AND_RECOVERY_QA_MISSING
+
+Existing R47 immediate direct DELETE on ambiguous upload failure must be retired only after isolated review and explicit production change approval. Do not edit R47/R50/R51/R52/R82 or any production code here.
+Do not store customer IDs, real credentials, JWT, photos or secrets in GitHub or Actions logs.
+DECISION: source-only gate PASS does not close any of the above risks. Public release NO_GO; database migration HOLD.
+NEXT: review an isolated real-Supabase staging project without production credentials, record actual API/policy capability and design a reviewed adapter + recovery plan. User must authorize any production changes.
