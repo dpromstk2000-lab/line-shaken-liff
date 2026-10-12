@@ -1,0 +1,88 @@
+name: DPRO CAR02 R99 Disposable Upload Boundary QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r99-disposable-upload-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout immutable reviewed sources
+        uses: actions/checkout@v5
+      - name: Confirm source baseline and production release lock
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-r97-readonly-preflight.mjs > /tmp/car02-r99-preflight.log
+          grep -Fq 'R97_PRODUCT_READINESS_SOURCE_ONLY_NO_GO_HOLD_PASS' /tmp/car02-r99-preflight.log
+      - name: Offline regression tests R94B through R99
+        run: |
+          set -euo pipefail
+          node --check car02-r99-disposable-upload-boundary-qa.mjs
+          node --check car02-r99-workflow-readonly-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs test-car02-r99-upload-boundary.mjs | tee /tmp/car02-r99-tests.log
+          grep -Fq '# fail 0' /tmp/car02-r99-tests.log
+          node car02-r99-workflow-readonly-guard.mjs
+      - name: Install disposable PostgreSQL 17 driver
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Create isolated PG17 schema and staff fixtures
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r93q_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93R_PG17_DRIVER_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r99-schema.log
+          grep -Fxq R93R_DISPOSABLE_PG17_FIXTURE_READY /tmp/car02-r99-schema.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r93q_qa_ci -v ON_ERROR_STOP=1 < R93S_PG17_DURABLE_INTENT_FIXTURE_QA_ONLY.sql | tee /tmp/car02-r99-intents.log
+          grep -Fxq R93S_DISPOSABLE_DURABLE_INTENT_SCHEMA_READY /tmp/car02-r99-intents.log
+      - name: Run R99 cross tenant and storage recovery challenges
+        env:
+          R99_DISPOSABLE_BOUNDARY_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: disposable-r93s-ci-only
+          PGDATABASE: car02_r93q_qa_ci
+        run: |
+          set -euo pipefail
+          node car02-r99-disposable-upload-boundary-qa.mjs | tee /tmp/car02-r99-driver.log
+          grep -Fxq R99_NEGATIVE_13_13_PASS /tmp/car02-r99-driver.log
+          grep -Fxq R99_IDEMPOTENCY_AND_FAIL_CLOSED_PASS /tmp/car02-r99-driver.log
+          grep -Fxq R99_PRIVATE_STORAGE_TOMBSTONE_OUTBOX_PASS /tmp/car02-r99-driver.log
+          grep -Fxq R99_DISPOSABLE_BOUNDARY_VERIFIED_PASS /tmp/car02-r99-driver.log
+      - name: Remove disposable database and temporary logs
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r93q_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r93q_qa_ci') THEN 'R99_DISPOSABLE_DB_REMOVED' ELSE 'R99_DISPOSABLE_DB_LEFT' END" | grep -Fxq R99_DISPOSABLE_DB_REMOVED
+          rm -f /tmp/car02-r99-*.log
+      - name: Final no deploy release gate
+        run: |
+          set -euo pipefail
+          node car02-r99-workflow-readonly-guard.mjs
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R99_PRODUCTION_NO_GO_MIGRATION_HOLD
