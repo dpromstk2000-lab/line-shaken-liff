@@ -1,0 +1,21 @@
+DPRO CAR02 R109 | ISOLATED durable quarantine ledger | 2026-10-12
+STATUS: R109 local candidate only. NO_GO / HOLD. No deploy or production SQL.
+
+GOAL
+R108's in-memory quarantine can disappear on process restart. R109 provides a PostgreSQL 17-only durable test candidate: insert-only tenant-scoped quarantine ledger, immutable object path reservations, explicit low-privilege RLS, FK-bound synthetic photo ownership, duplicate request idempotency with strict field comparison, process-restart retry, and irreversible write/delete protections for the test roles.
+
+STILL UNVERIFIED (NOT COMPLETE)
+- R109 is not connected to the real CAR02 reservation/photo tables or production role/JWT identity.
+- Uses only a disposable GitHub Actions PostgreSQL database with synthetic fixtures.
+- No real Supabase Storage access, upload, DELETE, HEAD, or version-conditional delete.
+- Privileged owner and superuser may modify DDL or disable triggers; maintenance access must be independently controlled and audited.
+- Immutable path in this ledger cannot by itself stop a privileged Storage writer from replacing bytes at the same object path.
+- R47 still contains its original best-effort immediate DELETE on ambiguous failure; it must be reviewed before real production wiring. R47, R50, R51, R52, R82 and existing production sources remain unchanged.
+- Backups/restores, retention, staff-role mapping, DB-level production RLS, actual private bucket policies, operational observability, and live failure/recovery tests are still required.
+- No release or migration authorization follows from a PASS of R109.
+
+GITHUB TEST
+Manual workflow .github/workflows/car02-r109-durable-quarantine-qa.yml; 8 allowlisted steps; permissions contents: read; postgres:17 service. Creates only car02_r109_qa_ci and car02_r109_a_ci/car02_r109_b_ci, destroys them in if: always() step, verifies absence. SQL is NOT TO BE PASTED INTO SUPABASE.
+
+NEXT NON-DESTRUCTIVE STEP
+Confirm R109 isolated PG17 QA; independently evaluate real staging Supabase storage/auth policy capability with explicit authorization; on 2026-10-13 complete company PC R90/R91 human acceptance from https://dpromstk2000-lab.github.io/line-shaken-liff/CAR02_R92_COMPANY_PC_START.html .
