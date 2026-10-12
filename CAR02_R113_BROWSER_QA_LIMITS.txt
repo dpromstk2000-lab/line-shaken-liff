@@ -1,0 +1,19 @@
+DPRO CAR02 R113 / HEADLESS CHROMIUM REVIEW OF R112 SYNTHETIC DEMO / 2026-10-12
+PURPOSE: validate real HTML/ES modules and controls on desktop + phone sizes, not production functionality.
+
+INPUT: CAR02_R112_QUARANTINE_REVIEW_DEMO.html and the two associated R112 public modules.
+In GitHub Actions a loopback 127.0.0.1 ephemeral HTTP server serves only three known files.
+CSP denies network APIs and outside origins. Browser automation aborts and reports any foreign request.
+Checks: 11 synthetic rows, four statistics, pagination, filters, search, details, reset, mobile overflow and browser JavaScript errors.
+Three synthetic screenshots are uploaded to GitHub Actions artifact for a maximum of seven days (if files exist).
+
+LOCAL LIMITATION: the current development environment blocks browser navigation to localhost/file by administrator policy.
+The --embedded local fallback uses the same code merged into the document, but does NOT test real network module loading.
+Only R113 GitHub Actions (real HTTP module mode) can satisfy the official R113 PASS condition.
+Chromium + Playwright install in GitHub QA downloads test dependencies, not customer data.
+Browser QA has no connection to actual users, LINE, Supabase, Worker or database.
+No production authentication, deletion, update, migrations, deploy or approval is performed.
+
+Security: GitHub Actions manual trigger only, contents: read; 7 protected blob hashes enforced,
+CAR02_RELEASE_LOCK=true, production NO_GO, database migration HOLD and real Storage delete unapproved.
+Real PC/Android visual acceptance and company PC procedure remain independent required steps.
