@@ -1,0 +1,70 @@
+name: DPRO CAR02 R114 Company PC Synthetic Roundtrip QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r114-disposable-company-pc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout reviewed sources
+        uses: actions/checkout@v5
+      - name: Verify seven protected blobs and immutable release lock
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          for source in CAR02_R90_COMPANY_PC_RECORD.html CAR02_R91_COMPANY_PC_TRIAGE.html car02-staff-review-app-r90.mjs car02-staff-review-model-r86.mjs car02-r89-acceptance-model.mjs car02-company-pc-record-r90.mjs car02-r91-triage-app.mjs car02-r91-triage-model.mjs; do
+            test -f "$source"
+          done
+          echo R114_PROTECTED_SOURCES_AND_RELEASE_HOLD_PASS
+      - name: Run R94B through R114 offline regression
+        run: |
+          set -euo pipefail
+          python3 -m py_compile car02-r114-company-pc-roundtrip-qa.py
+          node --check car02-r114-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs test-car02-r99-upload-boundary.mjs test-car02-r100-tenant-rls-qa.mjs test-car02-r101-session-reuse-qa.mjs test-car02-r102-early-ingress.mjs test-car02-r103-recovery-worker.mjs test-car02-r104-fenced-recovery.mjs test-car02-r105-generation-lease.mjs test-car02-r106-versioned-delete.mjs test-car02-r107-storage-compatibility.mjs test-car02-r108-storage-transition.mjs test-car02-r109-durable-ledger.mjs test-car02-r110-review-events.mjs test-car02-r111-readonly-inbox.mjs test-car02-r112-review-demo.mjs test-car02-r113-browser-evidence.mjs test-car02-r114-company-pc-browser.mjs > /tmp/car02-r114-regression.log
+          grep -Fxq '# fail 0' /tmp/car02-r114-regression.log
+          grep -Fxq '# tests 462' /tmp/car02-r114-regression.log
+          tail -n 8 /tmp/car02-r114-regression.log
+          node car02-r114-workflow-guard.mjs
+      - name: Install headless Chromium for isolated workflow QA
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/car02_r114_venv
+          /tmp/car02_r114_venv/bin/python -m pip install --disable-pip-version-check playwright==1.57.0
+          /tmp/car02_r114_venv/bin/python -m playwright install --with-deps chromium
+      - name: Exercise R90 export and R91 import in real browser
+        run: |
+          set -euo pipefail
+          /tmp/car02_r114_venv/bin/python car02-r114-company-pc-roundtrip-qa.py --out r114-browser-evidence | tee /tmp/car02-r114-browser.log
+          grep -Fq R114_DESKTOP_ROUNDTRIP_PASS /tmp/car02-r114-browser.log
+          grep -Fq R114_MOBILE_ROUNDTRIP_PASS /tmp/car02-r114-browser.log
+          grep -Fq R114_INVALID_IMPORT_REJECTED_PASS /tmp/car02-r114-browser.log
+          grep -Fq R114_NO_EXTERNAL_REQUESTS_PASS /tmp/car02-r114-browser.log
+          grep -Fq R114_R90_R91_REAL_HTTP_MODULE_ROUNDTRIP_PASS /tmp/car02-r114-browser.log
+          test -s r114-browser-evidence/desktop_r90.png
+          test -s r114-browser-evidence/mobile_r90.png
+          test -s r114-browser-evidence/desktop_r91.png
+          test -s r114-browser-evidence/mobile_r91.png
+      - name: Preserve synthetic screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r114-company-pc-synthetic-screenshots
+          path: r114-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Confirm no deployment and retain NO_GO HOLD
+        run: |
+          set -euo pipefail
+          node car02-r114-workflow-guard.mjs
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R114_PRODUCTION_NO_GO_MIGRATION_HOLD
