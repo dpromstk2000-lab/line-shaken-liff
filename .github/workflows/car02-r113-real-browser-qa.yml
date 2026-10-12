@@ -13,17 +13,45 @@ jobs:
       - name: Verify protected Git blobs and production HOLD
         run: |
           set -euo pipefail
-          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
-          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
-          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
-          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
-          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
-          test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
-          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcd8773c4c29d
-          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
-          test -f CAR02_R112_QUARANTINE_REVIEW_DEMO.html
-          test -f car02-r112-review-demo-browser.mjs
-          test -f car02-r112-review-demo-model.mjs
+          # Inspect the committed blob SHA and the checked-out worktree separately.
+          # A failed check reports which invariant failed without weakening it.
+          verify_pin() {
+            local path="$1" expected="$2" recorded="" actual=""
+            if ! test -f "$path"; then
+              echo "::error title=R113 pin file missing::$path"; return 1
+            fi
+            if ! git ls-files --error-unmatch -- "$path" >/dev/null; then
+              echo "::error title=R113 source not tracked::$path"; return 1
+            fi
+            recorded="$(git rev-parse "HEAD:$path")" || return 1
+            actual="$(git hash-object -- "$path")" || return 1
+            echo "R113_PIN path=$path committed=$recorded expected=$expected worktree=$actual"
+            if [ "$recorded" != "$expected" ]; then
+              echo "::error title=R113 committed SHA mismatch::$path expected=$expected actual=$recorded"; return 1
+            fi
+            if ! git diff --quiet HEAD -- "$path"; then
+              echo "::error title=R113 checkout differs from committed source::$path"; return 1
+            fi
+            echo "R113_PIN_PASS $path"
+          }
+          verify_pin car02-private-photo-r47.mjs e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          verify_pin car02-unified-runtime-r50.mjs 76e4e8cae27599f27e3d887118148718c32ebb80
+          verify_pin car02-edge-boundary-r51.mjs 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          verify_pin car02-edge-entry-r52.ts f0e31fb9f9d98524519d01dffd3489893d3d3302
+          verify_pin car02-private-photo-upload-http-r82.mjs 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          verify_pin car02-r93q-single-schema-lifecycle-isolated.mjs be1cd3feb78e26fb4759d9a86ecbd835d7ada144
+          verify_pin car02-r93s-durable-upload-intent-isolated.mjs 64e907008448264512594573cdcdcd8773c4c29d
+          if ! grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts; then
+            echo '::error title=R113 release lock missing::CAR02_RELEASE_LOCK must remain true'; exit 1
+          fi
+          echo R113_RELEASE_LOCK_CONFIRMED
+          for path in CAR02_R112_QUARANTINE_REVIEW_DEMO.html car02-r112-review-demo-browser.mjs car02-r112-review-demo-model.mjs; do
+            if ! test -s "$path"; then
+              echo "::error title=R113 missing or empty demo source::$path"; exit 1
+            fi
+            echo "R113_DEMO_SOURCE_CONFIRMED $path"
+          done
+          echo R113_SOURCE_AND_RELEASE_GATE_PASS
       - name: Run R94B through R113 source regression
         run: |
           set -euo pipefail
