@@ -57,6 +57,15 @@ for(const c of failures){
   noSideEffects(fixture,count);
  });
 }
+test('R99 foreign actor plus forged tenant header returns 401 and leaves no side effects',async()=>{
+ const {handle,fixture,count}=mockRig();
+ const r=await handle(createR99QARequest({
+  token:'Bearer qa-foreign-r99-fixture',intent:502,extra:{'x-shop-code':'other_shop'}
+ }));
+ assert.equal(r.status,401);
+ assert.deepEqual(await r.json(),{ok:false,code:'CAR02_UNAUTHORIZED'});
+ noSideEffects(fixture,count);
+});
 test('R99 CORS preflight approved and unapproved headers are safe',async()=>{
  const {handle,fixture,count}=mockRig();
  const req=createR99QARequest({method:'OPTIONS',extra:{

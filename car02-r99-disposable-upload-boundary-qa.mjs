@@ -80,7 +80,8 @@ export async function runR99AdversarialCases(pool){
   [{token:TOKENS.foreign},401,'foreign_tenant_actor'],
   [{token:TOKENS.guest},401,'guest_actor'],
   [{token:TOKENS.inactive},503,'inactive_staff'],
-  [{extra:{'x-shop-code':'other_shop'},intent:502,token:TOKENS.foreign},403,'header_spoof'],
+  // Foreign tenant identity is rejected by the R93V auth bridge BEFORE R82; this is HTTP 401, not 403.
+  [{extra:{'x-shop-code':'other_shop'},intent:502,token:TOKENS.foreign},401,'header_spoof'],
   [{url:`${R99_ORIGIN}/api/car02/uploads/${R99_ORDER}/${R99_REPORT}`},404,'unprefixed_route'],
   [{url:endpoint+'?shop=other_shop'},404,'query_tenant_spoof'],
   [{url:business,bytes:new Uint8Array(32769)},413,'business_cap_32k'],
@@ -93,6 +94,11 @@ export async function runR99AdversarialCases(pool){
  for(const [options,status,name] of failures){
   const response=await handle(createR99QARequest(options));
   assert.equal(response.status,status,`R99_NEGATIVE_${name}`);
+  if(name==='header_spoof') {
+   const body=await response.json();
+   assert.equal(body.ok,false,'R99_HEADER_SPOOF_FALSIFIED_SUCCESS');
+   assert.equal(body.code,'CAR02_UNAUTHORIZED','R99_HEADER_SPOOF_AUTH_FAILURE');
+  }
  }
  const initial=await readR99State(pool);
  assert.deepEqual(initial,{photos:[],intents:[],outbox:[]},'R99_REJECTED_REQUEST_CREATED_DB_ROWS');
