@@ -66,8 +66,20 @@ test('R94B ACL: public CREATE elevation is detected',()=>{
  const elevated=normalizeR94BSchemaAcl([...implicitDefault,ownerRow('CREATE',{grantee:'PUBLIC'})]);
  assert.notDeepEqual(elevated,normalized());
 });
-test('R94B ACL: owner USAGE revocation fails closed',()=>{
- assert.throws(()=>normalizeR94BSchemaAcl([ownerRow('CREATE')]),/R94B_ACL_EMPTY_OR_MISSING|R94B_OWNER_USAGE_MISSING/);
+test('R94B ACL: owner USAGE revocation with one remaining CREATE row fails closed with precise cause',()=>{
+ assert.throws(()=>normalizeR94BSchemaAcl([ownerRow('CREATE')]),/R94B_OWNER_USAGE_MISSING/);
+});
+test('R94B ACL: owner CREATE revocation with one remaining USAGE row is detected',()=>{
+ assert.throws(()=>normalizeR94BSchemaAcl([ownerRow('USAGE')]),/R94B_OWNER_CREATE_MISSING/);
+});
+test('R94B ACL: zero rows still fail closed and are never interpreted as valid defaults',()=>{
+ assert.throws(()=>normalizeR94BSchemaAcl([]),/R94B_ACL_EMPTY_OR_MISSING/);
+ assert.throws(()=>normalizeR94BSchemaAcl(null),/R94B_ACL_EMPTY_OR_MISSING/);
+});
+test('R94B ACL: the real probe handler recognizes the precise owner revocation error',()=>{
+ assert.match(impl,/R94B_OWNER_/);
+ assert.match(impl,/REVOKE USAGE ON SCHEMA car02_r93q_qa FROM postgres/);
+ assert.match(impl,/await client\.query\('ROLLBACK'\)/);
 });
 test('R94B ACL: owner CREATE revocation fails closed',()=>{
  assert.throws(()=>normalizeR94BSchemaAcl([ownerRow('USAGE'),ownerRow('USAGE',{grantee:'PUBLIC'})]),/R94B_OWNER_CREATE_MISSING/);
