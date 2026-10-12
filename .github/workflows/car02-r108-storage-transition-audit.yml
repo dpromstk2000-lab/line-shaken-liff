@@ -1,0 +1,46 @@
+name: DPRO CAR02 R108 Storage Transition Quarantine-Only Source Gate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r108-offline-transition:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout approved source-only repository
+        uses: actions/checkout@v5
+      - name: Validate seven protected Git blob hashes
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Run R94B to R108 local regression
+        run: |
+          set -euo pipefail
+          node --check car02-r108-storage-transition-isolated.mjs
+          node --check car02-r108-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs test-car02-r99-upload-boundary.mjs test-car02-r100-tenant-rls-qa.mjs test-car02-r101-session-reuse-qa.mjs test-car02-r102-early-ingress.mjs test-car02-r103-recovery-worker.mjs test-car02-r104-fenced-recovery.mjs test-car02-r105-generation-lease.mjs test-car02-r106-versioned-delete.mjs test-car02-r107-storage-compatibility.mjs test-car02-r108-storage-transition.mjs > /tmp/car02-r108-regression.log
+          grep -Fq '# fail 0' /tmp/car02-r108-regression.log
+          tail -n 8 /tmp/car02-r108-regression.log
+          node car02-r108-workflow-guard.mjs
+      - name: Read-only storage transition evidence gate
+        run: |
+          set -euo pipefail
+          node car02-r108-storage-transition-isolated.mjs > /tmp/car02-r108-audit.log
+          grep -Fxq R108_QUARANTINE_ONLY_SOURCE_GATE_NO_GO_HOLD_PASS /tmp/car02-r108-audit.log
+          grep -Fq '"releaseDecision": "NO_GO"' /tmp/car02-r108-audit.log
+          grep -Fq '"migrationDecision": "HOLD"' /tmp/car02-r108-audit.log
+          echo R108_PRODUCTION_STORAGE_CAPABILITY_NOT_VERIFIED
+      - name: Final immutable production lock
+        run: |
+          set -euo pipefail
+          node car02-r108-workflow-guard.mjs
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R108_PRODUCTION_NO_GO_MIGRATION_HOLD
