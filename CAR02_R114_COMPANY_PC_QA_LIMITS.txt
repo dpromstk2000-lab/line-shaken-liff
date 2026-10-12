@@ -1,0 +1,20 @@
+DPRO CAR02 R114 — R90 to R91 company-PC workflow synthetic QA, 2026-10-12
+PURPOSE: independently test the existing offline company-PC acceptance UX before human checks.
+This stage uses only synthetic, self-reported outcomes: one OK, one ISSUE and six PENDING.
+It does NOT replace the real company PC / human acceptance on 2026-10-13.
+
+Official GitHub Actions test: Chromium renders the original reviewed R90 and R91 pages
+with their real ECMAScript modules from an allowlisted loopback HTTP server.
+- R90 can select 8 statuses, export a strictly limited JSON file and import it again.
+- R91 imports that file, sorts issues before pending and OK, and exports a TXT summary.
+- Forged / oversized JSON is rejected without altering already imported results.
+- Status and TXT retain NO_GO and HOLD even if all self-reported checks are OK.
+- Screenshots on desktop and mobile contain only synthetic UI data; 7-day retention.
+- No external endpoints, credentials, real shop/customer data, DB/Storage, LINE or deploy.
+- Access to underlying GitHub repo is read-only. Seven existing protected files untouched.
+
+NOT TESTED by R114: physical company PC, live Supabase/Auth/Storage, contractual approval,
+Production Worker, LINE messaging, staged migration, backup restore on live data.
+The company PC operator must still use existing R92 -> R90 -> R91 and share the R90 JSON.
+This stage never updates R90, R91 or R92, and does not authorize release.
+Release NO_GO. Migration HOLD. CAR02_RELEASE_LOCK must remain true.
