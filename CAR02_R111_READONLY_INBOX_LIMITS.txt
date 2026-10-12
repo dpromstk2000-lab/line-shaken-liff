@@ -1,0 +1,28 @@
+DPRO CAR02 R111 READONLY INBOX LIMITS / 2026-10-12
+PURPOSE: internally review quarantined photo cleanup jobs in isolated disposable PG17.
+STATUS: candidate only; production release NO_GO and DB migration HOLD.
+NO production Worker, Supabase, LINE, or administrative changes are authorized.
+
+R111 can (in GitHub's disposable PG17):
+- Show tenant-scoped quarantine job ID, state, reason, created-at time, review count, whether escalated, latest review event kind/time.
+- Page results by normalized millisecond created time and unique job ID.
+- Filter escalation-required jobs without exposing Storage paths or proof hash values.
+- RLS limits each of two non-inheriting read-only DB users to one tenant.
+- Base-table privileges are COLUMN-LEVEL only. Storage path, SHA-256, photo ID and evidence hash are not selectable by R111 readers, even via raw table SQL.
+- Tenant and role checks remain in database and app; cross-tenant data mismatches fail closed.
+
+R111 cannot:
+- Delete files, change quarantine state, authorize deletions, approve a release, change accounts, send LINE, or apply migrations.
+- Serve as a production user-facing admin UI. No identity-provider or OAuth integration exists.
+- Guarantee confidential audit data cannot be obtained by superuser/DDL holder: a production privilege audit is still required.
+- Prove Supabase Storage has atomic version-bound DELETE, immutable path controls, RLS, secret isolation or real audit services.
+
+SECURITY NOTE: PostgreSQL ordinary views are commonly definer-rights by default.
+This stage explicitly uses (security_invoker=true,security_barrier=true) and limited SELECT privileges on referenced source columns.
+Direct access to path and hash columns must fail with insufficient-privilege SQLSTATE 42501.
+This security property is tested in disposable PostgreSQL 17, not asserted for live Supabase.
+
+NEXT GATES: real PG17 GitHub Actions integration; company PC human QA on 2026-10-13;
+explicitly authorized real staging Supabase setup, independent IAM/RLS/Storage audit,
+production backup-recovery and deployment/rollback sign-off.
+SQL named R111_PG17_READONLY_INBOX_QA_ONLY.sql is NOT for Supabase SQL Editor.
