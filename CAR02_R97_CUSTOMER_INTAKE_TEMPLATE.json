@@ -1,0 +1,20 @@
+{
+  "schema": "DPRO_CAR02_ORDER_INTAKE_TEMPLATE_R97",
+  "version": 1,
+  "customerType": null,
+  "facilityCode": null,
+  "requestedServices": ["HP", "LINE_OFFICIAL", "RESERVATION_WEB", "CAR02_MANAGEMENT", "PRIVATE_PHOTO"],
+  "domainPlan": null,
+  "bookingMinutes": null,
+  "approvals": {
+    "scope_and_price": false,
+    "contract_and_billing": false,
+    "privacy_and_data_controller": false,
+    "line_message_and_consent": false,
+    "owner_identity": false,
+    "staff_and_tenant_roles": false,
+    "calendar_and_booking_rules": false,
+    "domain_and_public_pages": false,
+    "support_and_incident_contact": false
+  }
+}
