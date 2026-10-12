@@ -97,10 +97,11 @@ test('R109 cannot be mutated by normal DML or TRUNCATE even as table owner',()=>
 });
 test('R109 write is transaction-scoped, exact on job conflict and never overwrites',()=>{
  assert.match(code,/await client\.query\('BEGIN'\)/);
- assert.match(code,/ON CONFLICT \(job_id\) DO NOTHING RETURNING job_id/);
+ assert.match(code,/ON CONFLICT DO NOTHING RETURNING job_id/);
  assert.match(code,/matchR109Ledger\(existing\.rows\[0\],input\)/);
  assert.match(code,/await client\.query\('ROLLBACK'\)/);
- assert.doesNotMatch(code,/ON CONFLICT \(job_id\) DO UPDATE/);
+ assert.doesNotMatch(code,/ON CONFLICT \(job_id\)/);
+ assert.doesNotMatch(code,/ON CONFLICT[^`]*DO UPDATE/);
 });
 test('R109 driver proves role/tenant separation, restart persistence, collisions and immutable record',()=>{
  for(const term of ['R109_DURABLE_RESTART_RETRY_PASS','R109_IMMUTABLE_TOMBSTONE_NO_STORAGE_DELETE_PASS',
@@ -169,4 +170,66 @@ test('R109 fake transaction: DB insert failure rolls back, never reports success
  await assert.rejects(q.enqueue(row),/SIMULATED_PG_DISCONNECT/);
  assert.ok(fake.state.queries.includes('ROLLBACK'));
  assert.ok(!fake.state.queries.includes('COMMIT'));
+});
+
+// A PG-like fake with distinct job-id and path constraints. It models the fact
+// that either index can win the concurrent-insert race, without weakening either.
+function dualUniquePool(){
+ const byJob=new Map(),byPath=new Map(),queries=[],releases=[];
+ const client={async query(q,values){
+  queries.push(q);
+  if(['BEGIN','COMMIT','ROLLBACK'].includes(q))return {rows:[],rowCount:0};
+  if(q.includes('SELECT current_database() AS db'))return {rows:[proof],rowCount:1};
+  if(q.includes('INSERT INTO car02_r109_qa.quarantine_ledger')){
+   const [jobId,shop,photoId,path,sha256,reason]=values;
+   if(byJob.has(jobId)||byPath.has(path)){
+    if(!q.includes('ON CONFLICT DO NOTHING RETURNING job_id'))
+     throw Object.assign(new Error('PG_UNHANDLED_UNIQUE'),{code:'23505'});
+    return {rows:[],rowCount:0};
+   }
+   const row=stored({jobId,shop,photoId,path,sha256,reason});
+   byJob.set(jobId,row);byPath.set(path,jobId);
+   return {rows:[{job_id:jobId}],rowCount:1};
+  }
+  if(q.includes('SELECT job_id::text')){
+   const [jobId,shop]=values;
+   const row=byJob.get(jobId);
+   return {rows:row&&row.shop_code===shop?[row]:[],rowCount:row&&row.shop_code===shop?1:0};
+  }
+  throw Error('R109_UNEXPECTED_FAKE_QUERY');
+ },release(v){releases.push(v)}};
+ return {connect:async()=>client,byJob,byPath,queries,releases};
+}
+test('R109 both job and storage path are idempotency arbiters with no update',()=>{
+ assert.match(code,/ON CONFLICT DO NOTHING RETURNING job_id/);
+ assert.doesNotMatch(code,/ON CONFLICT \(job_id\) DO NOTHING/);
+ assert.match(sql,/job_id uuid PRIMARY KEY/);
+ assert.match(sql,/storage_path text NOT NULL UNIQUE/);
+ assert.match(code,/matchR109Ledger\(existing\.rows\[0\],input\)/);
+});
+test('R109 double simultaneous exact retry on distinct unique indexes results one row',async()=>{
+ const pool=dualUniquePool(),ledger=createR109Ledger({environment:'isolated_qa',dbName:'car02_r109_qa_ci',pgPool:pool,expectedUser:'car02_r109_a_ci'});
+ const results=await Promise.all([ledger.enqueue(row),ledger.enqueue(row)]);
+ assert.deepEqual(results.map(x=>x.duplicate).sort(),[false,true]);
+ assert.equal(pool.byJob.size,1);assert.equal(pool.byPath.size,1);
+ assert.equal(pool.queries.filter(x=>x==='COMMIT').length,2);
+});
+test('R109 same path with new job is not a duplicate; transaction rolls back',async()=>{
+ const pool=dualUniquePool(),ledger=createR109Ledger({environment:'isolated_qa',dbName:'car02_r109_qa_ci',pgPool:pool,expectedUser:'car02_r109_a_ci'});
+ await ledger.enqueue(row);
+ const newJob={...row,jobId:'55555555-5555-4555-8555-555555555111'};
+ await assert.rejects(ledger.enqueue(newJob),/R109_REBIND_OR_SCOPE_DENIED/);
+ assert.equal(pool.byJob.size,1);assert.equal(pool.byPath.size,1);
+ assert.ok(pool.queries.includes('ROLLBACK'));
+});
+test('R109 same job with changed path is not a valid retry',async()=>{
+ const pool=dualUniquePool(),ledger=createR109Ledger({environment:'isolated_qa',dbName:'car02_r109_qa_ci',pgPool:pool,expectedUser:'car02_r109_a_ci'});
+ await ledger.enqueue(row);
+ await assert.rejects(ledger.enqueue({...row,path:row.path.replace('.jpg','.png')}),/R109_REBIND_OR_SCOPE_DENIED/);
+ assert.equal(pool.byJob.size,1);assert.equal(pool.byPath.size,1);
+});
+test('R109 real-PG driver explicitly checks path uniqueness even after idempotent enqueue',()=>{
+ assert.match(driver,/raw_path_unique_constraint/);
+ assert.match(driver,/\['23505'\]/);
+ assert.match(driver,/R109_REBIND_OR_SCOPE_DENIED/);
 });

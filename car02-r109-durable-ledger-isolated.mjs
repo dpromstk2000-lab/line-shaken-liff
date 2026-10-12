@@ -62,9 +62,12 @@ export function createR109Ledger({environment,dbName,pgPool,expectedUser}={}){
       FROM pg_roles WHERE rolname=current_user`);
     assert.equal(identity.rows.length,1,'R109_SESSION_MISSING');
     checkR109RoleIdentity(identity.rows[0],expectedUser);
+    // Both unique constraints are arbiters: concurrent retries may collide on job_id
+    // or storage_path. Never alter either uniqueness constraint or overwrite rows.
+    // Read the row back and accept only an exact same-job, same-tenant match.
     const inserted=await client.query(`INSERT INTO ${TABLE}
       (job_id,shop_code,photo_id,storage_path,sha256,reason)
-      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (job_id) DO NOTHING RETURNING job_id`,
+      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING job_id`,
      [input.jobId,input.shop,input.photoId,input.path,input.sha256,input.reason]);
     const existing=await client.query(`SELECT job_id::text,shop_code,photo_id::text,storage_path,sha256,reason,bucket,state
       FROM ${TABLE} WHERE job_id=$1 AND shop_code=$2`,[input.jobId,input.shop]);

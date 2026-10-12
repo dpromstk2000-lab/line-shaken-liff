@@ -70,7 +70,16 @@ export async function runR109Integration(pg){
     ]),['23503'],'cross_tenant_photo_fk');
   await assert.rejects(a.enqueue({...inputA,photoId:'11111111-1111-4111-8111-111111111110'}),/R109_REBIND_OR_SCOPE_DENIED/);
   await assert.rejects(a.enqueue({...inputA,reason:'ACK_LOST'}),/R109_REBIND_OR_SCOPE_DENIED/);
-  await assert.rejects(a.enqueue({...inputA,jobId:'55555555-5555-4555-8555-555555555111'}),e=>e.code==='23505');
+  // The public enqueue API maps conflicts on *either* unique key to an exact-read
+  // identity check: different job + reused path is denied, never treated as retry.
+  await assert.rejects(a.enqueue({...inputA,jobId:'55555555-5555-4555-8555-555555555111'}),
+   /R109_REBIND_OR_SCOPE_DENIED/);
+  // The database's immutable path constraint is still enforced for raw SQL callers.
+  await expectsSqlFailure(()=>pA.query(`INSERT INTO ${t}
+    (job_id,shop_code,photo_id,storage_path,sha256,reason)
+    VALUES($1,$2,$3,$4,$5,$6)`,[
+    '55555555-5555-4555-8555-555555555112',inputA.shop,inputA.photoId,inputA.path,inputA.sha256,inputA.reason
+   ]),['23505'],'raw_path_unique_constraint');
   assert.equal(await a.count(),1);assert.equal(await b.count(),1);
   console.log('R109_TENANT_AND_IDEMPOTENCY_HARD_DENIAL_PASS');
   // Pretend app process restarted by closing one pool and creating a wholly new pool.
