@@ -1,0 +1,96 @@
+name: DPRO CAR02 R111 Readonly Tenant Quarantine Inbox QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r111-disposable-inbox:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout immutable reviewed sources
+        uses: actions/checkout@v5
+      - name: Verify protected hashes and release lock
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Run R94B through R111 offline regression
+        run: |
+          set -euo pipefail
+          node --check car02-r111-readonly-inbox-isolated.mjs
+          node --check car02-r111-pg17-readonly-inbox-qa.mjs
+          node --check car02-r111-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs test-car02-r99-upload-boundary.mjs test-car02-r100-tenant-rls-qa.mjs test-car02-r101-session-reuse-qa.mjs test-car02-r102-early-ingress.mjs test-car02-r103-recovery-worker.mjs test-car02-r104-fenced-recovery.mjs test-car02-r105-generation-lease.mjs test-car02-r106-versioned-delete.mjs test-car02-r107-storage-compatibility.mjs test-car02-r108-storage-transition.mjs test-car02-r109-durable-ledger.mjs test-car02-r110-review-events.mjs test-car02-r111-readonly-inbox.mjs > /tmp/car02-r111-tests.log
+          grep -Fq '# fail 0' /tmp/car02-r111-tests.log
+          grep -Fxq '# tests 403' /tmp/car02-r111-tests.log
+          tail -n 8 /tmp/car02-r111-tests.log
+          node car02-r111-workflow-guard.mjs
+      - name: Install isolated PostgreSQL driver
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Initialize disposable ledger and inbox fixtures
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r109_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r109_qa_ci -v ON_ERROR_STOP=1 < R109_PG17_DURABLE_QUARANTINE_QA_ONLY.sql > /tmp/car02-r111-r109.log
+          grep -Fxq R109_DISPOSABLE_QUARANTINE_SCHEMA_READY /tmp/car02-r111-r109.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r109_qa_ci -v ON_ERROR_STOP=1 < R110_PG17_REVIEW_EVENTS_QA_ONLY.sql > /tmp/car02-r111-r110.log
+          grep -Fxq R110_DISPOSABLE_REVIEW_SCHEMA_READY /tmp/car02-r111-r110.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r109_qa_ci -v ON_ERROR_STOP=1 < R111_PG17_READONLY_INBOX_QA_ONLY.sql > /tmp/car02-r111-schema.log
+          grep -Fxq R111_DISPOSABLE_READONLY_INBOX_SCHEMA_READY /tmp/car02-r111-schema.log
+      - name: Exercise R111 readonly tenant inbox and pagination
+        env:
+          R111_DISPOSABLE_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGDATABASE: car02_r109_qa_ci
+        run: |
+          set -euo pipefail
+          node car02-r111-pg17-readonly-inbox-qa.mjs > /tmp/car02-r111-proof.log
+          grep -Fxq R111_TENANT_SCOPED_READONLY_INBOX_PASS /tmp/car02-r111-proof.log
+          grep -Fxq R111_KEYSET_PAGE_AND_ESCALATION_FILTER_PASS /tmp/car02-r111-proof.log
+          grep -Fxq R111_RESTART_PERSISTENCE_AND_NO_MUTATION_PASS /tmp/car02-r111-proof.log
+          grep -Fxq R111_DISPOSABLE_READONLY_INBOX_QA_PASS /tmp/car02-r111-proof.log
+          cat /tmp/car02-r111-proof.log
+      - name: Always remove disposable DB and test roles
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r109_qa_ci WITH (FORCE);'
+          for ROLE in car02_r111_a_ci car02_r111_b_ci car02_r110_a_ci car02_r110_b_ci car02_r109_a_ci car02_r109_b_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $ROLE;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='car02_r109_qa_ci') AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN ('car02_r109_a_ci','car02_r109_b_ci','car02_r110_a_ci','car02_r110_b_ci','car02_r111_a_ci','car02_r111_b_ci')) THEN 'R111_DISPOSABLE_DB_AND_ROLES_REMOVED' ELSE 'R111_CLEANUP_FAILED' END" | grep -Fxq R111_DISPOSABLE_DB_AND_ROLES_REMOVED
+          rm -f /tmp/car02-r111-*.log
+      - name: Confirm no deploy and release lock
+        run: |
+          set -euo pipefail
+          node car02-r111-workflow-guard.mjs
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R111_PRODUCTION_NO_GO_MIGRATION_HOLD
