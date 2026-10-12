@@ -1,0 +1,12 @@
+DPRO CAR02 R110 / 2026-10-12 / QA-ONLY review event ledger
+PURPOSE: Preserve R109 immutable quarantine entries, append evidence-hash and escalation events in a separate restricted ledger.
+NOT PRODUCTION. NO REAL STORAGE DELETE. NO SUPABASE SQL OR DEPLOY. NO LINE SENDING.
+The two fixed reviewer roles and fixed shop identifiers are disposable CI fixtures, NOT a production identity model.
+The event kinds do NOT include APPROVED, DELETED, DONE or RELEASED. Every record represents evidence-only or escalation-only; events do not grant delete authority.
+Raw customer details, photos, JWTs, customer identifiers, production secrets and free-text are NOT stored in review events or QA logs.
+Proof SHA256 is NOT proof of provenance, integrity of off-platform artifacts, reviewer identity or real-world consent. Admin superusers can bypass RLS and can change DDL. This is an append-only DML QA candidate, NOT tamper-proof auditing.
+R109 quarantine_ledger remains immutable and QUARANTINED. Composite FK (shop_code,job_id) prevents attaching event to another tenant's job. Reviewers can SELECT and INSERT only their own tenant events; they cannot UPDATE, DELETE or TRUNCATE.
+R110 SQL requires the disposable R109 PG17 fixture and may ONLY execute in the GitHub CI service database car02_r109_qa_ci.
+Unresolved production blockers: actual Supabase Storage semantics & policy, durable per-tenant identities and review workflow, authenticated evidence collection, operational approvals, company PC acceptance, staging end-to-end tests, rollback rehearsal, and authorization before production changes.
+R109 SUCCESS run 38209200856; R110 GitHub result PENDING.
+RELEASE NO_GO, DATABASE MIGRATION HOLD.
