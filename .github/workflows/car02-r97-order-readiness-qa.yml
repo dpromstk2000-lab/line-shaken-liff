@@ -1,0 +1,36 @@
+name: DPRO CAR02 R97 Order Intake and Product Safety Readiness QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r97-product-readiness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout reviewed main
+        uses: actions/checkout@v5
+      - name: Check immutable source and release lock
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node car02-r93t-release-preflight.mjs > /tmp/car02-r97-release-preflight.json
+          node --input-type=module -e 'import {readFileSync} from "node:fs"; const v=JSON.parse(readFileSync("/tmp/car02-r97-release-preflight.json","utf8"));if(v.releaseDecision!=="NO_GO"||v.migrationDecision!=="HOLD"||v.unsafeCount!==0||v.openCount!==6)process.exit(1);console.log("R97_BASELINE_SIX_GAPS_AND_NO_GO_HOLD")'
+      - name: Run offline security and order readiness regression tests
+        run: |
+          set -euo pipefail
+          node --check car02-r97-product-readiness.mjs
+          node --check car02-r97-readonly-preflight.mjs
+          node --check car02-r97-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs | tee /tmp/car02-r97-tests.log
+          grep -Fq '# fail 0' /tmp/car02-r97-tests.log
+      - name: Audit product intake template and unresolved deployment gates
+        run: |
+          set -euo pipefail
+          node car02-r97-workflow-guard.mjs
+          node car02-r97-readonly-preflight.mjs | tee /tmp/car02-r97-order-audit.log
+          grep -Fq 'R97_PRODUCT_READINESS_SOURCE_ONLY_NO_GO_HOLD_PASS' /tmp/car02-r97-order-audit.log
+      - name: Confirm production remains closed
+        run: |
+          set -euo pipefail
+          node --input-type=module -e 'import {runR97ReadOnlyPreflight} from "./car02-r97-readonly-preflight.mjs";const r=runR97ReadOnlyPreflight();if(r.productionReady!==false||r.productionDeployAllowed!==false||r.releaseDecision!=="NO_GO"||r.migrationDecision!=="HOLD"||r.productionBlockers.length!==8||r.stagingIntegrationGaps.length!==6||r.intake.intakeInformationComplete!==false)process.exit(1);console.log("R97_PRODUCT_READINESS_SOURCE_ONLY_NO_GO_HOLD_PASS NO_GO HOLD")'
