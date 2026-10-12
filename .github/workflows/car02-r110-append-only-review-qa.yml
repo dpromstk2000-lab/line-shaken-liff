@@ -1,0 +1,95 @@
+name: DPRO CAR02 R110 Disposable Append-Only Review Events QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r110-disposable-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-r93s-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout reviewed immutable sources
+        uses: actions/checkout@v5
+      - name: Verify seven protected hashes and hard release lock
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-private-photo-r47.mjs)" = e0f3abec6bcf57830d9f3b72fe2eee099b1dff1d
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = 76e4e8cae27599f27e3d887118148718c32ebb80
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = 6614f2ed1933aa787576cb8074cb7d4bc704efa0
+          test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
+          test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
+          test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Run R94B through R110 offline tests and safety guard
+        run: |
+          set -euo pipefail
+          node --check car02-r110-review-events-isolated.mjs
+          node --check car02-r110-pg17-review-events-qa.mjs
+          node --check car02-r110-workflow-guard.mjs
+          node --test test-car02-r94b-backup-restore-contract.mjs test-car02-r94b-workflow-guard.mjs test-car02-r95-restore-drift-qa.mjs test-car02-r96-backup-recovery-qa.mjs test-car02-r97-product-readiness.mjs test-car02-r98-order-intake.mjs test-car02-r98-browser-events.mjs test-car02-r99-upload-boundary.mjs test-car02-r100-tenant-rls-qa.mjs test-car02-r101-session-reuse-qa.mjs test-car02-r102-early-ingress.mjs test-car02-r103-recovery-worker.mjs test-car02-r104-fenced-recovery.mjs test-car02-r105-generation-lease.mjs test-car02-r106-versioned-delete.mjs test-car02-r107-storage-compatibility.mjs test-car02-r108-storage-transition.mjs test-car02-r109-durable-ledger.mjs test-car02-r110-review-events.mjs > /tmp/car02-r110-tests.log
+          grep -Fq '# fail 0' /tmp/car02-r110-tests.log
+          tail -n 8 /tmp/car02-r110-tests.log
+          node car02-r110-workflow-guard.mjs
+      - name: Install isolated PostgreSQL driver
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Create disposable R109 and R110 review schemas
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r109_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r109_qa_ci -v ON_ERROR_STOP=1 < R109_PG17_DURABLE_QUARANTINE_QA_ONLY.sql > /tmp/car02-r110-r109-schema.log
+          grep -Fxq R109_DISPOSABLE_QUARANTINE_SCHEMA_READY /tmp/car02-r110-r109-schema.log
+          docker exec -i "$CID" psql -X -U postgres -d car02_r109_qa_ci -v ON_ERROR_STOP=1 < R110_PG17_REVIEW_EVENTS_QA_ONLY.sql > /tmp/car02-r110-schema.log
+          grep -Fxq R110_DISPOSABLE_REVIEW_SCHEMA_READY /tmp/car02-r110-schema.log
+      - name: Exercise scoped review events and immutable quarantine
+        env:
+          R110_DISPOSABLE_QA: 'yes'
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGDATABASE: car02_r109_qa_ci
+        run: |
+          set -euo pipefail
+          node car02-r110-pg17-review-events-qa.mjs > /tmp/car02-r110-proof.log
+          grep -Fxq R110_APPEND_ONLY_RLS_SCHEMA_VERIFIED_PASS /tmp/car02-r110-proof.log
+          grep -Fxq R110_TENANT_FK_IDEMPOTENCY_DENIAL_PASS /tmp/car02-r110-proof.log
+          grep -Fxq R110_RESTART_DURABILITY_PASS /tmp/car02-r110-proof.log
+          grep -Fxq R110_IMMUTABLE_AND_NO_DELETE_AUTHORIZATION_PASS /tmp/car02-r110-proof.log
+          grep -Fxq R110_DISPOSABLE_REVIEW_EVENTS_QA_PASS /tmp/car02-r110-proof.log
+          cat /tmp/car02-r110-proof.log
+      - name: Always remove disposable database and all roles
+        if: always()
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r109_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP ROLE IF EXISTS car02_r110_a_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP ROLE IF EXISTS car02_r110_b_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP ROLE IF EXISTS car02_r109_a_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP ROLE IF EXISTS car02_r109_b_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='car02_r109_qa_ci') AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN ('car02_r109_a_ci','car02_r109_b_ci','car02_r110_a_ci','car02_r110_b_ci')) THEN 'R110_DISPOSABLE_DATABASE_AND_ROLES_REMOVED' ELSE 'R110_CLEANUP_FAILED' END" | grep -Fxq R110_DISPOSABLE_DATABASE_AND_ROLES_REMOVED
+          rm -f /tmp/car02-r110-*.log
+      - name: Confirm NO_GO HOLD without deployment
+        run: |
+          set -euo pipefail
+          node car02-r110-workflow-guard.mjs
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R110_PRODUCTION_NO_GO_MIGRATION_HOLD
