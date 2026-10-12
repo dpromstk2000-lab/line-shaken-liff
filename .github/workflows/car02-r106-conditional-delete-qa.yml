@@ -33,7 +33,7 @@ jobs:
           test "$(git hash-object car02-edge-entry-r52.ts)" = f0e31fb9f9d98524519d01dffd3489893d3d3302
           test "$(git hash-object car02-private-photo-upload-http-r82.mjs)" = 78f8b0f80fcc1f89d15fd25e4593c660cd197ea3
           test "$(git hash-object car02-r93q-single-schema-lifecycle-isolated.mjs)" = be1cd3feb78e26fb4759d9a86ecbd835d7ada144
-          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcd8773c4c29d
+          test "$(git hash-object car02-r93s-durable-upload-intent-isolated.mjs)" = 64e907008448264512594573cdcdcd8773c4c29d
           grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
           node car02-r97-readonly-preflight.mjs > /tmp/car02-r106-preflight.log
           grep -Fq 'R97_PRODUCT_READINESS_SOURCE_ONLY_NO_GO_HOLD_PASS' /tmp/car02-r106-preflight.log
