@@ -1,0 +1,15 @@
+{
+  "schema": "DPRO_CAR02_R108_STAGING_PROOF",
+  "version": 1,
+  "checks": {
+    "providerOperationEvidence": "UNVERIFIED",
+    "separateStagingProject": "UNVERIFIED",
+    "privateBucketAndNoPublicRead": "UNVERIFIED",
+    "allWriterIdentitiesAudited": "UNVERIFIED",
+    "overwriteDeniedEvenForPrivilegedWriters": "UNVERIFIED",
+    "durableNeverReuseReservation": "UNVERIFIED",
+    "tenantBoundRecoveryAndDelete": "UNVERIFIED",
+    "concurrencyAndAckLossTest": "UNVERIFIED",
+    "independentSecurityApproval": "UNVERIFIED"
+  }
+}

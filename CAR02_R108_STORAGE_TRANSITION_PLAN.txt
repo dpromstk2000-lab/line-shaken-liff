@@ -1,0 +1,43 @@
+DPRO CAR02 R108 — STORAGE TRANSITION / DELIVERY ENGINEERING DECISION
+2026-10-12 — SOURCE-ONLY, OFFLINE, NOT DEPLOYABLE. Release: NO_GO. Migration: HOLD.
+
+PROVIDER EVIDENCE (public documentation, not inspection of user's project):
+https://supabase.com/docs/guides/storage/management/delete-objects
+https://supabase.com/docs/guides/storage/uploads/standard-uploads
+https://supabase.com/docs/guides/getting-started/api-keys
+- Standard Storage remove takes object paths, not a proven atomic path+SHA+version condition.
+- Uploads with upsert:false reject an already-existing path, but upsert:true may overwrite it.
+- Backend secret/service-role authorization can bypass database RLS; enforcing a writer allowlist requires reviewing ALL credentials and privileged workflows, not just app-level RLS.
+- Storage metadata must not be deleted directly from SQL. Use Storage API after a reviewed process.
+
+RECOMMENDED INTERIM BEHAVIOR: QUARANTINE_ONLY
+- On ambiguous upload or delete result, do NOT immediately invoke unconditional path DELETE.
+- Durable recovery request is queued for manual/approved recovery, without disclosing photos or token values in logging.
+- Mark the photo unavailable to normal viewers until its state can be independently reconciled; do not claim physical deletion.
+- A cleanup worker may not promote requests to actual DELETE until an independently reviewed isolated staging proof, exact tenant/path/actor authorization, audit trail, and disaster-recovery approval exist.
+- The R108 JavaScript is an in-process model; it does NOT write a durable queue or change R47. It cannot be deployed.
+
+REAL STAGING TEST PLAN (future operator action; DO NOT run on production):
+1. Obtain a dedicated, disposable Supabase project and a dedicated private test bucket after human approval. Never use customer data or production secrets.
+2. Enumerate EVERY writer and credential class, especially server-side secrets/service-role keys, dashboards, scripts and batch integrations. Record roles/policies privately, not in GitHub.
+3. Prove create-only object writes with non-upsert; prove unauthorized overwrite, direct UPDATE, move/copy and privileged overwrites are unavailable to ALL actors allowed near the CAR02 namespace.
+4. Create a durable unique object-path ledger and permanent never-reuse tombstone in an isolated staging DB; verify concurrency and retries across processes and restarts.
+5. Test tenant isolation, content integrity, read-back and private bucket policy, plus lost upload acknowledgment, duplicate requests and object replacement attempts.
+6. Validate actual deletion semantics separately. If a provider-supported atomic conditional delete is not proven, only an independently proven immutable-path + exclusive-delete-authority scheme could qualify; a HEAD+remove(path) pair is never atomic.
+7. Exercise interrupted cleanups, retries, timeouts, concurrent workers and backup/restore against the staging project. Capture redacted operation traces.
+8. Independent security/DB/operator review and explicit permission are required before any deployment. The report's boolean labels alone cannot unlock production.
+
+R47 CHANGE CANDIDATE (NOT AUTHORIZED HERE):
+- Existing R47 does an immediate direct DELETE on a failed upload after a successful POST. This must be replaced via reviewed durable reconciliation before production release. Do not edit R47 until specific user approval.
+- Preserve R47 unique paths and x-upsert:false; permanently block key reuse, ensure Storage object belongs to recorded tenant and only one authorized cleanup identity may delete.
+- Never interpret a failed DELETE/timeout as proof that the object was removed; reconcile provider status and object ledger before marking cleanup done.
+
+R107 OPEN GATES (all remain unverified):
+ATOMIC_VERSION_CONDITIONAL_DELETE_NOT_PROVEN_ON_REAL_SUPABASE
+IMMUTABLE_PATH_ENFORCEMENT_ACROSS_ALL_WRITERS_NOT_PROVEN
+EXCLUSIVE_DELETE_AUTHORITY_AND_RLS_NOT_PROVEN
+DURABLE_PATH_TOMBSTONE_AND_NO_REUSE_NOT_PROVEN
+R47_IMMEDIATE_DELETE_ON_AMBIGUOUS_FAILURE_REMAINS
+STAGING_SUPABASE_WRITE_READ_DELETE_AND_RECOVERY_QA_MISSING
+
+RESULT: R108 source-only testing can certify only that the safety design fails closed. Provider capability and actual storage policy remain NOT VERIFIED. NO_GO / HOLD.
