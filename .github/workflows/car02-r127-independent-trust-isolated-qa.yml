@@ -1,0 +1,104 @@
+name: DPRO CAR02 R127 Independent Trust and Key Revocation QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r127-independent-trust-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r127-offline-trust-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R127_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify protected original files and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r127
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r127/protected-originals.json | tee qa-evidence-r127/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r127/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check syntax and static security contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r127-independent-trust-isolated.mjs
+          node --check test-car02-r127-independent-trust.mjs
+          node --check test-car02-r127-contract.mjs
+          node --check car02-r126-signed-chain-isolated.mjs
+          node --check car02-r124-r123-fixtures.mjs
+          node --test test-car02-r127-contract.mjs | tee qa-evidence-r127/static-contract.log
+          grep -Fq '# pass 20' qa-evidence-r127/static-contract.log
+          grep -Fq '# fail 0' qa-evidence-r127/static-contract.log
+      - name: Repeated independent trust rollback rotation and revocation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r127-independent-trust.mjs > "qa-evidence-r127/functional-${i}.log" 2>&1
+            grep -Fq '# pass 42' "qa-evidence-r127/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r127/functional-${i}.log"
+            node --test test-car02-r127-contract.mjs > "qa-evidence-r127/contract-${i}.log" 2>&1
+            grep -Fq '# pass 20' "qa-evidence-r127/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r127/contract-${i}.log"
+          done
+          echo R127_OFFLINE_INDEPENDENT_TRUST_186_TESTS_PASS | tee qa-evidence-r127/test-summary.txt
+      - name: Produce synthetic proof without exporting private signing keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' | tee qa-evidence-r127/nonproduction-proof.log
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          import {generateKeyPairSync} from 'node:crypto';
+          import {createSyntheticRows,ephemeralTestKeys,makeManifest,signSyntheticManifest} from './car02-r126-signed-chain-isolated.mjs';
+          import {createCheckpoint,cosignCheckpoint,checkpointHash,verifyCurrentSyntheticSnapshot} from './car02-r127-independent-trust-isolated.mjs';
+          const fixtures=JSON.parse(execFileSync('node',['car02-r124-r123-fixtures.mjs'],{encoding:'utf8'}));
+          const rows=createSyntheticRows(fixtures),now=3000001;
+          const key=ephemeralTestKeys();
+          const auditorA=generateKeyPairSync('ed25519',{publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});
+          const auditorB=generateKeyPairSync('ed25519',{publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});
+          const manifest=makeManifest(rows,{snapshotId:'r126-r127-ci-synthetic-snapshot-0001',createdAtMs:3000000,expiresAtMs:3060000});
+          const signed=signSyntheticManifest(manifest,key.privateKey);
+          const checkpoint=createCheckpoint({epoch:1,previousHash:'0'.repeat(64),createdAtMs:3000000,expiresAtMs:3060000,action:'ANCHOR',manifest,signingPublicKey:key.publicKey});
+          const entry=cosignCheckpoint(checkpoint,{auditorA:auditorA.privateKey,auditorB:auditorB.privateKey});
+          const independentPin={epoch:1,hash:checkpointHash(entry)};
+          const verified=verifyCurrentSyntheticSnapshot(signed,rows,[entry],{trustedAuditors:{auditorA:auditorA.publicKey,auditorB:auditorB.publicKey},independentPin,nowMs:now});
+          fs.writeFileSync('qa-evidence-r127/synthetic-proof.json',JSON.stringify({version:'R127',...verified,independentPinEpoch:1,independentPinHash:independentPin.hash,privateKeysExported:false,realStorageTested:false,realDBTested:false,realAuthTested:false,productionReady:false},null,2)+'\n');
+          console.log('R127_SYNTHETIC_INDEPENDENT_PIN_VERIFIED_NO_GO_HOLD');
+          JS
+          grep -Fxq R127_SYNTHETIC_INDEPENDENT_PIN_VERIFIED_NO_GO_HOLD qa-evidence-r127/nonproduction-proof.log
+      - name: Recheck offline and release gating
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R127_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('qa-evidence-r127/synthetic-proof.json').read_text())
+          assert j['status']=='VERIFIED_SYNTHETIC_WITH_INDEPENDENT_TEST_PIN'
+          assert j['release']=='NO_GO' and j['migration']=='HOLD'
+          assert j['productionReady'] is False and j['privateKeysExported'] is False
+          assert j['realStorageTested'] is False and j['realDBTested'] is False and j['realAuthTested'] is False
+          print('R127_NO_PRODUCTION_CHANGE_GATE_PASS')
+          PY
+      - name: Upload synthetic redacted offline proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r127-independent-trust-offline-proof
+          path: qa-evidence-r127/
+          retention-days: 7
+          if-no-files-found: warn
