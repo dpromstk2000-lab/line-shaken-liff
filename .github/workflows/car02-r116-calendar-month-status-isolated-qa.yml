@@ -1,0 +1,67 @@
+name: DPRO CAR02 R116 Calendar Month Navigation and Entry Paths QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r116-booking-entry-readonly-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated UI source read only
+        uses: actions/checkout@v5
+      - name: Verify source hashes and no production connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum CAR02_R116_BOOKING_CALENDAR_ISOLATED_QA.html | cut -d ' ' -f1)" = "7f93b83ab685fd4bb1d3b549a221a22b6c0d15d3d959c08cf4a7d9952e450ec1" || { echo '::error::Calendar source differs from reviewed file'; exit 1; }
+          test "$(sha256sum CAR02_R116_ENTRY_PATHS_ISOLATED_QA.html | cut -d ' ' -f1)" = "33da1856e7e273ed4f991ad54e1e4cae2941ec9e309a5e8bbabd166eb31161b0" || { echo '::error::Entry source differs from reviewed file'; exit 1; }
+          test "$(sha256sum qa_car02_r116.py | cut -d ' ' -f1)" = "d1a10adf61cc7e6dbf7d71e17b360ba15b65d1115561fdc8faa531c5c6b57dc2" || { echo '::error::QA script differs from reviewed file'; exit 1; }
+          test "$(git hash-object CAR02_R8C_CUSTOMER_READABILITY_ISOLATED_QA.html)" = "4d33903cacbef35bdbe0c87f36d9324d8c614dbb" || { echo '::error::R8C protected source changed'; exit 1; }
+          python3 - <<'PYQA'
+          from pathlib import Path
+          for name in ('CAR02_R116_BOOKING_CALENDAR_ISOLATED_QA.html','CAR02_R116_ENTRY_PATHS_ISOLATED_QA.html'):
+              s=Path(name).read_text('utf-8')
+              assert 'noindex,nofollow' in s
+              assert 'NO_GO' in s and 'HOLD' in s
+              assert "connect-src 'none'" in s
+              assert all(t not in s for t in ('fetch(', 'XMLHttpRequest', 'WebSocket', 'sendBeacon', 'localStorage', 'sessionStorage', 'indexedDB'))
+              assert 'https://' not in s and 'http://' not in s
+              assert '<form' not in s and '<iframe' not in s
+          print('R116_STATIC_LOCK_NO_GO_HOLD_PASS')
+          PYQA
+      - name: Install isolated Chromium test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/car02_r116_venv
+          /tmp/car02_r116_venv/bin/python -m pip install --disable-pip-version-check playwright==1.57.0
+          /tmp/car02_r116_venv/bin/python -m playwright install --with-deps chromium
+      - name: Real browser calendar and entry flow QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/car02_r116_venv/bin/python qa_car02_r116.py
+          echo R116_BOOKING_AND_ENTRY_4_VIEWPORTS_PASS
+      - name: GitHub Pages published files match reviewed HTML (GET only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in CAR02_R116_BOOKING_CALENDAR_ISOLATED_QA.html CAR02_R116_ENTRY_PATHS_ISOLATED_QA.html; do
+            url="https://dpromstk2000-lab.github.io/line-shaken-liff/$file"
+            curl --fail --silent --show-error --location --retry 6 --retry-delay 10 --max-time 40 "$url" --output "/tmp/$file"
+            cmp "$file" "/tmp/$file" || { echo '::error::Pages bytes mismatch for '$file; exit 1; }
+            echo "R116_PAGES_BYTES_MATCH_$file"
+          done
+      - name: Archive synthetic-only screenshots and QA JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r116-isolated-booking-entry-qa-evidence
+          path: |
+            car02_r116_qa_evidence/*.png
+            QA_RESULTS.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Confirm no production deployment was performed
+        run: echo 'R116_REVIEW_ONLY_NO_GO_DB_HOLD_NO_WORKER_NO_LINE_NO_SUPABASE_MUTATIONS'
