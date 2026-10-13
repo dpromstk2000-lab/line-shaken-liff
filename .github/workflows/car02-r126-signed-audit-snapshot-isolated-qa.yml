@@ -1,0 +1,97 @@
+name: DPRO CAR02 R126 Signed Offline Audit Snapshot QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r126-signed-offline-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r126-signed-offline-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R126_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven original files and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r126
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r126/protected-originals.json | tee qa-evidence-r126/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r126/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check syntax and static contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r126-signed-chain-isolated.mjs
+          node --check test-car02-r126-signed-chain.mjs
+          node --check test-car02-r126-contract.mjs
+          node --check car02-r124-r123-fixtures.mjs
+          node --test test-car02-r126-contract.mjs | tee qa-evidence-r126/contract-qa.log
+          grep -Fq '# pass 14' qa-evidence-r126/contract-qa.log
+          grep -Fq '# fail 0' qa-evidence-r126/contract-qa.log
+      - name: Repeated actual R123 synthetic bridge and signed snapshot tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r126-signed-chain.mjs > "qa-evidence-r126/functional-${i}.log" 2>&1
+            grep -Fq '# pass 40' "qa-evidence-r126/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r126/functional-${i}.log"
+            node --test test-car02-r126-contract.mjs > "qa-evidence-r126/contract-${i}.log" 2>&1
+            grep -Fq '# pass 14' "qa-evidence-r126/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r126/contract-${i}.log"
+          done
+          echo R126_OFFLINE_SIGNED_CHAIN_162_TESTS_PASS | tee qa-evidence-r126/test-summary.txt
+      - name: Produce independent synthetic proof without retaining signing keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' | tee qa-evidence-r126/synthetic-attestation.log
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          import {createSyntheticRows,makeManifest,ephemeralTestKeys,signSyntheticManifest,verifySyntheticBundle} from './car02-r126-signed-chain-isolated.mjs';
+          const records=JSON.parse(execFileSync('node',['car02-r124-r123-fixtures.mjs'],{encoding:'utf8'}));
+          const rows=createSyntheticRows(records);const pair=ephemeralTestKeys();
+          const manifest=makeManifest(rows,{snapshotId:'r126-ci-synthetic-proof-0001',createdAtMs:3000000,expiresAtMs:3060000});
+          const bundle=signSyntheticManifest(manifest,pair.privateKey);
+          const verified=verifySyntheticBundle(bundle,rows,{trustedPublicKey:pair.publicKey,nowMs:3000001,expectedSnapshotId:manifest.snapshotId});
+          fs.writeFileSync('qa-evidence-r126/nonproduction-summary.json',JSON.stringify({version:'R126',...verified,
+            signatureVerified:true,ephemeralTestKeyDestroyedAfterJob:true,release:'NO_GO',migration:'HOLD',
+            realPGTested:false,realStorageTested:false,realAuthTested:false,productionReady:false},null,2)+'\n');
+          console.log('R126_SIGNED_SYNTHETIC_CHAIN_VERIFIED_NO_GO_HOLD');
+          JS
+          grep -Fxq R126_SIGNED_SYNTHETIC_CHAIN_VERIFIED_NO_GO_HOLD qa-evidence-r126/synthetic-attestation.log
+      - name: Final offline isolation and no deploy gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R126_DISPOSABLE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('qa-evidence-r126/nonproduction-summary.json').read_text())
+          assert x['status']=='VERIFIED_SYNTHETIC_ONLY' and x['count']==3
+          assert x['release']=='NO_GO' and x['migration']=='HOLD'
+          assert x['productionReady'] is False and x['realPGTested'] is False
+          assert x['realStorageTested'] is False and x['realAuthTested'] is False
+          print('R126_OFFLINE_NONRELEASE_GATE_PASS')
+          PY
+      - name: Upload sanitized test-only proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r126-signed-offline-chain-proof
+          path: qa-evidence-r126/
+          retention-days: 7
+          if-no-files-found: warn
