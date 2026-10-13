@@ -1,0 +1,92 @@
+name: DPRO CAR02 R128 Independent Witness Escrow QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r128-independent-witness-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r128-offline-witness-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R128_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven original files and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r128
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r128/protected-originals.json | tee qa-evidence-r128/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r128/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check syntax and static security contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r128-witness-escrow-isolated.mjs
+          node --check test-car02-r128-witness-escrow.mjs
+          node --check test-car02-r128-contract.mjs
+          node --check car02-r127-independent-trust-isolated.mjs
+          node --test test-car02-r128-contract.mjs | tee qa-evidence-r128/contract-preflight.log
+          grep -Fq '# pass 20' qa-evidence-r128/contract-preflight.log
+          grep -Fq '# fail 0' qa-evidence-r128/contract-preflight.log
+      - name: Repeat real R123 synthetic R127 witness restore and tamper tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r128-witness-escrow.mjs > "qa-evidence-r128/functional-${i}.log" 2>&1
+            grep -Fq '# pass 40' "qa-evidence-r128/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r128/functional-${i}.log"
+            node --test test-car02-r128-contract.mjs > "qa-evidence-r128/contract-${i}.log" 2>&1
+            grep -Fq '# pass 20' "qa-evidence-r128/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r128/contract-${i}.log"
+          done
+          echo R128_OFFLINE_WITNESS_ESCROW_180_TESTS_PASS | tee qa-evidence-r128/test-summary.txt
+      - name: Produce nonproduction witness verification receipt without retaining keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          x={'version':'R128','status':'SYNTHETIC_WITNESS_ESCROW_TESTS_ONLY','functional_tests':120,
+             'contract_tests':60,'test_result':'PASS','release':'NO_GO','migration':'HOLD',
+             'productionReady':False,'realExternalStorageVerified':False,'realAuthVerified':False,
+             'productionDBTested':False,'keysExported':False,
+             'limitation':'Both synthetic witness files reside on the same disposable CI runner, not separate independent external stores.'}
+          Path('qa-evidence-r128/nonproduction-summary.json').write_text(json.dumps(x,indent=2)+'\n')
+          print('R128_SYNTHETIC_WITNESS_NO_GO_HOLD')
+          PY
+      - name: Recheck offline nonproduction lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R128_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('qa-evidence-r128/nonproduction-summary.json').read_text())
+          assert x['release']=='NO_GO' and x['migration']=='HOLD'
+          assert not x['productionReady'] and not x['realExternalStorageVerified']
+          assert not x['keysExported'] and not x['realAuthVerified'] and not x['productionDBTested']
+          print('R128_NONPRODUCTION_GATE_PASS')
+          PY
+      - name: Upload sanitized offline synthetic proof only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r128-independent-witness-escrow-proof
+          path: qa-evidence-r128/
+          retention-days: 7
+          if-no-files-found: warn
