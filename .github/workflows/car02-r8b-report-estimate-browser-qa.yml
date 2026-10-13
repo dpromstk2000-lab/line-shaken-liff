@@ -1,0 +1,227 @@
+name: DPRO CAR02 R8B Report Estimate Browser QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r8b-isolated-ui-browser-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout reviewed sources read only
+        uses: actions/checkout@v5
+      - name: Verify reviewed R8 and R8B are unchanged and isolated
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object CAR02_DEMO.html)" = "471763d210a002eb87e1e04f7457460e4f8b68db" || { echo '::error::R8 original changed'; exit 1; }
+          test "$(git hash-object CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html)" = "34eaf3d606e66e569e708bbcaade017468d49b90" || { echo '::error::R8B changed'; exit 1; }
+          python3 - <<'PYQA'
+          from pathlib import Path
+          s=Path('CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html').read_text('utf8')
+          assert '<meta name="robots" content="noindex,nofollow">' in s
+          assert 'NO NETWORK' in s and 'NO STORAGE' in s and 'NO PRODUCTION ACTION' in s
+          assert not any(x in s for x in ('fetch(', 'XMLHttpRequest','WebSocket','sendBeacon','localStorage','sessionStorage','indexedDB'))
+          assert "$('saveReport').textContent='点検内容を下書きに反映'" in s
+          assert '.customer-photo-zoom img{width:100%;height:190px;object-fit:contain' in s
+          print('R8B_SOURCE_PIN_NO_GO_HOLD_SAFE_STATIC_PASS')
+          PYQA
+      - name: Install standalone Chromium for isolated QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/car02_r8b_venv
+          /tmp/car02_r8b_venv/bin/python -m pip install --disable-pip-version-check playwright==1.57.0 Pillow==11.3.0
+          /tmp/car02_r8b_venv/bin/python -m playwright install --with-deps chromium
+      - name: Run R8B real browser UI and photo tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/car02_r8b_qa.py <<'PYQA'
+          from playwright.sync_api import sync_playwright
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+          from io import BytesIO
+          import json, hashlib, traceback
+
+          ROOT=Path.cwd()
+          html=(ROOT/'CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html').read_text('utf-8')
+          evidence=ROOT/'car02_r8b_qa_evidence'
+          evidence.mkdir(exist_ok=True)
+
+          def screenshot_png(size,color,label):
+              im=Image.new('RGB',size,color)
+              d=ImageDraw.Draw(im)
+              d.rectangle((5,5,size[0]-6,size[1]-6),outline=(0,0,0),width=3)
+              d.text((20,20),label,fill=(0,0,0))
+              f=BytesIO();im.save(f,'PNG');return f.getvalue()
+
+          images=[screenshot_png((800,450),(220,234,249),'DEMO LANDSCAPE'),screenshot_png((450,800),(240,233,220),'DEMO PORTRAIT'),screenshot_png((600,600),(224,244,231),'DEMO SQUARE')]
+
+          def fixture(i):return {'name':f'synthetic_{i+1}.png','mimeType':'image/png','buffer':images[i]}
+
+          def check(condition,msg):
+              if not condition:raise AssertionError(msg)
+
+          runs={}
+          with sync_playwright() as p:
+            browser=p.chromium.launch(headless=True,args=['--no-sandbox'])
+            for name,width,height in [('desktop',1440,900),('tablet',768,900),('mobile',390,844),('narrow',320,760)]:
+              context=browser.new_context(viewport={'width':width,'height':height},device_scale_factor=1,accept_downloads=False)
+              page=context.new_page()
+              errors=[]; requests=[];dialogs=[]
+              page.on('pageerror',lambda e:errors.append(str(e)))
+              page.on('request',lambda r:requests.append(r.url) if r.url.startswith(('http://','https://')) else None)
+              page.on('dialog',lambda d:(dialogs.append({'type':d.type,'message':d.message}),d.accept()))
+              page.set_content(html,wait_until='load')
+              check(page.locator('#stateBadge').inner_text()=='下書き',f'{name} initial state')
+              check(page.locator('.estimate-row').count()==2,f'{name} items initial')
+              css=page.evaluate('''() => {
+                 const size=(selector) => parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
+                 return {h2:size('h2'),helper:size('.hint'),label:size('.field label'),nav:size(width=>null),summaryAmount:size('.summary-row strong'),customerText:size('#customerSummary'),body:size('body')};
+              }''') if False else page.evaluate('''() => {
+                 const size=(selector) => parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
+                 return {h2:size('h2'),helper:size('.hint'),label:size('.field label'),nav:size('.tabs-mobile button'),summaryAmount:size('.summary-row strong'),customerText:size('#customerSummary'),body:size('body')};
+              }''')
+              check(css['h2']>=20 and css['helper']>=15 and css['label']>=16 and css['summaryAmount']>=18 and css['customerText']>=16, f'{name} font contract {css}')
+              check(page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth+1'),f'{name} page initial overflow')
+              page.screenshot(path=str(evidence/f'{name}_initial.png'),full_page=True)
+              page.locator('#saveReport').click()
+              check(page.locator('#saveReport').inner_text()=='下書きを更新しました',f'{name} save feedback')
+              page.locator('[data-tab="history"]:visible').first.click()
+              page.locator('#reset').click()
+              check(page.locator('#saveReport').inner_text()=='点検内容を下書きに反映',f'{name} reset label')
+              check(page.locator('#summaryPhotos').inner_text().strip().startswith('0 / 3'),f'{name} reset count')
+              for i in range(3):
+                page.locator('#photoInput').set_input_files(fixture(i))
+                check(page.locator('#summaryPhotos').inner_text().strip().startswith(str(i+1)+' / 3'),f'{name} upload {i+1}')
+              check(page.locator('.photo-expand img').count()==3,f'{name} preview 3 photos')
+              check(page.locator('.photo-expand img').first.evaluate('(e)=>getComputedStyle(e).objectFit')=='contain',f'{name} staff image crop')
+              page.locator('.photo-expand').first.click()
+              check(page.locator('#zoomDialog').evaluate('(e)=>e.open'),f'{name} zoom')
+              page.locator('#zoomClose').click()
+              check(not page.locator('#zoomDialog').evaluate('(e)=>e.open'),f'{name} zoom close')
+              page.locator('#photoInput').set_input_files(fixture(0))
+              check(page.locator('#summaryPhotos').inner_text().strip().startswith('3 / 3'),f'{name} 4th blocked')
+              check(any('画像は最大3枚です' in d['message'] for d in dialogs),f'{name} 4th warning')
+              page.locator('.photo-remove').first.click()
+              check(page.locator('#summaryPhotos').inner_text().strip().startswith('2 / 3'),f'{name} remove photo')
+              page.locator('#photoInput').set_input_files(fixture(0))
+              check(page.locator('#summaryPhotos').inner_text().strip().startswith('3 / 3'),f'{name} refill photos')
+              page.locator('[data-go="estimate"]').first.click()
+              check(page.locator('#total').inner_text().strip()=='¥18,040',f'{name} estimate sum')
+              total_font=float(page.locator('#total').evaluate('(e)=>parseFloat(getComputedStyle(e).fontSize)'))
+              check(total_font>=23,f'{name} total font too small: {total_font}px')
+              page.locator('#present').click()
+              check(page.locator('#stateBadge').inner_text()=='承認待ち',f'{name} pending')
+              check(page.locator('#summaryAmount').inner_text()=='¥18,040',f'{name} sum after present')
+              check(page.locator('.customer-photo-zoom img').count()==3,f'{name} customer photos')
+              check(page.locator('.customer-photo-zoom img').first.evaluate('(e)=>getComputedStyle(e).objectFit')=='contain',f'{name} customer image must not crop')
+              check(page.locator('#finish').is_disabled(),f'{name} finish blocked before approval')
+              # inspect actual landscape/portrait full content area on preview, rather than object-fit CSS alone
+              check(page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth+1'),f'{name} customer page horizontal overflow')
+              page.screenshot(path=str(evidence/f'{name}_customer.png'),full_page=True)
+              page.locator('#approve').click()
+              check(page.locator('#stateBadge').inner_text()=='承認済み',f'{name} approved')
+              check(page.locator('#finish').is_enabled(),f'{name} finish unlocked')
+              page.locator('#finish').click()
+              check(page.locator('#stateBadge').inner_text()=='作業完了',f'{name} completed')
+              check(page.locator('#finish').is_disabled(),f'{name} finish twice blocked')
+              page.locator('[data-tab="history"]:visible').first.click()
+              events=page.locator('#events .event b').all_inner_texts()
+              check(events[:3]==['追加作業を完了','お客様が追加作業を承認','追加見積を提示'],f'{name} audit list {events}')
+              page.locator('#reset').click()
+              check(page.locator('#stateBadge').inner_text()=='下書き',f'{name} reset after completed')
+              check(page.locator('#saveReport').inner_text()=='点検内容を下書きに反映',f'{name} reset after completed button label')
+              check(page.locator('#summaryPhotos').inner_text().strip().startswith('0 / 3'),f'{name} reset after completed photo count')
+              check(page.locator('#photoGrid img').count()==0,f'{name} photo removed on reset')
+              check(not errors,f'{name} pageerrors {errors}')
+              check(not requests,f'{name} network requests {requests}')
+              runs[name]={'viewport':[width,height],'fonts':css,'total_font_px':total_font,'photo_limit':'PASS','photo_remove':'PASS','photo_zoom':'PASS','customer_photo_contain':'PASS','approval_gate':'PASS','history':'PASS','reset_label':'PASS','network_requests':len(requests),'js_errors':len(errors),'horizontal_overflow':False,'screenshots':[f'{name}_initial.png',f'{name}_customer.png']}
+              print(name,'PASS',css,'total',total_font,flush=True)
+              context.close()
+            browser.close()
+
+          report={'version':'R8B','scope':'isolated demo only; no actual API, storage or approvals','checks':runs,'overall':'PASS','browser':'Chromium in sandbox using Playwright set_content; data are synthetic','source_sha256':hashlib.sha256((ROOT/'CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html').read_bytes()).hexdigest()}
+          (evidence/'CAR02_R8B_BROWSER_QA_RESULTS.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf-8')
+          print('OVERALL PASS')
+          PYQA
+          /tmp/car02_r8b_venv/bin/python /tmp/car02_r8b_qa.py
+      - name: Run invalid image and declined estimate cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/car02_r8b_extra_qa.py <<'PYQA'
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          from PIL import Image
+          from io import BytesIO
+          import json
+          html=Path('CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html').read_text('utf-8')
+          log=[]
+          with sync_playwright() as p:
+           b=p.chromium.launch(headless=True,args=['--no-sandbox'])
+           page=b.new_page(viewport={'width':1440,'height':900})
+           errors=[]
+           page.on('pageerror',lambda e: errors.append(str(e)))
+           page.on('dialog',lambda d:(log.append({'type':d.type,'message':d.message}),d.accept()))
+           page.set_content(html,wait_until='load')
+           page.locator('#typeToggle').click()
+           assert page.locator('#typeToggle').get_attribute('aria-pressed')=='true'
+           assert page.locator('body').evaluate('(e)=>parseFloat(getComputedStyle(e).fontSize)')==19
+           page.locator('#typeToggle').click()
+           assert page.locator('#typeToggle').get_attribute('aria-pressed')=='false'
+           page.locator('#photoInput').set_input_files({'name':'invalid.txt','mimeType':'text/plain','buffer':b'not an image'})
+           assert any('JPEG・PNG・WebP' in x['message'] for x in log)
+           assert page.locator('#summaryPhotos').inner_text().startswith('0 / 3')
+           page.locator('#photoInput').set_input_files({'name':'large.png','mimeType':'image/png','buffer':b'0'*(5*1024*1024+1)})
+           assert len([x for x in log if 'JPEG・PNG・WebP' in x['message']])>=2
+           assert page.locator('#summaryPhotos').inner_text().startswith('0 / 3')
+           img=Image.new('RGB',(200,140),'lightgray')
+           mem=BytesIO();img.save(mem,'PNG')
+           page.locator('#photoInput').set_input_files({'name':'synthetic.png','mimeType':'image/png','buffer':mem.getvalue()})
+           assert page.locator('#summaryPhotos').inner_text().startswith('1 / 3')
+           page.locator('[data-go="estimate"]').first.click()
+           page.locator('#present').click()
+           assert page.locator('#stateBadge').inner_text()=='承認待ち'
+           page.locator('#decline').click()
+           assert any('見送る理由を入力してください' in x['message'] for x in log)
+           assert page.locator('#stateBadge').inner_text()=='承認待ち'
+           page.locator('#declineReason').fill('今回は整備を見送る検証です')
+           page.locator('#decline').click()
+           assert page.locator('#stateBadge').inner_text()=='見送り'
+           assert page.locator('#finish').is_disabled()
+           page.locator('[data-tab="history"]:visible').first.click()
+           assert page.locator('#events .event b').first.inner_text()=='お客様が追加作業を見送り'
+           page.locator('#reset').click()
+           assert page.locator('#stateBadge').inner_text()=='下書き'
+           assert page.locator('#saveReport').inner_text()=='点検内容を下書きに反映'
+           assert not errors,errors
+           b.close()
+          result={'version':'R8B','extra_qa':'PASS','tests':['large text toggle','non-image rejection','greater-than-5MB image rejection','cancel requires reason','customer declines quote and finish stays disabled','reset after declined state restores original button label'],'browser_js_errors':errors,'synthetic_images_only':True}
+          Path('car02_r8b_qa_evidence/CAR02_R8B_EXTRA_QA_RESULTS.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PYQA
+          /tmp/car02_r8b_venv/bin/python /tmp/car02_r8b_extra_qa.py
+      - name: Verify GitHub Pages shows the committed R8B file with GET only
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://dpromstk2000-lab.github.io/line-shaken-liff/CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html'
+          curl --fail --silent --show-error --location --retry 6 --retry-delay 10 --retry-connrefused --max-time 40 "$url" --output /tmp/car02-r8b-live.html
+          cmp --silent CAR02_R8B_REPORT_ESTIMATE_ISOLATED_QA.html /tmp/car02-r8b-live.html || { echo '::error::Pages content differs from GitHub source'; exit 1; }
+          echo 'R8B_PAGES_LIVE_BYTES_MATCH_COMMITTED_SOURCE_PASS'
+      - name: Preserve synthetic-only browser QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r8b-isolated-browser-qa-evidence
+          path: car02_r8b_qa_evidence/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Confirm no production deployment is performed
+        if: always()
+        shell: bash
+        run: |
+          echo 'R8B_BROWSER_QA_ONLY -- RELEASE NO_GO / DB MIGRATION HOLD'
+          echo 'No database, Worker, LINE, permissions, secret changes or production deploy step.'
