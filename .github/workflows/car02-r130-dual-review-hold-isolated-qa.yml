@@ -1,0 +1,96 @@
+name: DPRO CAR02 R130 Dual Signed Hold Review QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r130-dual-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r130-readonly-review-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R129_OFFLINE_QA: 'yes'
+      R130_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven original files and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r130
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r130/protected-originals.json | tee qa-evidence-r130/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r130/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check syntax and read-only recovery contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-r123-photo-review-offline.mjs car02-r124-r123-fixtures.mjs car02-r126-signed-chain-isolated.mjs car02-r127-independent-trust-isolated.mjs car02-r128-witness-escrow-isolated.mjs car02-r129-escrow-recovery-isolated.mjs car02-r130-recovery-review-isolated.mjs test-car02-r130-recovery-review.mjs test-car02-r130-contract.mjs; do node --check "$f"; done
+          node --test test-car02-r130-contract.mjs | tee qa-evidence-r130/contract-preflight.log
+          grep -Fq '# pass 28' qa-evidence-r130/contract-preflight.log
+          grep -Fq '# fail 0' qa-evidence-r130/contract-preflight.log
+      - name: Repeat interrupted state dual signature freshness and no-write tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r130-recovery-review.mjs > "qa-evidence-r130/functional-${i}.log" 2>&1
+            grep -Fq '# pass 42' "qa-evidence-r130/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r130/functional-${i}.log"
+            node --test test-car02-r130-contract.mjs > "qa-evidence-r130/contract-${i}.log" 2>&1
+            grep -Fq '# pass 28' "qa-evidence-r130/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r130/contract-${i}.log"
+          done
+          echo R130_READONLY_DUAL_REVIEW_210_TESTS_PASS | tee qa-evidence-r130/test-summary.txt
+      - name: Record synthetic limitations without trust keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          summary={'version':'R130','result':'OFFLINE_SYNTHETIC_QA_ONLY',
+             'functional_cases':42,'contract_cases':28,'repetitions':3,'passed':210,
+             'release':'NO_GO','migration':'HOLD','productionReady':False,
+             'realAuthTested':False,'realExternalWitnesses':False,
+             'lockRemovalAuthorized':False,'automaticRecoveryAuthorized':False,
+             'independentUpdatedPinPublished':False,'privateKeysExported':False,
+             'limitations':['Two witness files exist on one disposable runner',
+                'Two signer keys are ephemeral test keys, not live staff authorization',
+                'No stale lock deletion or automatic manual HOLD release',
+                'No real external updated pin, storage, Worker, DB or photo deletion',
+                'Staging backup/rollback and identity verification remain required']}
+          Path('qa-evidence-r130/nonproduction-summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print('R130_OFFLINE_NO_GO_HOLD_ONLY')
+          PY
+      - name: Enforce production gates before evidence upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R130_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          j=json.load(open('qa-evidence-r130/nonproduction-summary.json'))
+          assert j['release']=='NO_GO' and j['migration']=='HOLD'
+          assert j['productionReady'] is False and j['privateKeysExported'] is False
+          assert j['automaticRecoveryAuthorized'] is False
+          assert j['independentUpdatedPinPublished'] is False
+          print('R130_NO_GO_HOLD_GATE_PASS')
+          PY
+      - name: Upload sanitized synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r130-readonly-dual-review-proof
+          path: qa-evidence-r130/
+          retention-days: 7
+          if-no-files-found: warn
