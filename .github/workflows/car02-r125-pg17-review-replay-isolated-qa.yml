@@ -1,0 +1,137 @@
+name: DPRO CAR02 R125 PG17 Durable Photo Review Replay QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r125-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r125-disposable-review-pg17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r125-disposable-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R125_DISPOSABLE_QA: 'yes'
+      PGHOST: '127.0.0.1'
+      PGPORT: '5432'
+      PGDATABASE: car02_r125_qa_ci
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without retained GitHub credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven originals and preserve NO_GO / HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r125
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r125/protected-originals.json | tee qa-evidence-r125/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r125/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check syntax and offline safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r125-pg17-review-journal-qa.mjs
+          node --check test-car02-r125-contract.mjs
+          node --check car02-r124-r123-fixtures.mjs
+          node --test test-car02-r125-contract.mjs > qa-evidence-r125/contract-tests.txt
+          grep -Fq '# pass 16' qa-evidence-r125/contract-tests.txt
+          grep -Fq '# fail 0' qa-evidence-r125/contract-tests.txt
+          echo R125_OFFLINE_CONTRACT_16_PASS
+      - name: Install transient test-only PostgreSQL client driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Create uniquely named disposable PostgreSQL 17 database
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r125_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r125_qa_ci -v ON_ERROR_STOP=1 < R125_PG17_REVIEW_JOURNAL_QA_ONLY.sql > qa-evidence-r125/schema.log
+          grep -Fq R125_PG17_DISPOSABLE_SCHEMA_READY qa-evidence-r125/schema.log
+      - name: Test actual PG17 6-way replay RLS tamper resistance and audit chain
+        shell: bash
+        env:
+          R125_EVIDENCE_FILE: qa-evidence-r125/pg17-source-result.json
+        run: |
+          set -euo pipefail
+          node car02-r125-pg17-review-journal-qa.mjs | tee qa-evidence-r125/source.log
+          grep -Fxq R125_PG17_CONCURRENT_REPLAY_TENANT_AUDIT_PASS qa-evidence-r125/source.log
+      - name: Verify synthetic dump corruption and restore to a SECOND database
+        shell: bash
+        env:
+          PGDATABASE: car02_r125_restore_ci
+          R125_EVIDENCE_FILE: qa-evidence-r125/pg17-restored-result.json
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test "$PGDATABASE" = car02_r125_restore_ci
+          docker exec -i "$CID" pg_dump -U postgres -d car02_r125_qa_ci --format=custom --no-owner > /tmp/car02-r125-synthetic.dump
+          sha256sum /tmp/car02-r125-synthetic.dump | cut -d' ' -f1 > qa-evidence-r125/backup-sha256.txt
+          docker exec -i "$CID" pg_restore -l < /tmp/car02-r125-synthetic.dump >/dev/null
+          head -c 16 /tmp/car02-r125-synthetic.dump > /tmp/car02-r125-corrupt.dump
+          if docker exec -i "$CID" pg_restore -l < /tmp/car02-r125-corrupt.dump >/dev/null 2>&1; then
+            echo R125_CORRUPT_BACKUP_WRONGLY_ACCEPTED >&2
+            exit 1
+          fi
+          echo R125_CORRUPT_BACKUP_REJECTED | tee qa-evidence-r125/corruption-check.txt
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r125_restore_ci;'
+          docker exec -i "$CID" pg_restore -U postgres -d car02_r125_restore_ci --no-owner < /tmp/car02-r125-synthetic.dump
+          node car02-r125-pg17-review-journal-qa.mjs --restore | tee qa-evidence-r125/restore.log
+          grep -Fxq R125_PG17_RESTORED_REVIEW_RLS_CHAIN_PASS qa-evidence-r125/restore.log
+      - name: Always delete disposable test databases roles and backup
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r125_restore_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r125_qa_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP ROLE IF EXISTS car02_r125_a_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP ROLE IF EXISTS car02_r125_b_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM pg_database WHERE datname IN ('car02_r125_qa_ci','car02_r125_restore_ci')) AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN ('car02_r125_a_ci','car02_r125_b_ci')) THEN 'R125_ALL_DISPOSABLE_RESOURCES_DELETED' ELSE 'R125_CLEANUP_FAILED' END" | grep -Fxq R125_ALL_DISPOSABLE_RESOURCES_DELETED
+          rm -f /tmp/car02-r125-synthetic.dump /tmp/car02-r125-corrupt.dump
+      - name: Final proof that no production release happened
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for p in ('qa-evidence-r125/pg17-source-result.json','qa-evidence-r125/pg17-restored-result.json'):
+              r=json.loads(Path(p).read_text())
+              assert r['release']=='NO_GO' and r['migration']=='HOLD'
+              assert not r['productionReady'] and not r['realStorageTested'] and not r['realAuthenticationTested']
+              assert len(r['chainHead'])==64 and r['tenants']==2
+          print('R125_DISPOSABLE_PG17_ONLY_RELEASE_NO_GO_DB_HOLD_PASS')
+          PY
+      - name: Upload synthetic redacted QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r125-pg17-disposable-review-replay-proof
+          path: qa-evidence-r125/
+          retention-days: 7
+          if-no-files-found: warn
