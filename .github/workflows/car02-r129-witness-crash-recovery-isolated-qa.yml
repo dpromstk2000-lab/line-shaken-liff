@@ -1,0 +1,97 @@
+name: DPRO CAR02 R129 Witness Crash Recovery QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r129-witness-recovery-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r129-offline-witness-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R129_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven original files and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r129
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r129/protected-originals.json | tee qa-evidence-r129/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r129/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check syntax and static security contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-r126-signed-chain-isolated.mjs car02-r127-independent-trust-isolated.mjs car02-r128-witness-escrow-isolated.mjs car02-r129-escrow-recovery-isolated.mjs test-car02-r129-escrow-recovery.mjs test-car02-r129-contract.mjs; do node --check "$f"; done
+          node --test test-car02-r129-contract.mjs | tee qa-evidence-r129/contract-preflight.log
+          grep -Fq '# pass 19' qa-evidence-r129/contract-preflight.log
+          grep -Fq '# fail 0' qa-evidence-r129/contract-preflight.log
+      - name: Repeat six-process race crash retry rollback and recovery tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r129-escrow-recovery.mjs > "qa-evidence-r129/functional-${i}.log" 2>&1
+            grep -Fq '# pass 33' "qa-evidence-r129/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r129/functional-${i}.log"
+            node --test test-car02-r129-contract.mjs > "qa-evidence-r129/contract-${i}.log" 2>&1
+            grep -Fq '# pass 19' "qa-evidence-r129/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r129/contract-${i}.log"
+          done
+          echo R129_DISPOSABLE_ESCROW_RECOVERY_156_TESTS_PASS | tee qa-evidence-r129/test-summary.txt
+      - name: Record sanitized limitations and isolated result
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          proof={
+            'version':'R129', 'result':'LOCAL_SYNTHETIC_CI_QA_ONLY',
+            'functional_cases':33, 'contract_cases':19, 'repetitions':3,
+            'total_assertions':156, 'passed':156,
+            'release':'NO_GO','migration':'HOLD','productionReady':False,
+            'realExternalWitnesses':False,'realDBTested':False,'realAuthTested':False,
+            'independentUpdatedPinWritten':False,'privateKeysExported':False,
+            'limitations':['Two JSON witness files share one disposable GitHub runner',
+              'Only same-operation replay after simulated write failure is tested',
+              'Crash-retained locks fail closed and require separate operator recovery design',
+              'Independent out-of-band pin refresh and production auth are untested',
+              'No actual Worker, Storage, Supabase, photo deletion or release is performed']}
+          Path('qa-evidence-r129/nonproduction-summary.json').write_text(json.dumps(proof,indent=2)+'\n')
+          print('R129_NO_GO_HOLD_SYNTHETIC_ONLY')
+          PY
+      - name: Enforce closed production gate before artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R129_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('qa-evidence-r129/nonproduction-summary.json').read_text())
+          assert j['release']=='NO_GO' and j['migration']=='HOLD'
+          assert j['productionReady'] is False and j['privateKeysExported'] is False
+          assert j['realExternalWitnesses'] is False and j['realDBTested'] is False
+          assert j['independentUpdatedPinWritten'] is False
+          print('R129_NONPRODUCTION_GATE_PASS')
+          PY
+      - name: Upload sanitized synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r129-witness-crash-recovery-offline-proof
+          path: qa-evidence-r129/
+          retention-days: 7
+          if-no-files-found: warn
