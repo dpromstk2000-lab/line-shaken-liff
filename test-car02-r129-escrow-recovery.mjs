@@ -62,7 +62,7 @@ test('R129_15_same_operation_repairs_partial',()=>run(root=>{fault(()=>applySign
 test('R129_16_after_both_written_intent_stays_pending',()=>run(root=>{fault(()=>applySignedEscrowEpoch(data(root,{injectFailure:'AFTER_B'})),'INJECTED_AFTER_B');fault(()=>verified(root),'PENDING_MANUAL_HOLD')}));
 test('R129_17_retry_after_both_writes_completes',()=>run(root=>{fault(()=>applySignedEscrowEpoch(data(root,{injectFailure:'AFTER_B'})),'INJECTED_AFTER_B');assert.equal(applySignedEscrowEpoch(data(root)).status,'APPLIED');assert.equal(verified(root).epoch,2)}));
 test('R129_18_different_operation_id_rejected_on_pending',()=>run(root=>{fault(()=>applySignedEscrowEpoch(data(root,{injectFailure:'AFTER_A'})),'INJECTED_AFTER_A');fault(()=>applySignedEscrowEpoch(data(root,{operationId:'r129-different-operation'})),'OPERATION_CONFLICT')}));
-test('R129_19_altered_signed_receipt_rejected',()=>run(root=>{const n=copy(newReceipts);n.witnessB.signature='A'+n.witnessB.signature.slice(1);assert.throws(()=>applySignedEscrowEpoch(data(root,{newReceipts:n})))}));
+test('R129_19_altered_signed_receipt_rejected',()=>run(root=>{const n=copy(newReceipts);n.witnessB.signature=(n.witnessB.signature[0]==='A'?'B':'A')+n.witnessB.signature.slice(1);assert.throws(()=>applySignedEscrowEpoch(data(root,{newReceipts:n})))}));
 test('R129_20_missing_witness_denied',()=>run(root=>{fs.unlinkSync(path.join(root,'witnessB.json'));assert.throws(()=>verified(root))}));
 test('R129_21_rogue_public_key_denied',()=>run(root=>{assert.throws(()=>applySignedEscrowEpoch(data(root,{trustedWitnesses:{...trustedWitnesses,witnessA:key().publicKey}})),/R128_SIGNATURE/);}));
 test('R129_22_forked_checkpoint_pin_denied',()=>run(root=>{assert.throws(()=>applySignedEscrowEpoch(data(root,{r127Pin:{...r127Pin,hash:'f'.repeat(64)}})))}));
@@ -74,7 +74,9 @@ test('R129_25_old_state_is_rejected_by_new_external_pin',()=>run(root=>{
 }));
 test('R129_26_preexisting_lock_fail_closed',()=>run(root=>{fs.mkdirSync(path.join(root,'.r129-lock'));fault(()=>applySignedEscrowEpoch(data(root)),'LOCKED')}));
 test('R129_27_offline_flag_required',()=>run(root=>{const p=process.env.R129_OFFLINE_QA;delete process.env.R129_OFFLINE_QA;try{fault(()=>applySignedEscrowEpoch(data(root)),'ISOLATION_REQUIRED')}finally{process.env.R129_OFFLINE_QA=p}}));
-test('R129_28_root_must_be_temporary',()=>run(root=>{fault(()=>applySignedEscrowEpoch(data(root,{root:'/mnt/data'})),'TEMP_ROOT')}));
+// Portable negative test: the OS temporary directory exists on both CI and local hosts,
+// but is not an allowed car02-r129-* child directory.
+test('R129_28_root_must_be_temporary',()=>run(root=>{fault(()=>applySignedEscrowEpoch(data(root,{root:os.tmpdir()})),'TEMP_ROOT')}));
 test('R129_29_done_ledger_file_missing_denied',()=>run(root=>{applySignedEscrowEpoch(data(root));fs.unlinkSync(path.join(root,'witnessA.json'));assert.throws(()=>verified(root))}));
 test('R129_30_attempt_with_different_witness_after_partial_rejected',()=>run(root=>{fault(()=>applySignedEscrowEpoch(data(root,{injectFailure:'AFTER_A'})),'INJECTED_AFTER_A');const d=copy(newReceipts);d.witnessB.signature=d.witnessB.signature.replace(/^./,d.witnessB.signature[0]==='Z'?'A':'Z');assert.throws(()=>applySignedEscrowEpoch(data(root,{newReceipts:d})))}));
 test('R129_31_durable_write_survives_separate_process',()=>run(root=>{applySignedEscrowEpoch(data(root));const args=JSON.stringify({root,...publicContext});const code=`import {readVerifiedEscrow} from './car02-r129-escrow-recovery-isolated.mjs';const x=JSON.parse(process.argv[1]);console.log(readVerifiedEscrow(x).epoch);`;assert.equal(execFileSync('node',['--input-type=module','-e',code,args],{encoding:'utf8'}).trim(),'2')}));
