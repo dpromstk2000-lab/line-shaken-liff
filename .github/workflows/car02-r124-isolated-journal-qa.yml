@@ -1,0 +1,71 @@
+name: DPRO CAR02 R124 Durable Offline Review Replay QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r124-offline-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r124-disposable-review-journal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R124_ISOLATED_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven originals and maintain release NO_GO
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r124
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r124/protected-source-proof.json | tee qa-evidence-r124/protected-source.log
+          grep -Fq 'R118_READONLY_GATE_PASS' qa-evidence-r124/protected-source.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Check R123 bridge and generate synthetic valid decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r123-photo-review-offline.mjs
+          node --check car02-r124-r123-fixtures.mjs
+          python3 -m py_compile car02_r124_review_journal.py test_car02_r124_review_journal.py
+          node car02-r124-r123-fixtures.mjs > qa-evidence-r124/r123-synthetic-bridge.json
+          python3 -m json.tool qa-evidence-r124/r123-synthetic-bridge.json >/dev/null
+          echo 'R124_R123_FIXTURE_BRIDGE_GENERATED' | tee qa-evidence-r124/bridge-result.txt
+      - name: Repeated offline concurrency and restore tests
+        shell: bash
+        env:
+          R124_R123_FIXTURES: qa-evidence-r124/r123-synthetic-bridge.json
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            python3 -m unittest -v test_car02_r124_review_journal.py > "qa-evidence-r124/test-${i}.log" 2>&1
+            grep -Fq 'Ran 27 tests' "qa-evidence-r124/test-${i}.log"
+            grep -Fxq 'OK' "qa-evidence-r124/test-${i}.log"
+          done
+          echo 'R124_OFFLINE_81_TESTS_AND_R123_BRIDGE_PASS' | tee qa-evidence-r124/qa-summary.txt
+      - name: Final safety scope and non-release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R124_ISOLATED_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          from car02_r124_review_journal import QA_RELEASE, QA_MIGRATION
+          assert (QA_RELEASE, QA_MIGRATION) == ('NO_GO','HOLD')
+          print('R124_NO_GO_HOLD_NO_REAL_PHOTO_DB_MUTATION_PASS')
+          PY
+      - name: Upload sanitized synthetic results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r124-isolated-journal-proof
+          path: qa-evidence-r124/
+          retention-days: 7
+          if-no-files-found: warn
