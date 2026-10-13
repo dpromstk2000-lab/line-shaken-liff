@@ -1,0 +1,215 @@
+name: DPRO CAR02 R96B UI Readability Browser QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r96b-readonly-browser-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout read-only reviewed sources
+        uses: actions/checkout@v5
+      - name: Pin reviewed inputs and confirm release locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_pin() { test "$(git hash-object "$1")" = "$2" || { echo "::error::Changed source: $1"; exit 1; }; }
+          check_pin CAR02_R96B_READABILITY_ISOLATED_QA.html a66ba82066dff7b90f11d2d85e3b323dfd03b9b6
+          check_pin CAR02_R96_READABILITY_ISOLATED_QA.html cac93056f3eb789ba7483cbce49b001529057190
+          check_pin CAR02_R95_READABILITY_ISOLATED_QA.html 3722290e063e7187f50ad22cb628298de54728b2
+          check_pin CAR02_R90_COMPANY_PC_RECORD.html 86c98faf880c80213dc12ea62a5eb455bc79664a
+          check_pin car02-staff-review-app-r90.mjs f9c94c220b7d78288f4f36d20ba07110736f4e8a
+          check_pin car02-staff-review-model-r86.mjs a79c97625579e0d892892be2f5b59067da12348f
+          check_pin car02-r89-acceptance-model.mjs f9143531ca46abc3b37962ba0ed7695fccf75704
+          check_pin car02-company-pc-record-r90.mjs be476a673a046197cb64b905d90a1f82e5419652
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          grep -Fq "connect-src 'none'" CAR02_R96B_READABILITY_ISOLATED_QA.html
+          grep -Fq 'R96B: isolated visual/readability QA' CAR02_R96B_READABILITY_ISOLATED_QA.html
+          echo R96B_READONLY_SOURCE_PINS_AND_RELEASE_LOCK_PASS
+      - name: Install isolated Chromium and Playwright
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/car02_r96b_venv
+          /tmp/car02_r96b_venv/bin/python -m pip install --disable-pip-version-check playwright==1.57.0
+          /tmp/car02_r96b_venv/bin/python -m playwright install --with-deps chromium
+      - name: Run actual JavaScript module browser QA, local-only HTTP
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/car02_r96b_browser_qa.py <<'PYQA'
+          from __future__ import annotations
+          import functools
+          import hashlib
+          import http.server
+          import json
+          import os
+          from pathlib import Path
+          import threading
+          from urllib.parse import urlparse
+          from playwright.sync_api import sync_playwright
+          
+          REPO = Path.cwd()
+          OUTPUT = REPO / 'r96b-readability-evidence'
+          OUTPUT.mkdir(exist_ok=True)
+          SOURCE = 'CAR02_R96B_READABILITY_ISOLATED_QA.html'
+          
+          class SilentHandler(http.server.SimpleHTTPRequestHandler):
+              def __init__(self, *args, **kwargs):
+                  super().__init__(*args, directory=str(REPO), **kwargs)
+              def log_message(self, fmt, *args):
+                  return
+          
+          server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), SilentHandler)
+          threading.Thread(target=server.serve_forever, daemon=True).start()
+          URL = 'http://127.0.0.1:%d/%s' % (server.server_address[1], SOURCE)
+          results = {}
+          
+          def check(cond, message):
+              if not cond:
+                  raise AssertionError(message)
+          
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+              for name, width, height in [('desktop',1440,900),('tablet',768,900),('mobile',390,844),('narrow',320,680)]:
+                  context = browser.new_context(viewport={'width':width,'height':height}, accept_downloads=True)
+                  page = context.new_page()
+                  errors = []
+                  external_requests = []
+                  page.on('pageerror', lambda e: errors.append(str(e)))
+                  def inspect_request(request):
+                      parsed = urlparse(request.url)
+                      if parsed.scheme in ('http','https') and parsed.hostname not in ('127.0.0.1','localhost'):
+                          external_requests.append(request.url)
+                  page.on('request', inspect_request)
+                  response = page.goto(URL, wait_until='networkidle', timeout=30000)
+                  check(response is not None and response.status == 200, name + ' HTTP document load failed')
+                  page.wait_for_function("document.querySelectorAll('#staffRows tr').length === 5", timeout=12000)
+                  check(page.locator('#statTotal').inner_text().strip() == '5', name + ' statistics')
+                  check(page.locator('#statActive').inner_text().strip() == '4', name + ' active statistic')
+                  check(page.locator('#statOwners').inner_text().strip() == '2', name + ' owner statistic')
+                  check(page.locator('#statInactive').inner_text().strip() == '1', name + ' inactive statistic')
+                  # R96B regression: R96 left the staff name at 13-14px because an older rule was more specific.
+                  # Verify the computed pixel sizes, not merely the presence of CSS declarations.
+                  font_checks = {
+                      '.person b':17, '.person small':15,
+                      '.panel-header h2':21, '.field label':15,
+                      '.filters button':15,
+                  }
+                  for selector, expected_min in font_checks.items():
+                      # Staff row cells are created by the real R90 JavaScript module.
+                      element = page.locator(selector).first
+                      actual = float(element.evaluate('(e) => parseFloat(getComputedStyle(e).fontSize)'))
+                      check(actual >= expected_min, name + ' R96B font regression: ' + selector + '=' + str(actual) + 'px < ' + str(expected_min))
+                  print('R96B_FONT_SIZE_CONTRACT_%s_PASS' % name.upper(), flush=True)
+                  nav = page.locator('nav.nav button').first
+                  if width <= 790:
+                      check(not nav.is_visible(), name + ' mobile menu should start collapsed')
+                      page.locator('.mobile-nav-toggle').click()
+                      check(nav.is_visible(), name + ' mobile menu should open')
+                      page.locator('.mobile-nav-toggle').click()
+                      check(not nav.is_visible(), name + ' mobile menu should close')
+                      filters = [b.bounding_box() for b in page.locator('.filters button').all()]
+                      check(abs(filters[0]['y']-filters[1]['y']) < 1 and filters[2]['y'] > filters[1]['y'], name + ' filter 2-column layout')
+                      check(all(b['x'] >= 0 and b['x'] + b['width'] <= width + 1 for b in filters), name + ' filter clipping')
+                  else:
+                      check(nav.is_visible(), name + ' desktop nav should show')
+                  check(page.evaluate('document.documentElement.scrollWidth') <= width + 1, name + ' horizontal overflow')
+                  check(float(page.locator('.filters button').first.evaluate('e => getComputedStyle(e).fontSize').replace('px','')) >= 14, name + ' filter font too small')
+                  page.locator('#staffSearch').fill('田中')
+                  check(page.locator('#staffRows tr').count() == 1, name + ' search')
+                  page.locator('#staffSearch').fill('')
+                  page.locator('[data-filter=all]').focus()
+                  page.keyboard.press('Tab')
+                  check(page.evaluate('document.activeElement?.getAttribute("data-filter")') == 'active', name + ' Tab focus')
+                  page.keyboard.press('Enter')
+                  check(page.locator('#staffRows tr').count() == 4, name + ' Enter active')
+                  page.locator('[data-filter=inactive]').click()
+                  check(page.locator('#staffRows tr').count() == 1, name + ' inactive filter')
+                  page.locator('[data-filter=owner]').click()
+                  check(page.locator('#staffRows tr').count() == 2, name + ' owner filter')
+                  check(page.locator('#staffRows tr').first.locator('button').is_disabled(), name + ' self protection')
+                  page.locator('[data-filter=all]').click()
+                  page.locator('#reasonInput').fill('')
+                  page.locator('#reviewButton').click()
+                  check(page.locator('#reasonInput').get_attribute('aria-invalid') == 'true', name + ' reason validation')
+                  page.locator('#reasonInput').fill('会社PCでの権限変更確認テストです。実際の変更は行いません。')
+                  page.locator('#statusSelect').select_option('false')
+                  page.locator('#reviewButton').click()
+                  check(page.locator('#reviewDialog').is_visible(), name + ' preview modal')
+                  check('停止' in page.locator('#newState').inner_text(), name + ' preview diff')
+                  check('nextActive' in page.locator('#jsonPreview').inner_text(), name + ' preview JSON')
+                  page.locator('#closeDialog').click()
+                  if width <= 790:
+                      page.locator('.mobile-nav-toggle').click()
+                  page.locator('[data-page=history]').click()
+                  check(page.locator('#previewHistory .event').count() == 1, name + ' session preview history')
+                  page.locator('[data-page=qa]').click()
+                  check(page.locator('#qaChecklist select').count() == 8, name + ' R90 checklist')
+                  check('NO_GO' in page.locator('.qa-gate').inner_text(), name + ' release lock')
+                  check('HOLD' in page.locator('.qa-gate').inner_text(), name + ' migration lock')
+                  page.locator('#qaChecklist select').first.select_option('issue')
+                  with page.expect_download(timeout=15000) as download_info:
+                      page.locator('#qaExport').click()
+                  download = download_info.value
+                  check(download.suggested_filename.startswith('DPRO_CAR02_R90_PC_SELF_CHECK_'), name + ' JSON export')
+                  download_path = OUTPUT / ('r96b-'+name+'-self-report.json')
+                  download.save_as(str(download_path))
+                  qa = json.loads(download_path.read_text(encoding='utf-8'))
+                  check(qa['releaseDecision'] == 'NO_GO' and qa['migrationDecision'] == 'HOLD' and qa['productionReady'] is False, name + ' export gate')
+                  check(not errors, name + ' page JavaScript errors: ' + repr(errors))
+                  check(not external_requests, name + ' unauthorized network requests: ' + repr(external_requests))
+                  check(page.evaluate('document.documentElement.scrollWidth') <= width + 1, name + ' QA horizontal overflow')
+                  # Return to staff page and capture each real-browser layout.
+                  page.locator('[data-page=staff]').click()
+                  if width <= 790 and page.locator('.mobile-nav-checkbox').is_checked():
+                      page.locator('.mobile-nav-toggle').click()
+                  page.screenshot(path=str(OUTPUT / (name+'.png')), full_page=True)
+                  results[name] = {'font_size_contract':'PASS','viewport':width,'staff':5,'filters':[4,1,2], 'keyboard':'PASS', 'self_protection':'PASS', 'preview':'PASS', 'history':'PASS', 'r90_export':'PASS', 'external_requests':len(external_requests),'js_errors':len(errors), 'page_overflow':False}
+                  print('R96B_%s_REAL_BROWSER_PASS' % name.upper(),flush=True)
+                  context.close()
+              browser.close()
+          server.shutdown()
+          (OUTPUT/'qa-results.json').write_text(json.dumps(results,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('R96B_ALL_LOCAL_REAL_BROWSER_MODULE_QA_PASS',flush=True)
+          PYQA
+          /tmp/car02_r96b_venv/bin/python /tmp/car02_r96b_browser_qa.py | tee /tmp/car02-r96b-browser.log
+          for check in DESKTOP TABLET MOBILE NARROW; do
+            grep -Fq "R96B_${check}_REAL_BROWSER_PASS" /tmp/car02-r96b-browser.log
+            grep -Fq "R96B_FONT_SIZE_CONTRACT_${check}_PASS" /tmp/car02-r96b-browser.log
+          done
+          grep -Fq R96B_ALL_LOCAL_REAL_BROWSER_MODULE_QA_PASS /tmp/car02-r96b-browser.log
+      - name: Confirm Pages serves the committed R96B file (GET only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://dpromstk2000-lab.github.io/line-shaken-liff/CAR02_R96B_READABILITY_ISOLATED_QA.html"
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location --max-time 20 "$URL" --output /tmp/car02-r96b-live.html; then
+              if cmp -s CAR02_R96B_READABILITY_ISOLATED_QA.html /tmp/car02-r96b-live.html; then
+                echo R96B_PAGES_LIVE_BYTES_MATCH_COMMITTED_SOURCE_PASS
+                exit 0
+              fi
+              echo "::warning::Pages content does not match reviewed R96B committed HTML (attempt ${attempt})"
+            else
+              echo "::warning::R96B Pages URL not ready (attempt ${attempt})"
+            fi
+            sleep 10
+          done
+          echo '::error::GitHub Pages R96B live content not verifiably equal to committed HTML'
+          exit 1
+      - name: Retain synthetic-only QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r96b-ui-isolated-browser-evidence
+          path: r96b-readability-evidence/*
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Preserve NO_GO / HOLD; no production deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo R96B_RELEASE_NO_GO_MIGRATION_HOLD_NO_DB_WORKER_LINE_WRITES
