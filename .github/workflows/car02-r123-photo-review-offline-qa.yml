@@ -1,0 +1,66 @@
+name: DPRO CAR02 R123 Photo Review Evidence Safety QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r123-offline-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r123-offline-evidence-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R123_ISOLATED_QA: 'yes'
+    steps:
+      - name: Read-only checkout without stored GitHub credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Check seven protected source files and release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r123
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r123/protected-source-proof.json | tee qa-evidence-r123/protected-source.log
+          grep -Fq 'R118_READONLY_GATE_PASS' qa-evidence-r123/protected-source.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Syntax and deterministic offline tests across three repetitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r123-photo-review-offline.mjs
+          node --check test-car02-r123-photo-review.mjs
+          node --check test-car02-r123-safety-contract.mjs
+          for i in $(seq 1 3); do
+            node --test test-car02-r123-photo-review.mjs > "qa-evidence-r123/photo-review-${i}.txt"
+            grep -Fq '# pass 41' "qa-evidence-r123/photo-review-${i}.txt"
+            grep -Fq '# fail 0' "qa-evidence-r123/photo-review-${i}.txt"
+            node --test test-car02-r123-safety-contract.mjs > "qa-evidence-r123/safety-contract-${i}.txt"
+            grep -Fq '# pass 11' "qa-evidence-r123/safety-contract-${i}.txt"
+            grep -Fq '# fail 0' "qa-evidence-r123/safety-contract-${i}.txt"
+          done
+          echo 'R123_OFFLINE_REVIEW_156_TESTS_PASS' | tee qa-evidence-r123/qa-summary.txt
+      - name: Final NO_GO HOLD and no real Storage/DB claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          node --input-type=module <<'NODE' | tee qa-evidence-r123/final-gate.log
+          import {R123_CONTRACT} from './car02-r123-photo-review-offline.mjs';
+          if(R123_CONTRACT.release!=='NO_GO'||R123_CONTRACT.migration!=='HOLD'||
+            R123_CONTRACT.productionReady!==false||R123_CONTRACT.realAuthenticationTested!==false||
+            R123_CONTRACT.databaseWrites!==false||R123_CONTRACT.networkCalls!==false||
+            R123_CONTRACT.noDelete!==true||R123_CONTRACT.noMarkReady!==true)
+            throw Error('R123_RELEASE_GATE_INVALID');
+          console.log('R123_NO_GO_DB_HOLD_NO_LIVE_MUTATION_PASS');
+          NODE
+      - name: Save synthetic redacted QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r123-photo-review-isolated-qa-evidence
+          path: qa-evidence-r123/
+          retention-days: 7
+          if-no-files-found: warn
