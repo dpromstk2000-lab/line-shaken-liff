@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10233c">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'">
+<title>DPRO CAR02 | スタッフ管理 — R96 文字サイズ再改善（隔離QA）</title>
+<style>
+:root{color-scheme:light;--ink:#17304a;--muted:#66768a;--nav:#10233c;--nav2:#192f4b;--line:#e2e9ef;--bg:#f3f6fa;--white:#fff;--accent:#176ab4;--pale:#eaf4ff;--mint:#e6f6ef;--green:#13784b;--amber:#926109;--radius:14px;font-family:'Noto Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--bg);font-size:16px;line-height:1.68}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}a{color:inherit}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #75b7f8;outline-offset:2px}h1,h2,h3,p{margin:0}.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--nav);color:#e4efff;padding:27px 16px;display:flex;flex-direction:column;gap:24px}.brand{padding:2px 13px 20px;border-bottom:1px solid #30435c}.brand strong{font-size:24px;letter-spacing:.07em;color:white}.brand small{display:block;letter-spacing:.12em;color:#95b4d4;font-size:10px}.section-label{display:block;padding:0 14px 9px;color:#91abc7;font-size:11px;font-weight:700;letter-spacing:.11em}.nav{display:grid;gap:6px}.nav button{width:100%;border:0;border-radius:11px;text-align:left;color:#c9d7e7;background:transparent;padding:13px 15px;display:flex;align-items:center;gap:12px;font-weight:700;font-size:16px}.nav button.active{background:#204568;color:white;box-shadow:inset 3px 0 #65b8ff}.nav button:hover{background:var(--nav2)}.nav .sym{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;border:1px solid #49617e;border-radius:8px;font-size:14px}.side-bottom{margin-top:auto;border-radius:12px;border:1px solid #38536f;background:#162e49;padding:14px;font-size:13px;color:#b5cbe2}.side-bottom b{color:white;display:block;margin-bottom:4px}.main{min-width:0}.top{height:79px;background:var(--white);border-bottom:1px solid var(--line);padding:0 38px;display:flex;justify-content:space-between;align-items:center;gap:14px}.crumb{font-size:14px;color:var(--muted)}.crumb b{font-size:16px;color:var(--ink)}.profile{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700}.avatar{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#dae8f9;color:#285681;font-weight:800}.canvas{padding:30px 38px 64px;max-width:1530px;margin:auto}.eyebrow{letter-spacing:.13em;font-size:13px;font-weight:800;color:#55789c}.heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:10px 0 21px;flex-wrap:wrap}.heading h1{font-size:30px;line-height:1.4;letter-spacing:-.03em}.sub{font-size:15px;color:var(--muted);margin-top:6px}.flag{color:#845a08;background:#fff1cb;border:1px solid #ecd188;font-size:13px;border-radius:999px;padding:8px 14px;font-weight:800;white-space:nowrap}.notice{border-radius:12px;border:1px solid #c9dff2;background:#eaf5ff;color:#1b537d;padding:15px 19px;margin-bottom:23px;font-size:15px}.notice strong{font-weight:800}.stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.stat{background:white;border:1px solid var(--line);border-radius:var(--radius);padding:17px 20px;min-height:119px}.stat .label{color:var(--muted);font-size:14px;font-weight:700}.stat .number{font-weight:800;font-size:32px;margin-top:9px;line-height:1.1}.stat .foot{font-size:13px;color:#8591a0;margin-top:7px}.workspace{display:grid;grid-template-columns:minmax(0,1.62fr) minmax(310px,.98fr);gap:19px;align-items:start}.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 4px 16px rgba(19,42,68,.025);overflow:hidden}.panel-header{padding:20px 23px 15px;border-bottom:1px solid var(--line)}.panel-header h2{font-size:20px;letter-spacing:-.015em}.panel-header p{font-size:14px;color:var(--muted);margin-top:5px}.tools{padding:15px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}.search{flex:1;min-width:150px}.search input{width:100%;height:48px;border:1px solid #d5e1ec;border-radius:9px;padding:0 14px;background:#f9fbfd;color:var(--ink);font-size:15px}.filters{display:flex;gap:5px;background:#eef3f8;border-radius:9px;padding:4px}.filters button{font-size:14px;border:0;border-radius:6px;background:transparent;color:#526a83;padding:8px 12px;white-space:nowrap}.filters button.selected{background:#fff;box-shadow:0 1px 4px #cad4e0;color:#154c7c;font-weight:800}.staff-scroll{overflow:auto}.staff-table{border-collapse:collapse;width:100%;min-width:540px}.staff-table th{text-align:left;background:#f7f9fc;color:#728196;font-size:12px;letter-spacing:.04em;padding:14px 21px;white-space:nowrap}.staff-table td{border-top:1px solid #edf0f4;padding:17px 20px;font-size:14px;white-space:nowrap}.staff-table tr.chosen td{background:#f1f7ff}.person{display:flex;align-items:center;gap:11px}.person .av{display:flex;align-items:center;justify-content:center;flex:none;width:37px;height:37px;border-radius:11px;background:#dfeafb;color:#2c5a8d;font-weight:800}.person b{display:block;font-size:16px}.person small{color:#8a98a8;font-size:14px}.tag{font-weight:750;font-size:12px;border-radius:5px;padding:5px 9px;background:#edf2f7;color:#4c657e}.tag.owner{background:#eaf0fd;color:#315f9f}.tag.active{background:var(--mint);color:var(--green)}.tag.inactive{background:#f2f2f2;color:#888}.smallbtn{background:white;border:1px solid #c6d7e6;color:#175f99;border-radius:7px;padding:9px 12px;font-size:14px;font-weight:750}.smallbtn:hover{background:#ebf5ff}.panel-foot{padding:14px 22px;color:#7b8b9d;font-size:13px;border-top:1px solid var(--line)}.form-content{padding:19px 23px 23px}.selection{padding:13px;border-radius:10px;background:#f0f5fa;margin-bottom:18px}.selection small{display:block;color:#607990;font-size:13px}.selection strong{display:block;font-size:19px;margin:3px 0}.selection p{font-size:13px;color:#718295}.field{margin:0 0 15px}.field label{font-weight:800;font-size:14px;display:block;margin-bottom:7px}.field select,.field textarea{width:100%;border:1px solid #cbd8e4;border-radius:9px;padding:12px 13px;color:var(--ink);background:white;font-size:15px}.field textarea{min-height:98px;resize:vertical}.field .hint{font-size:13px;color:#7a8998;display:flex;justify-content:space-between;gap:6px;margin-top:5px}.preview-note{font-size:13px;color:#64788d;background:#f5f8fb;padding:11px 13px;border-radius:9px;margin:11px 0 15px}.primary{border:0;border-radius:9px;background:#1765a5;color:white;font-weight:800;padding:13px 16px;width:100%;transition:background .2s;font-size:15px}.primary:hover{background:#115284}.feedback{margin-top:12px;color:#b64b37;font-size:12px;font-weight:700;min-height:18px}.muted-placeholder{color:#79889b;font-size:13px;padding:14px}.history-list{display:grid;gap:10px;padding:20px}.event{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff}.event strong{font-size:13px}.event p{font-size:12px;color:var(--muted);margin-top:3px}.help{padding:24px;display:grid;gap:16px}.help article{border-bottom:1px solid var(--line);padding-bottom:16px}.help h3{font-size:15px;margin-bottom:5px}.help p{color:var(--muted);font-size:13px}.hidden{display:none!important}dialog{width:min(630px,calc(100% - 22px));border:1px solid #d7e2ec;border-radius:16px;box-shadow:0 24px 80px #10233c50;padding:0;color:var(--ink)}dialog::backdrop{background:#0d213c89}.modal-head{padding:22px 26px;border-bottom:1px solid var(--line)}.modal-head h2{font-size:20px}.modal-body{padding:22px 26px}.modal-body p{font-size:13px;color:var(--muted)}.diff{display:grid;grid-template-columns:1fr 25px 1fr;align-items:center;gap:6px;margin:17px 0}.diff>div{border-radius:9px;background:#f3f7fb;padding:13px}.diff strong{display:block;font-size:15px}.diff small{font-size:10px;color:var(--muted)}pre{background:#11263e;color:#e5f5ff;padding:15px;border-radius:9px;font-size:12px;overflow:auto;max-height:245px;line-height:1.55}.modal-footer{border-top:1px solid var(--line);padding:16px 26px;display:flex;justify-content:flex-end}.modal-footer button{background:#eaf2f8;border:0;border-radius:9px;color:#1e587e;font-weight:800;padding:10px 19px}.footer-note{font-size:13px;color:#8291a2;margin-top:22px}.top-mobile{display:none}
+@media(max-width:1190px){.workspace{grid-template-columns:1fr}.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:790px){.app{grid-template-columns:1fr}.sidebar{padding:12px 14px 9px;gap:8px}.brand{padding:0;border:0}.brand strong{font-size:19px}.brand small{font-size:9px}.sidebar .section-label,.side-bottom{display:none}.nav{display:flex;gap:4px;overflow:auto}.nav button{width:auto;padding:7px 10px;font-size:11px;white-space:nowrap}.nav .sym{width:22px;height:22px}.top{height:58px;padding:0 16px}.crumb{font-size:11px}.crumb b{font-size:12px}.profile{font-size:11px}.avatar{width:30px;height:30px}.canvas{padding:18px 13px 42px}.heading h1{font-size:22px}.stat{padding:13px;min-height:90px}.stat .number{font-size:25px}.tools{padding:13px}.panel-header{padding:15px}.staff-table th,.staff-table td{padding:13px 12px}.form-content{padding:16px}.filters{max-width:100%;overflow:auto}.notice{font-size:12px}.diff strong{font-size:12px}}
+
+/* R87 mobile QA: contain layout without clipping the staff table's own horizontal scroller. */
+.app,.sidebar,.main,.canvas,.workspace,.panel,.tools,.staff-scroll{min-width:0}
+.staff-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+@media(max-width:790px){
+  html,body{max-width:100%;overflow-x:clip}
+  .app{grid-template-columns:minmax(0,1fr);width:100%;max-width:100%}
+  .sidebar,.main{width:100%;max-width:100%;min-width:0}
+  .sidebar>div,.sidebar nav{min-width:0;max-width:100%}
+  .top{width:100%;min-width:0;padding:0 13px;gap:8px}
+  .top .crumb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top .profile{min-width:0;gap:7px;flex-shrink:0}
+  .top .profile .flag{font-size:10px;padding:5px 8px}
+  .top .profile>span:last-child{display:none}
+  .canvas{width:100%;min-width:0;max-width:100%}
+  .nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-width:100%;overflow:visible}
+  .nav button{width:100%;min-height:38px;justify-content:center;white-space:normal;padding:7px 5px;font-size:12px}
+  .heading{min-width:0}
+  .staff-scroll{width:100%;max-width:100%;}
+  .stat-grid,.workspace{min-width:0;max-width:100%;}
+  .tools>*{min-width:0}
+  .search{min-width:120px}
+  .filters{max-width:100%;overflow-x:auto;}
+}
+@media(max-width:360px){
+  .heading h1{font-size:21px}
+  .top .profile .flag{display:none}
+  .stat-grid{gap:9px}
+  .stat{padding:11px}
+  .canvas{padding-left:10px;padding-right:10px}
+}
+/* R87 screen-only preview trail; never confuse a preview with a real audit. */
+.preview-history{display:grid;gap:9px;padding:16px 20px 20px}
+.preview-history .empty{padding:14px;border:1px dashed #bfcede;background:#f7f9fc;border-radius:10px;color:#5d7489;font-size:13px}
+.preview-history .event{border-left:4px solid #78add9}
+.preview-history .event p{white-space:normal;overflow-wrap:anywhere}
+.preview-history-head{padding:17px 20px 0;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.preview-history-head h3{font-size:15px}
+.preview-history-head button{font-size:12px;border:1px solid #c6d7e6;background:#fff;color:#1c5b89;padding:8px 12px;border-radius:8px;font-weight:800}
+.preview-history-warning{font-size:12px;color:#6e8195;margin-top:5px}
+
+/* R87: on phones every staff record is a readable two-row card, not an off-screen table. */
+@media(max-width:790px){
+ .staff-scroll{overflow-x:visible}
+ .staff-table,.staff-table tbody{display:block;width:100%;min-width:0}
+ .staff-table thead{display:none}
+ .staff-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"person state" "role action";column-gap:12px;row-gap:9px;padding:13px 14px;border-top:1px solid #edf0f4;align-items:center}
+ .staff-table tbody tr.chosen{background:#f1f7ff}
+ .staff-table tbody td{padding:0;white-space:normal;border:0;min-width:0}
+ .staff-table tbody td:nth-child(1){grid-area:person}
+ .staff-table tbody td:nth-child(2){grid-area:role;padding-left:48px}
+ .staff-table tbody td:nth-child(3){grid-area:state;text-align:right}
+ .staff-table tbody td:nth-child(4){grid-area:action;text-align:right}
+ .staff-table tbody td.muted-placeholder{grid-area:person/span 2;padding:15px 5px;text-align:center}
+ .staff-table .person{min-width:0}
+ .staff-table .person b{font-size:13px;white-space:normal}
+ .staff-table .smallbtn{min-width:76px;min-height:38px}
+}
+
+/* R90: larger touch targets, legible metadata and visible keyboard focus. */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:fixed;z-index:999;top:-100px;left:18px;background:#fff;color:#113e67;border:3px solid #115f9d;border-radius:8px;padding:10px 16px;font-weight:800}
+.skip-link:focus{top:12px}
+.nav button:focus-visible,.filters button:focus-visible,.smallbtn:focus-visible,.preview-history-head button:focus-visible,.modal-footer button:focus-visible{outline:3px solid #f8a94e;outline-offset:2px}
+.filters button[aria-pressed="true"]{background:white;box-shadow:0 1px 4px #cad4e0;color:#164d80;font-weight:800}
+.field textarea[aria-invalid="true"]{border:2px solid #ad3e31;background:#fff8f6}
+.field .hint,.panel-foot,.selection p,.selection small,.preview-note,.footer-note,.stat .foot{font-size:12px}
+.event p,.staff-table td,.help p{font-size:13px}
+.smallbtn,.filters button,.preview-history-head button,.modal-footer button{min-height:42px}
+.staff-table button[aria-pressed="true"]{background:#1765a5;color:white;border-color:#1765a5}
+@media(max-width:790px){
+ .nav button{min-height:46px;font-size:13px}
+ .filters button{min-height:44px;font-size:13px;padding:7px 12px}
+ .smallbtn{min-width:88px;min-height:44px;font-size:13px}
+ .field label{font-size:13px}
+ .field select{min-height:46px}
+ .field textarea{min-height:115px}
+ .primary{min-height:48px}
+ .panel-header p,.sub,.notice{font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* R90: readable offline QA recording; never a live release approval */
+.qa-r90-note{background:#eef5fc;border:1px solid #cadef0;border-radius:10px;padding:14px 16px;margin:12px 0 18px;font-size:13px;color:#244a70}
+.qa-r90-note strong{display:block;margin-bottom:3px}
+.qa-result-line{display:grid;grid-template-columns:minmax(0,1fr) 160px;align-items:center;gap:12px;min-height:64px;border-top:1px solid var(--line);padding:10px 2px}
+.qa-result-line label{font-size:13px;font-weight:650;line-height:1.5}
+.qa-result-line select{width:100%;border:1px solid #b4c9dc;border-radius:8px;padding:9px 8px;background:white;font-size:14px;min-height:44px}
+.qa-result-line .self-report-only{font-size:11px;color:#79889b;display:block;font-weight:400}
+.qa-result-line.issue{background:#fff6ed}.qa-result-line.ok{background:#f3fbf7}
+.qa-r90-feedback{font-size:13px;color:#1c557d;font-weight:750;min-height:20px;margin:12px 0}
+.qa-r90-warning{color:#8a590c;background:#fff8e6;border:1px solid #ebd69b;padding:13px;border-radius:10px;font-size:12px}
+.qa-file-hidden{display:none!important}
+.qa-actions .primary{width:auto}
+@media(max-width:480px){.qa-result-line{grid-template-columns:1fr;gap:6px;padding:13px 3px}.qa-result-line select{width:100%}.qa-actions button{width:100%}.qa-actions{display:grid;grid-template-columns:1fr}}
+@media print{.qa-actions,.qa-r90-feedback,.qa-file-hidden{display:none!important}.qa-result-line{grid-template-columns:1fr 140px;break-inside:avoid}.qa-r90-note{background:white!important} .qa-r90-warning{border:2px solid #8a590c}}
+</style>
+<style>
+/* R90: company-PC read-only confirmation. No storage, no action to production. */
+.app.qa-mode .stat-grid{display:none}
+.qa-gate{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;border:1px solid #e9cc88;border-radius:11px;background:#fff6df;color:#654807;padding:12px 15px;font-size:13px;margin-bottom:14px}
+.qa-gate strong{font-size:15px}.qa-progress{font-weight:800;font-size:15px;margin-bottom:12px}
+.qa-checklist{display:grid;gap:14px}.qa-group{border:1px solid var(--line);border-radius:12px;padding:13px;background:#fafcfe}
+.qa-group h3{font-size:14px;margin:0 0 11px}.qa-line{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);min-height:49px;padding:8px 4px;font-size:13px}
+.qa-line input{width:22px;height:22px;flex:0 0 auto;accent-color:#1765a5}.qa-line span{overflow-wrap:anywhere}.qa-line.locked{color:#697987}
+.qa-line.locked::after{content:"公開前ゲート";margin-left:auto;white-space:nowrap;font-size:10px;background:#f5e9c8;color:#80570c;padding:3px 6px;border-radius:5px}
+.qa-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:15px}.qa-actions button{min-height:44px;padding:10px 14px}
+@media(max-width:790px){.qa-line.locked{flex-wrap:wrap}.qa-line.locked::after{margin-left:34px}}
+@media print{.sidebar,.top,.stat-grid,.workspace,.heading,.notice,.eyebrow,.footer-note,.qa-actions,#dashboardPage,#historyPage,#helpPage,dialog{display:none!important}
+ .app,.main,.canvas{display:block!important;margin:0!important;padding:0!important;width:100%!important;min-height:0!important}
+ #qaPage{display:block!important;border:0!important;box-shadow:none!important}.qa-line{break-inside:avoid}.qa-group{break-inside:avoid}
+ body{background:white}.qa-gate{background:white;border:2px solid #80570c} }
+
+/* R90: readable offline QA recording; never a live release approval */
+.qa-r90-note{background:#eef5fc;border:1px solid #cadef0;border-radius:10px;padding:14px 16px;margin:12px 0 18px;font-size:13px;color:#244a70}
+.qa-r90-note strong{display:block;margin-bottom:3px}
+.qa-result-line{display:grid;grid-template-columns:minmax(0,1fr) 160px;align-items:center;gap:12px;min-height:64px;border-top:1px solid var(--line);padding:10px 2px}
+.qa-result-line label{font-size:13px;font-weight:650;line-height:1.5}
+.qa-result-line select{width:100%;border:1px solid #b4c9dc;border-radius:8px;padding:9px 8px;background:white;font-size:14px;min-height:44px}
+.qa-result-line .self-report-only{font-size:11px;color:#79889b;display:block;font-weight:400}
+.qa-result-line.issue{background:#fff6ed}.qa-result-line.ok{background:#f3fbf7}
+.qa-r90-feedback{font-size:13px;color:#1c557d;font-weight:750;min-height:20px;margin:12px 0}
+.qa-r90-warning{color:#8a590c;background:#fff8e6;border:1px solid #ebd69b;padding:13px;border-radius:10px;font-size:12px}
+.qa-file-hidden{display:none!important}
+.qa-actions .primary{width:auto}
+@media(max-width:480px){.qa-result-line{grid-template-columns:1fr;gap:6px;padding:13px 3px}.qa-result-line select{width:100%}.qa-actions button{width:100%}.qa-actions{display:grid;grid-template-columns:1fr}}
+@media print{.qa-actions,.qa-r90-feedback,.qa-file-hidden{display:none!important}.qa-result-line{grid-template-columns:1fr 140px;break-inside:avoid}.qa-r90-note{background:white!important} .qa-r90-warning{border:2px solid #8a590c}}
+</style>
+<style>
+
+/* R96: isolated visual/readability QA. R90 behavior, security restrictions and records unchanged. */
+.mobile-nav-checkbox,.mobile-nav-toggle{display:none}
+@media (min-width:791px){
+ body{font-size:17px}
+ .nav button{font-size:15px;min-height:48px}
+ .section-label,.eyebrow,.panel-header p,.sub,.notice,.crumb,.profile,
+ .stat .label,.stat .foot,.panel-foot,.selection small,.selection p,
+ .field label,.field .hint,.preview-note,.feedback,.footer-note,.help p,
+ .event p,.preview-history-warning,.brand small{font-size:14px}
+ .staff-table th,.staff-table td,.person b,.person small,.tag,.smallbtn,
+ .filters button,.qa-result-line label,.qa-result-line .self-report-only,
+ .qa-group h3,.qa-line,.qa-r90-note,.qa-r90-warning{font-size:14px}
+ .search input,.field select,.field textarea{font-size:16px}
+ .panel-header h2{font-size:19px}
+ .filters button,.smallbtn{min-height:44px}
+}
+@media (max-width:790px){
+ body{font-size:17px}
+ .sidebar{padding:10px 13px 12px}
+ .sidebar .nav-container{min-width:0;max-width:100%}
+ .mobile-nav-checkbox{position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+ .mobile-nav-toggle{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:48px;
+  padding:10px 15px;margin:9px 0 0;border:1px solid #5c7795;border-radius:10px;
+  background:#204568;color:white;font-size:17px;font-weight:800;cursor:pointer}
+ .mobile-nav-toggle-indicator::after{content:'開く ▼';font-size:15px}
+ .mobile-nav-checkbox:checked+.mobile-nav-toggle .mobile-nav-toggle-indicator::after{content:'閉じる ▲'}
+ .mobile-nav-checkbox:focus-visible+.mobile-nav-toggle{outline:3px solid #f8a94e;outline-offset:2px}
+ .nav{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 0;overflow:visible}
+ .mobile-nav-checkbox:checked~.nav{display:grid}
+ .nav button{min-width:0;min-height:50px;font-size:16px;padding:11px 9px;overflow-wrap:anywhere}
+ .tools{flex-direction:column;align-items:stretch;gap:10px}
+ .search{width:100%;min-width:0}
+ .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;max-width:100%;
+  min-width:0;overflow:visible;gap:8px;padding:7px}
+ .filters button{width:100%;min-width:0;min-height:48px;font-size:15px;white-space:normal;overflow-wrap:anywhere}
+ .panel-header p,.sub,.notice,.stat .label,.stat .foot,.panel-foot,.selection small,
+ .selection p,.field label,.field .hint,.preview-note,.feedback,.footer-note,
+ .help p,.event p,.person b,.person small,.tag,.smallbtn,.qa-result-line label,
+ .qa-result-line .self-report-only,.qa-group h3,.qa-line,.qa-r90-note,
+ .qa-r90-warning,.preview-history-warning{font-size:15px}
+ .staff-table tbody tr{padding:16px 14px;row-gap:12px}
+ .staff-table .smallbtn,.field select,.primary{min-height:46px}
+ .field select,.field textarea,.search input{font-size:17px}
+ .stat{min-height:108px}
+ .stat-grid{gap:10px}
+ .heading h1{font-size:26px}
+}
+@media (max-width:360px){
+ .filters{gap:5px}
+ .nav button{font-size:15px}
+ .stat{padding:11px}
+}
+
+</style>
+</head>
+<body>
+<a class="skip-link" href="#mainContent">本文へスキップ</a>
+<div class="app">
+<aside class="sidebar" aria-label="メインメニュー">
+ <div class="brand"><strong>DPRO <span style="color:#7db7e8;font-weight:400">/</span> CAR02</strong><small>MANAGEMENT SYSTEM</small></div>
+ <div class="nav-container"><span class="section-label">管理メニュー</span>
+  <input class="mobile-nav-checkbox" type="checkbox" id="mobileNavCheckbox" aria-label="メニューを展開・折りたたむ">
+  <label class="mobile-nav-toggle" for="mobileNavCheckbox"><span>操作メニュー</span><span class="mobile-nav-toggle-indicator" aria-hidden="true"></span></label>
+  <nav class="nav" aria-label="操作メニュー">
+  <button type="button" data-page="dashboard"><span class="sym" aria-hidden="true">▦</span>ダッシュボード</button>
+  <button type="button" data-page="staff" class="active" aria-current="page"><span class="sym" aria-hidden="true">♙</span>スタッフ管理</button>
+  <button type="button" data-page="history"><span class="sym" aria-hidden="true">≡</span>変更履歴（デモ）</button>
+  <button type="button" data-page="qa"><span class="sym" aria-hidden="true">✓</span>会社PC確認</button>
+  <button type="button" data-page="help"><span class="sym" aria-hidden="true">?</span>操作ガイド</button>
+ </nav></div>
+ <div class="side-bottom"><b>R96 検証専用の画面</b>店舗データ・ログイン・権限変更はすべて疑似データです。実際のDB更新は行いません。</div>
+</aside>
+<div class="main"><header class="top"><div class="crumb">DPRO CAR02 <span aria-hidden="true"> / </span> <b id="breadcrumb">スタッフ管理</b></div><div class="profile"><span class="flag">DEMO / 更新不可</span><span class="avatar" aria-hidden="true">山</span><span>店舗管理者（デモ）</span></div></header>
+<main class="canvas" id="mainContent" tabindex="-1">
+ <div class="eyebrow">STREET HOUSE WANGAN • CAR02 ISOLATED PREVIEW</div>
+ <div class="heading"><div><h1 id="pageTitle">スタッフ管理</h1><p class="sub" id="pageSub">スタッフの権限・利用状態を確認し、変更内容を安全にレビューできます。</p></div><span class="flag">本番接続なし / 反映なし</span></div>
+ <div class="notice" role="note"><strong>安全な検証画面です。</strong> ここで操作しても実際のスタッフ情報・本番DB・LINE・予約には一切反映されません。変更内容の確認だけ行います。</div>
+ <div class="stat-grid" aria-label="スタッフ集計">
+  <div class="stat"><div class="label">スタッフ登録数</div><div class="number" id="statTotal">5</div><div class="foot">デモスタッフ</div></div>
+  <div class="stat"><div class="label">有効なスタッフ</div><div class="number" id="statActive">4</div><div class="foot">現在利用可能（疑似）</div></div>
+  <div class="stat"><div class="label">有効なオーナー</div><div class="number" id="statOwners">2</div><div class="foot">最後の1名を保護</div></div>
+  <div class="stat"><div class="label">停止中</div><div class="number" id="statInactive">1</div><div class="foot">再有効化は本人確認必須</div></div>
+ </div>
+ <div class="workspace" id="staffPage">
+  <section class="panel" aria-label="スタッフ一覧">
+   <div class="panel-header"><h2>スタッフ一覧</h2><p>権限変更するスタッフを選択してください（デモ）。</p></div>
+   <div class="tools"><label class="search"><input id="staffSearch" type="search" autocomplete="off" aria-label="名前や担当で検索" placeholder="名前・担当で検索"></label><div class="filters" role="group" aria-label="スタッフの絞り込み"><button type="button" aria-pressed="true" class="selected" data-filter="all">すべて</button><button type="button" aria-pressed="false" data-filter="active">有効</button><button type="button" aria-pressed="false" data-filter="inactive">停止中</button><button type="button" aria-pressed="false" data-filter="owner">オーナー</button></div></div>
+   <div class="staff-scroll"><table class="staff-table"><thead><tr><th>スタッフ</th><th>権限</th><th>状態</th><th>操作</th></tr></thead><tbody id="staffRows"></tbody></table></div>
+   <div class="panel-foot" id="staffCount" role="status" aria-live="polite" aria-atomic="true">全5件 / デモデータ</div>
+  </section>
+  <section class="panel" aria-label="変更内容確認" id="editorPanel" tabindex="-1"><div class="panel-header"><h2>権限変更の確認</h2><p>変更内容を事前確認します。実際の更新は行いません。</p></div>
+   <div class="form-content"><div class="selection"><small>選択中のスタッフ</small><strong id="selectedName">選択してください</strong><p id="selectedDetail">左の一覧からスタッフを選んでください。</p></div>
+   <form id="reviewForm" autocomplete="off"><div class="field"><label for="roleSelect">変更後の権限</label><select id="roleSelect" disabled><option value="owner">オーナー（管理権限あり）</option><option value="staff">スタッフ（整備・受付）</option></select></div>
+   <div class="field"><label for="statusSelect">変更後の利用状態</label><select id="statusSelect" disabled><option value="true">有効（利用可）</option><option value="false">停止（利用不可）</option></select></div>
+   <div class="field"><label for="reasonInput">変更理由（必須）</label><textarea id="reasonInput" aria-describedby="reasonHint feedback" aria-invalid="false" placeholder="例：担当業務変更に伴う権限の見直し" maxlength="512" disabled></textarea><div class="hint"><span id="reasonHint">8〜512文字・変更履歴の監査を想定</span><span id="charCount">0 / 512</span></div></div>
+   <p class="preview-note">R85 API形式のJSONを表示するだけです。ログイン認証・DB登録・変更履歴の書き込みは実行されません。</p><button class="primary" id="reviewButton" type="submit" disabled>変更内容を確認する（送信なし）</button><div class="feedback" id="feedback" role="status" aria-live="polite"></div></form></div>
+  </section>
+ </div>
+ <section class="panel hidden" id="dashboardPage" aria-label="概要"><div class="panel-header"><h2>管理状況（デモ）</h2><p>運用イメージを確認するための疑似集計です。</p></div><div class="help"><article><h3>権限管理はサーバーで検証</h3><p>画面でオーナーを選んだだけでは操作できません。R85では認証とDB上のオーナー権限を確認します。</p></article><article><h3>過去の正式QA</h3><p>R79〜R88のGitHub隔離QA合格記録を保持。R90では会社PCの確認漏れ防止とNO_GO維持を重点確認します。</p></article><article><h3>本番移行の状態</h3><p>NO_GO / HOLD。会社PC確認とバックアップ・復元検証完了まで公開しません。</p></article></div></section>
+ <section class="panel hidden" id="historyPage" aria-label="操作履歴"><div class="panel-header"><h2>変更履歴の見え方（サンプル）</h2><p>これは履歴表示のデザイン確認用です。実際の監査ログではありません。</p></div><div class="preview-history-head"><div><h3>この画面で確認したプレビュー</h3><p class="preview-history-warning">表示は現在のタブだけ。実際の監査ログや権限変更履歴ではありません。</p></div><button id="clearPreviewHistory" type="button" disabled>プレビュー履歴を消す</button></div><div class="preview-history" id="previewHistory" aria-live="polite"><div class="empty">まだ確認したプレビューはありません。</div></div><div class="history-list"><div class="event"><strong>スタッフ権限の変更履歴</strong><p>本番監査履歴は未接続です。R70ではDB上に変更前・変更後・理由・変更者を原子的に記録する設計です。</p></div><div class="event"><strong>セキュリティ上の注意</strong><p>画面上ではオーナー本人の権限変更や最後のオーナー停止を防ぐ補助チェックを行いますが、最終判定は必ずサーバーで行います。</p></div></div></section>
+ <section class="panel hidden" id="helpPage" aria-label="操作説明"><div class="panel-header"><h2>操作ガイド</h2><p>この画面で試せる操作を説明します。</p></div><div class="help"><article><h3>1. 一覧からスタッフを選ぶ</h3><p>名前や担当による検索と、権限・利用状態の絞り込みができます。PCでは「/」キーで検索欄に移動できます。</p></article><article><h3>2. 変更内容を確認する</h3><p>権限・状態・変更理由を指定します。変更のない場合は先に進めません。</p></article><article><h3>3. R85形式を確認する</h3><p>プレビューは通信せず、その場で閉じられます。実際の更新には正式な認証・本番公開承認が必要です。</p></article></div></section>
+
+ <section class="panel hidden qa-panel" id="qaPage" aria-labelledby="qaTitle">
+  <div class="panel-header"><h2 id="qaTitle">会社PC 確認結果の記録（隔離・自己申告）</h2>
+   <p>10月13日の確認用。項目ごとに「未確認／問題なし／要修正」を選択し、結果をPC内のJSONに保存・復元できます。</p></div>
+  <div class="form-content">
+   <div class="qa-gate" role="status"><strong>公開：NO_GO ／ DB移行：HOLD</strong><span>結果がすべて「問題なし」でも公開承認にはなりません。</span></div>
+   <div class="qa-r90-note"><strong>この記録は自己申告メモです。</strong>検証用ダミー画面です。氏名・個人情報・認証情報は記録しません。JSONは端末内に保存され、サーバーには送信されません。画面を閉じる前に必要に応じて書き出してください。</div>
+   <p class="qa-progress" id="qaProgress" role="status" aria-live="polite">未確認 8件</p>
+   <div id="qaChecklist" class="qa-checklist" aria-label="会社PC検証項目（自己申告）"></div>
+   <div class="qa-actions" aria-label="確認結果の操作">
+      <button class="primary" id="qaExport" type="button">結果をJSONで保存</button>
+      <button class="smallbtn" id="qaImport" type="button">保存したJSONを読み込む</button>
+      <input id="qaImportFile" class="qa-file-hidden" type="file" accept=".json,application/json" aria-label="会社PCの保存済みJSONを選択">
+      <button id="qaPrint" class="smallbtn" type="button">結果を印刷</button>
+      <button id="qaReset" class="smallbtn" type="button">すべて未確認に戻す</button>
+   </div>
+   <p id="qaMessage" class="qa-r90-feedback" role="status" aria-live="polite"></p>
+   <p class="qa-r90-warning">未解除の公開前ゲート：本番バックアップと別環境での復元確認／正式な本人確認と認可検査／契約・通知・公開承認。ここからは操作できません。</p>
+  </div>
+ </section>
+ <p id="pageAnnouncement" class="sr-only" role="status" aria-live="polite"></p>
+ <div class="footer-note">DPRO CAR02 R96 / REVIEW ONLY • No API calls • No database writes • No LINE dispatch • Release NO_GO</div>
+</main></div></div>
+<dialog id="reviewDialog" aria-labelledby="dialogTitle"><div class="modal-head"><div class="eyebrow">CONFIRMATION PREVIEW / NOT SENT</div><h2 id="dialogTitle">変更内容の確認（デモ）</h2></div><div class="modal-body"><p id="dialogMember"></p><div class="diff"><div><small>変更前</small><strong id="oldState"></strong></div><span aria-hidden="true" style="text-align:center">→</span><div><small>変更後</small><strong id="newState"></strong></div></div><p><strong>R85 APIに渡す形式（通信しません）</strong></p><pre id="jsonPreview"></pre><p id="reasonPreview" style="overflow-wrap:anywhere;white-space:pre-wrap;margin:9px 0"></p><p id="endpointPreview" style="overflow-wrap:anywhere"></p><div class="notice" style="margin:15px 0 0">これは確認専用のプレビューです。APIへの送信、保存、実際の権限変更はしていません。記録は現在のタブのメモリだけです。</div></div><div class="modal-footer"><button id="closeDialog" type="button">確認して閉じる</button></div></dialog>
+<script type="module" src="./car02-staff-review-app-r90.mjs"></script>
+</body></html>
