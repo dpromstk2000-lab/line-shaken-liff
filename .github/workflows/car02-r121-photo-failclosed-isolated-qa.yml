@@ -1,0 +1,69 @@
+name: DPRO CAR02 R121 Photo Fail-Closed Quarantine QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r121-isolated-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r121-offline-photo-quarantine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_R121_QA_ONLY: 'yes'
+    steps:
+      - name: Read-only checkout without repository credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify protected sources and release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r121
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r121/protected-source-proof.json
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo 'R121_LEGACY_PROTECTED_SOURCES_PASS'
+      - name: Check isolated source syntax and static safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-r121-photo-failclosed-isolated.mjs
+          node --check test-car02-r121-photo-failclosed.mjs
+          node --check test-car02-r121-contract.mjs
+          node --test test-car02-r121-contract.mjs | tee qa-evidence-r121/contract.txt
+          grep -Fq '# fail 0' qa-evidence-r121/contract.txt
+          echo 'R121_STATIC_CONTRACT_PASS'
+      - name: Run offline ambiguity and quarantine regression three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r121-photo-failclosed.mjs | tee "qa-evidence-r121/functional-$i.txt"
+            grep -Fq '# pass 29' "qa-evidence-r121/functional-$i.txt"
+            grep -Fq '# fail 0' "qa-evidence-r121/functional-$i.txt"
+          done
+          echo 'R121_PHOTO_AMBIGUITY_FAIL_CLOSED_87_TESTS_PASS'
+      - name: Ensure offline only and closed release gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$CAR02_R121_QA_ONLY" = yes
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          paths=['car02-r121-photo-failclosed-isolated.mjs','test-car02-r121-photo-failclosed.mjs','test-car02-r121-contract.mjs','.github/workflows/car02-r121-photo-failclosed-isolated-qa.yml']
+          data={'version':'R121','environment':'offline_fake_adapters_only','productionReady':False,'realStorageTested':False,'realPgTested':False,'release':'NO_GO','migration':'HOLD','functionalPasses':87,'contractPasses':3,'sources':{p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in paths}}
+          pathlib.Path('qa-evidence-r121/R121_QA_SUMMARY.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('R121_RELEASE_NO_GO_DB_HOLD')
+          PY
+      - name: Upload nonsecret local-model evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r121-offline-photo-quarantine-proof
+          path: qa-evidence-r121/
+          retention-days: 7
+          if-no-files-found: warn
