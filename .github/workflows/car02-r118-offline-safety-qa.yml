@@ -1,0 +1,58 @@
+name: DPRO CAR02 R118 Offline Booking and Quarantine QA (Isolated)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: car02-r118-isolated-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  r118-offline-safety-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_QA_MODE: 'disposable_offline_only'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out source without write credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify protected production-source hashes and release lock (READ ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence/source-gate.json
+
+      - name: Verify disposable booking race, tenant, quarantine, owner, restore invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 test_car02_r118_isolated_safety.py --json qa-evidence/offline-qa.json 2>&1 | tee qa-evidence/test-log.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source=json.loads(Path('qa-evidence/source-gate.json').read_text())
+          tests=json.loads(Path('qa-evidence/offline-qa.json').read_text())
+          assert source['integrityGatePassed'] and tests['passed']
+          assert source['releaseDecision']==tests['releaseDecision']=='NO_GO'
+          assert source['migrationDecision']==tests['migrationDecision']=='HOLD'
+          assert source['productionReady'] is False and tests['productionReady'] is False
+          assert tests['testCount'] >= 27
+          print('R118_OFFLINE_QA_PASS_AND_RELEASE_LOCKED')
+          PY
+
+      - name: Retain synthetic-only QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r118-offline-qa-evidence
+          path: qa-evidence/
+          retention-days: 7
+          if-no-files-found: warn
