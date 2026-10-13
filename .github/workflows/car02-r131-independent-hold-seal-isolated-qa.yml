@@ -1,0 +1,93 @@
+name: DPRO CAR02 R131 Detached Hold Seal QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r131-hold-seal-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r131-hold-seal-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R129_OFFLINE_QA: 'yes'
+      R130_OFFLINE_QA: 'yes'
+      R131_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven original files and closed production gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r131
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r131/protected-originals.json | tee qa-evidence-r131/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r131/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Validate syntax and offline safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-r123-photo-review-offline.mjs car02-r124-r123-fixtures.mjs car02-r126-signed-chain-isolated.mjs car02-r127-independent-trust-isolated.mjs car02-r128-witness-escrow-isolated.mjs car02-r129-escrow-recovery-isolated.mjs car02-r130-recovery-review-isolated.mjs car02-r131-independent-hold-seal-isolated.mjs test-car02-r131-independent-hold-seal.mjs test-car02-r131-contract.mjs; do node --check "$f"; done
+          node --test test-car02-r131-contract.mjs | tee qa-evidence-r131/contract-preflight.log
+          grep -Fq '# pass 25' qa-evidence-r131/contract-preflight.log
+          grep -Fq '# fail 0' qa-evidence-r131/contract-preflight.log
+      - name: Repeat detached witness seal and stale-evidence safety tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r131-independent-hold-seal.mjs > "qa-evidence-r131/functional-${i}.log" 2>&1
+            grep -Fq '# pass 42' "qa-evidence-r131/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r131/functional-${i}.log"
+            node --test test-car02-r131-contract.mjs > "qa-evidence-r131/contract-${i}.log" 2>&1
+            grep -Fq '# pass 25' "qa-evidence-r131/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r131/contract-${i}.log"
+          done
+          echo R131_OFFLINE_HOLD_SEAL_201_TESTS_PASS | tee qa-evidence-r131/result.txt
+      - name: Write limitations without signing keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          summary={'version':'R131','status':'OFFLINE_SYNTHETIC_QA_ONLY','functional':42,'contract':25,'rounds':3,'pass':201,
+            'release':'NO_GO','migration':'HOLD','productionReady':False,'automaticRecoveryAuthorized':False,
+            'lockRemovalAuthorized':False,'realAuthTested':False,'realStorageTested':False,
+            'liveTrustedClockTested':False,'externalChallengeServiceTested':False,
+            'signaturePrivateKeysInArtifact':False,
+            'openGates':['Out-of-band challenge uniqueness, trust anchors and real independent signing remain untested',
+              'This check is not atomic and does not authorize changes to the existing R129 lock or witness files',
+              'Staging backup restore, credential authorization, external witness and rollback remain pending']}
+          Path('qa-evidence-r131/nonproduction-summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print('R131_NO_GO_HOLD_ONLY')
+          PY
+      - name: Enforce NO_GO and HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R131_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          q=json.load(open('qa-evidence-r131/nonproduction-summary.json'))
+          assert q['release']=='NO_GO' and q['migration']=='HOLD'
+          assert q['productionReady'] is False and q['lockRemovalAuthorized'] is False
+          assert q['signaturePrivateKeysInArtifact'] is False
+          print('R131_NO_GO_HOLD_GATE_PASS')
+          PY
+      - name: Upload sanitized synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r131-offline-detached-hold-seal-proof
+          path: qa-evidence-r131/
+          retention-days: 7
+          if-no-files-found: warn
