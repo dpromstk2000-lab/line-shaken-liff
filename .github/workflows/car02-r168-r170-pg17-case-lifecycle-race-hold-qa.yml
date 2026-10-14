@@ -1,0 +1,142 @@
+name: CAR02 R168-R170 Disposable PG17 Case Lifecycle Race HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r168-r170-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-case-lifecycle-pg17-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r168-disposable-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R168_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout source without stored credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify immutable R138B R159 R162 R165 source and release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r168
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r162_booking_stress_isolated.py)" = 'd6dd3a48a48ffe045ce4ab5df3c2fdd86b3e0e5e'
+          test "$(git rev-parse HEAD:car02_r165_interleaving_isolated.py)" = 'ce9c2a3e1b2dae378ea97e097a5738868f18a19f'
+          echo R168_R170_SOURCE_IMMUTABILITY_PASS > qa-evidence-r168/source-pins.log
+          echo R168_R170_RELEASE_NO_GO_DB_MIGRATION_HOLD > qa-evidence-r168/release-lock.log
+      - name: R169 negative case transition tests in three complete passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r169_case_race.py 2>&1 | tee "qa-evidence-r168/r169-case-negative-${round}.log"
+            grep -Eq '^Ran 71 tests in ' "qa-evidence-r168/r169-case-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r168/r169-case-negative-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r168/r169-case-negative-${round}.log"
+          done
+      - name: R170 workflow read-only and rollback safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r170_workflow_contract.py 2>&1 | tee qa-evidence-r168/r170-workflow-contract.log
+          grep -Fxq OK qa-evidence-r168/r170-workflow-contract.log
+      - name: Create isolated PostgreSQL 17 fixture and five fake identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r168/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r168/schema.log
+      - name: Check initial case and booking data are empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc 'SELECT count(*) FROM car02_r138_qa.bookings;' | grep -Fxq 0
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc 'SELECT count(*) FROM car02_r138_qa.service_cases;' | grep -Fxq 0
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc 'SELECT count(*) FROM car02_r138_qa.case_operations;' | grep -Fxq 0
+          echo R168_DISPOSABLE_EMPTY_FIXTURE_PASS > qa-evidence-r168/initial-empty.log
+      - name: Run concurrent report quote owner approval completion on isolated PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r168_case_race_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r168/r168-probe.log
+          grep -Fxq R168_PG17_CASE_LIFECYCLE_CONCURRENCY_SYNTHETIC_PASS_NO_GO_HOLD qa-evidence-r168/r168-probe.log
+          python3 - <<'PYVERIFY'
+          import os,json
+          from pathlib import Path
+          from car02_r168_case_race_isolated import verify_report
+          report=json.loads(Path('qa-evidence-r168/r168-case-lifecycle-concurrency.json').read_text(encoding='ascii'))
+          assert report['githubCommit']==os.environ['GITHUB_SHA']
+          assert verify_report(report)
+          assert [row['customer'] for row in report['rounds']]==['a1','a2','b1']
+          assert report['productionTouched'] is False
+          print('R168_PROOF_INDEPENDENT_REREAD_PASS_NO_GO_HOLD')
+          PYVERIFY
+      - name: Always remove disposable PostgreSQL database and synthetic accounts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R168_ALL_DISPOSABLE_RESOURCES_DELETED' ELSE 'R168_CLEANUP_FAILED' END" | grep -Fxq R168_ALL_DISPOSABLE_RESOURCES_DELETED
+          echo R168_ALL_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r168/cleanup.log
+      - name: Verify cleanup source integrity and unconditional NO_GO HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R168_ALL_DISPOSABLE_RESOURCES_DELETED qa-evidence-r168/cleanup.log
+          grep -Fxq R168_R170_RELEASE_NO_GO_DB_MIGRATION_HOLD qa-evidence-r168/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r162_booking_stress_isolated.py)" = 'd6dd3a48a48ffe045ce4ab5df3c2fdd86b3e0e5e'
+          test "$(git rev-parse HEAD:car02_r165_interleaving_isolated.py)" = 'ce9c2a3e1b2dae378ea97e097a5738868f18a19f'
+          python3 - <<'PYHOLD'
+          import os,json
+          from pathlib import Path
+          from car02_r168_case_race_isolated import verify_report
+          report=json.loads(Path('qa-evidence-r168/r168-case-lifecycle-concurrency.json').read_text(encoding='ascii'))
+          assert report['githubCommit']==os.environ['GITHUB_SHA']
+          assert report['release']=='NO_GO' and report['migration']=='HOLD'
+          assert report['realWorldGatesOpen']==12
+          assert report['realAuthenticationVerified'] is False and report['realRLSVerified'] is False
+          assert report['externalSignatureVerified'] is False
+          assert verify_report(report)
+          print('R168_R170_DISPOSABLE_CASE_LIFECYCLE_QA_CLEANUP_PASS_NO_GO_HOLD')
+          PYHOLD
+      - name: Preserve synthetic test artifacts for seven days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r168-r170-disposable-case-lifecycle-evidence
+          path: qa-evidence-r168/
+          if-no-files-found: warn
+          retention-days: 7
