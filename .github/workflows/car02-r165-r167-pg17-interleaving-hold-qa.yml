@@ -1,0 +1,135 @@
+name: CAR02 R165-R167 Disposable PG17 Interleaving HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r165-r167-isolated-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  disposable-pg17-interleavings-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r165-synthetic-only-not-a-production-password
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R165_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without persisted authentication
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify immutable fixture and previous QA source objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r165
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r162_booking_stress_isolated.py)" = 'd6dd3a48a48ffe045ce4ab5df3c2fdd86b3e0e5e'
+          echo R165_R167_IMMUTABLE_SOURCE_PIN_PASS > qa-evidence-r165/source-pins.log
+          echo R165_R167_RELEASE_NO_GO_DB_MIGRATION_HOLD > qa-evidence-r165/release-lock.log
+      - name: Three passes of R160 R163 and R166 isolated negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r160_concurrency_contract.py test_car02_r163_booking_stress.py test_car02_r166_interleaving.py 2>&1 | tee "qa-evidence-r165/offline-regression-${round}.log"
+            grep -Eq '^Ran 177 tests in ' "qa-evidence-r165/offline-regression-${round}.log"
+            grep -Fxq OK "qa-evidence-r165/offline-regression-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r165/offline-regression-${round}.log"
+          done
+      - name: R167 workflow fail-closed policy tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r167_workflow_contract.py 2>&1 | tee qa-evidence-r165/r167-safety.log
+          grep -Fxq OK qa-evidence-r165/r167-safety.log
+      - name: Create R138B fixture in disposable PostgreSQL 17 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r165/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r165/schema.log
+      - name: Check disposable business tables are empty before testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          for table in bookings service_cases booking_operations case_operations audit_events; do
+            docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc "SELECT count(*) FROM car02_r138_qa.$table;" | grep -Fxq 0
+          done
+          echo R165_DISPOSABLE_FIVE_TABLE_PRECONDITION_EMPTY > qa-evidence-r165/prestate.log
+      - name: R165 real PG17 overlapping operations and cross-tenant request keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r165_interleaving_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r165/r165-probe.log
+          grep -Fxq R165_DISPOSABLE_PG17_CROSS_OPERATION_INTERLEAVING_PASS_NO_GO_HOLD qa-evidence-r165/r165-probe.log
+          python3 - <<'PYRECHECK'
+          import json,os
+          from pathlib import Path
+          from car02_r165_interleaving_isolated import verify_report
+          proof=json.loads(Path('qa-evidence-r165/r165-interleaving-proof.json').read_text(encoding='ascii'))
+          assert proof['githubCommit']==os.environ['GITHUB_SHA']
+          assert verify_report(proof) and proof['release']=='NO_GO' and proof['migration']=='HOLD'
+          print('R165_INTERLEAVING_PROOF_INDEPENDENT_REREAD_OK')
+          PYRECHECK
+      - name: Always delete only disposable PG17 database and five synthetic roles
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R165_ALL_DISPOSABLE_RESOURCES_DELETED' ELSE 'R165_DISPOSABLE_CLEANUP_FAILED' END" | grep -Fxq R165_ALL_DISPOSABLE_RESOURCES_DELETED
+          echo R165_ALL_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r165/cleanup.log
+      - name: Recheck source pins receipt and NO GO HOLD after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R165_ALL_DISPOSABLE_RESOURCES_DELETED qa-evidence-r165/cleanup.log
+          grep -Fxq R165_R167_RELEASE_NO_GO_DB_MIGRATION_HOLD qa-evidence-r165/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r162_booking_stress_isolated.py)" = 'd6dd3a48a48ffe045ce4ab5df3c2fdd86b3e0e5e'
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r165_interleaving_isolated import verify_report
+          report=json.loads(Path('qa-evidence-r165/r165-interleaving-proof.json').read_text())
+          assert report['githubCommit']==os.environ['GITHUB_SHA'] and verify_report(report)
+          assert report['realWorldGatesOpen']==12 and report['productionTouched'] is False
+          assert report['realAuthenticationVerified'] is False and report['realRLSVerified'] is False
+          print('R165_R167_PG17_DISPOSABLE_INTERLEAVINGS_QA_PASS_NO_GO_HOLD')
+          PYHOLD
+      - name: Preserve short-lived isolated QA evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r165-r167-interleaving-synthetic-only
+          path: qa-evidence-r165/
+          if-no-files-found: warn
+          retention-days: 7
