@@ -1,0 +1,136 @@
+name: CAR02 R182-R184 Disposable PG17 Catalog ACL HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r182-r184-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-pg17-catalog-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r182-disposable-ci-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R182_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read only without stored credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Pin immutable R138B and R171 prior sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r182
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          echo R182_R184_ORIGINAL_SOURCE_PINS_VERIFIED > qa-evidence-r182/source-pins.log
+          echo R182_R184_RELEASE_NO_GO_DB_MIGRATION_HOLD > qa-evidence-r182/release-lock.log
+      - name: R183 strict proof and privilege regression tests three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r183_acl_catalog.py 2>&1 | tee "qa-evidence-r182/r183-negative-${round}.log"
+            grep -Eq '^Ran 89 tests in ' "qa-evidence-r182/r183-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r182/r183-negative-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r182/r183-negative-${round}.log"
+          done
+      - name: R184 workflow isolation static checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r184_workflow_contract.py 2>&1 | tee qa-evidence-r182/r184-workflow-contract.log
+          grep -Fxq OK qa-evidence-r182/r184-workflow-contract.log
+      - name: Create only disposable PostgreSQL 17 fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r182/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r182/schema.log
+      - name: Validate all five business tables begin empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          for table in bookings service_cases case_operations booking_operations audit_events; do
+            docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc "SELECT count(*) FROM car02_r138_qa.$table;" | grep -Fxq 0
+          done
+          echo R182_ALL_SYNTHETIC_TABLES_EMPTY > qa-evidence-r182/empty-fixture.log
+      - name: Inspect actual PG17 RLS ACL definer and block role impersonation
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r182_acl_catalog_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r182/r182-catalog-probe.log
+          grep -Fxq R182_DISPOSABLE_PG17_CATALOG_ACL_RLS_IMPERSONATION_PASS_NO_GO_HOLD qa-evidence-r182/r182-catalog-probe.log
+          python3 - <<'PYVERIFY'
+          import json,os
+          from pathlib import Path
+          from car02_r182_acl_catalog_isolated import verify_report
+          proof=json.loads(Path('qa-evidence-r182/r182-catalog-acl-proof.json').read_text(encoding='ascii'))
+          assert proof['githubCommit']==os.environ['GITHUB_SHA']
+          assert verify_report(proof)
+          assert proof['catalog']['serverMajor']==17
+          assert proof['release']=='NO_GO' and proof['migration']=='HOLD'
+          print('R182_INDEPENDENT_RECHECK_OF_CATALOG_AND_NO_GO_HOLD_PASS')
+          PYVERIFY
+      - name: Always destroy disposable database and five synthetic identities
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R182_ALL_DISPOSABLE_IDENTITIES_AND_DB_DELETED' ELSE 'R182_CLEANUP_FAILED' END" | grep -Fxq R182_ALL_DISPOSABLE_IDENTITIES_AND_DB_DELETED
+          echo R182_ALL_DISPOSABLE_IDENTITIES_AND_DB_DELETED > qa-evidence-r182/cleanup.log
+      - name: Verify cleanup source pins and unconditional NO GO HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R182_ALL_DISPOSABLE_IDENTITIES_AND_DB_DELETED qa-evidence-r182/cleanup.log
+          grep -Fxq R182_R184_RELEASE_NO_GO_DB_MIGRATION_HOLD qa-evidence-r182/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r182_acl_catalog_isolated import verify_report
+          d=json.loads(Path('qa-evidence-r182/r182-catalog-acl-proof.json').read_text(encoding='ascii'))
+          assert d['githubCommit']==os.environ['GITHUB_SHA'] and verify_report(d)
+          assert d['release']=='NO_GO' and d['migration']=='HOLD'
+          assert d['realWorldGatesOpen']==12 and d['productionTouched'] is False
+          assert d['realAuthenticationVerified'] is False and d['realRLSVerified'] is False
+          print('R182_R184_POST_CLEANUP_CATALOG_ACL_QA_PASS_NO_GO_HOLD')
+          PYHOLD
+      - name: Retain isolated QA evidence seven days only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r182-r184-disposable-pg17-catalog-acl-evidence
+          path: qa-evidence-r182/
+          if-no-files-found: warn
+          retention-days: 7
