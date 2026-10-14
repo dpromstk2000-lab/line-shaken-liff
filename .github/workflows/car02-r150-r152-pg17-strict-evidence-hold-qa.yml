@@ -1,0 +1,210 @@
+name: CAR02 R150-R152 Strict Evidence Bundle HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r150-r152-pg17-strict-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r150-r152-disposable-db-strict-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r143-disposable-postgres-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R138_DISPOSABLE_QA: 'yes'
+      R139_DISPOSABLE_QA: 'yes'
+      R140_SYNTHETIC_QA: 'yes'
+      R143_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without retained tokens
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify original immutable sources and exact R138 fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r143
+          python3 car02_r142_provenance_lock_isolated.py > qa-evidence-r143/r142-original-integrity.json.log
+          grep -Fxq 'R142_ORIGINAL_SOURCE_INTEGRITY_PASS_PRODUCTION_NO_GO_DB_HOLD' qa-evidence-r143/r142-original-integrity.json.log
+          echo '6453a322cf6ab96ca00a22c8b83babadd6499f5a0ad3016616e7eabc80edb374  R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql' | sha256sum -c -
+          echo '64c7d9ff4aefff0df65e05371c32555124351ac60a4bc7831feb52160bd2a7e7  car02_r138_pg17_lifecycle_qa.py' | sha256sum -c -
+          echo R143_R144_RELEASE_NO_GO_DB_MIGRATION_HOLD > qa-evidence-r143/release-lock.log
+      - name: Pin R147-R149 committed QA baseline without modification
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '125dbcb6f525f7f4330a9019625628d0fc747bf5  car02_r147_evidence_chain_isolated.py' > qa-evidence-r143/r149-git-object-pins.txt
+          echo 'fc9fb786abed9dfe711e0ff9e1d0fa665f140187  test_car02_r147_evidence_chain.py' >> qa-evidence-r143/r149-git-object-pins.txt
+          echo '6e0a9370bad326e3778f2c409b3c17f86d316a3d  test_car02_r149_workflow_contract.py' >> qa-evidence-r143/r149-git-object-pins.txt
+          echo 'c3d4e0c5767d73732a96c01b58ad1de5f8964eb9  .github/workflows/car02-r147-r149-pg17-evidence-chain-hold-qa.yml' >> qa-evidence-r143/r149-git-object-pins.txt
+          while read -r expected filename; do
+            test "$(git hash-object "$filename")" = "$expected"
+          done < qa-evidence-r143/r149-git-object-pins.txt
+          echo R149_ORIGINAL_GIT_BLOBS_UNCHANGED > qa-evidence-r143/r149-git-integrity.log
+      - name: Local-only negative gate tests repeated three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r143_r144_boundary.py test_car02_r145_workflow_safety.py 2>&1 | tee "qa-evidence-r143/offline-${round}.log"
+            grep -Eq '^Ran 74 tests in ' "qa-evidence-r143/offline-${round}.log"
+            grep -Fxq OK "qa-evidence-r143/offline-${round}.log"
+            if grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r143/offline-${round}.log"; then
+              echo 'R143_R144_UNIT_FAIL'; exit 1
+            fi
+          done
+      - name: R148 cross-evidence fail-closed unit tests repeated three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r147_evidence_chain.py 2>&1 | tee "qa-evidence-r143/r148-cross-evidence-${round}.log"
+            grep -Eq '^Ran 52 tests in ' "qa-evidence-r143/r148-cross-evidence-${round}.log"
+            grep -Fxq OK "qa-evidence-r143/r148-cross-evidence-${round}.log"
+            if grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r143/r148-cross-evidence-${round}.log"; then
+              echo 'R148_LOCAL_FAIL'; exit 1
+            fi
+          done
+      - name: R151 duplicate-key and strict-artifact fail-closed unit tests repeated three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r151_strict_bundle.py 2>&1 | tee "qa-evidence-r143/r151-strict-${round}.log"
+            grep -Eq '^Ran 64 tests in ' "qa-evidence-r143/r151-strict-${round}.log"
+            grep -Fxq OK "qa-evidence-r143/r151-strict-${round}.log"
+            if grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r143/r151-strict-${round}.log"; then
+              echo 'R151_TESTS_FAILED'; exit 1
+            fi
+          done
+      - name: R152 workflow safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r152_workflow_contract.py 2>&1 | tee qa-evidence-r143/r152-workflow-contract.log
+          grep -Eq '^Ran 32 tests in ' qa-evidence-r143/r152-workflow-contract.log
+          grep -Fxq OK qa-evidence-r143/r152-workflow-contract.log
+      - name: R149 workflow hold-contract verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r149_workflow_contract.py 2>&1 | tee qa-evidence-r143/r149-contract.log
+          grep -Fxq OK qa-evidence-r143/r149-contract.log
+      - name: Create only the isolated service database and fixture users
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r143/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r143/schema.log
+      - name: Populate verified R138B synthetic customer and lifecycle history
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r138_pg17_lifecycle_qa.py source --cid "$CID" --evidence qa-evidence-r143/r138-source.json | tee qa-evidence-r143/r138-lifecycle.log
+          grep -Fxq R138_PG17_BOOKING_LIFECYCLE_OWNERSHIP_PASS qa-evidence-r143/r138-lifecycle.log
+      - name: Capture independent five-table BEFORE evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r139_pg17_reconciliation_qa.py source --cid "$CID" --out qa-evidence-r143/r139-before.json | tee qa-evidence-r143/r139-before.log
+          grep -Fxq R139_PG17_INDEPENDENT_AUDIT_RECONCILIATION_PASS qa-evidence-r143/r139-before.log
+      - name: Reject role spoofing cross-tenant authority direct writes and source drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r143_pg17_boundary_probe_isolated.py --cid "$CID" \
+            --source qa-evidence-r143/r138-source.json \
+            --out qa-evidence-r143/r143-r144-boundary-proof.json | tee qa-evidence-r143/r143-probe.log
+          grep -Fxq R143_R144_PG17_SYNTHETIC_ACCESS_BOUNDARY_PASS_NO_GO_HOLD qa-evidence-r143/r143-probe.log
+      - name: Capture independent five-table AFTER evidence and assert no mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r139_pg17_reconciliation_qa.py source --cid "$CID" --out qa-evidence-r143/r139-after.json | tee qa-evidence-r143/r139-after.log
+          python3 car02_r144_independent_parity_isolated.py | tee qa-evidence-r143/r144-parity.log
+          grep -Fxq R144_INDEPENDENT_PG17_FIVE_TABLE_NO_MUTATION_PARITY_PASS_NO_GO_HOLD qa-evidence-r143/r144-parity.log
+      - name: R147 bind R138 R139 R143 and R144 proofs to same isolated commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 car02_r147_evidence_chain_isolated.py --commit "$GITHUB_SHA" | tee qa-evidence-r143/r147-evidence-chain.log
+          grep -Fxq R147_PG17_CROSS_EVIDENCE_CORRELATION_PASS_NO_GO_HOLD qa-evidence-r143/r147-evidence-chain.log
+      - name: R150 independently strict-parse all six evidences and fail on drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 car02_r150_strict_bundle_isolated.py --commit "$GITHUB_SHA" | tee qa-evidence-r143/r150-strict-bundle.log
+          grep -Fxq R150_STRICT_SYNTHETIC_EVIDENCE_BUNDLE_PASS_NO_GO_HOLD qa-evidence-r143/r150-strict-bundle.log
+      - name: Remove all disposable databases and throwaway roles
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R143_ALL_DISPOSABLE_RESOURCES_DELETED' ELSE 'R143_CLEANUP_FAILED' END" | grep -Fxq R143_ALL_DISPOSABLE_RESOURCES_DELETED
+          echo R143_ALL_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r143/cleanup.log
+      - name: Enforce final never-deploy and no-go hold gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R143_ALL_DISPOSABLE_RESOURCES_DELETED qa-evidence-r143/cleanup.log
+          grep -Fxq R143_R144_RELEASE_NO_GO_DB_MIGRATION_HOLD qa-evidence-r143/release-lock.log
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          base=Path('qa-evidence-r143')
+          report=json.loads((base/'r144-independent-parity.json').read_text())
+          assert report['release']=='NO_GO' and report['migration']=='HOLD'
+          assert report['realWorldGatesOpen']==12 and report['fiveTableParity'] is True
+          assert report['probeChecks']>=50 and report['productionTouched'] is False
+          manifest=json.loads((base/'r147-independent-evidence-chain.json').read_text())
+          assert manifest['version']=='R147' and manifest['crossEvidenceMatched'] is True
+          assert manifest['release']=='NO_GO' and manifest['migration']=='HOLD'
+          assert manifest['productionTouched'] is False and manifest['productionAuthorized'] is False
+          assert manifest['realWorldGatesOpen']==12 and manifest['githubCommit']=='${{ github.sha }}'
+          strict=json.loads((base/'r150-strict-bundle.json').read_text())
+          assert strict['version']=='R150' and strict['r147VerifiedRecomputed'] is True
+          assert strict['githubCommit']=='${{ github.sha }}'
+          assert strict['release']=='NO_GO' and strict['migration']=='HOLD'
+          assert strict['realWorldGatesOpen']==12 and strict['productionAuthorized'] is False
+          assert strict['externalWitnessVerified'] is False and strict['externalSignatureVerified'] is False
+          assert strict['duplicateJsonKeysRejected'] is True
+          assert strict['nonFiniteNumbersRejected'] is True
+          assert strict['r147Sha256']==manifest['sha256']
+          print('R150_R152_PG17_STRICT_EVIDENCE_BUNDLE_QA_PASS_NO_GO_HOLD')
+          PY
+      - name: Keep isolated QA evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r150-r152-disposable-pg17-strict-bundle-only
+          path: qa-evidence-r143/
+          if-no-files-found: warn
+          retention-days: 7
