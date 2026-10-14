@@ -1,0 +1,132 @@
+name: DPRO CAR02 R136 PG17 Booking Case Link QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r136-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r136-disposable-case-pg17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r136-throwaway-superuser-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R136_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify seven protected originals and the closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r136
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r136/protected-originals.json | tee qa-evidence-r136/protected.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r136/protected.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Syntax and safety contract preflight repeated three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check test-car02-r136-contract.mjs
+          python3 -m ast car02_r136_pg17_case_qa.py > /dev/null
+          for i in 1 2 3; do
+            node --test test-car02-r136-contract.mjs > "qa-evidence-r136/contract-${i}.log" 2>&1
+            grep -Fxq '# pass 35' "qa-evidence-r136/contract-${i}.log"
+            grep -Fxq '# fail 0' "qa-evidence-r136/contract-${i}.log"
+          done
+      - name: Create exact disposable PostgreSQL 17 database and fixture roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r136_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r136_qa_ci -v ON_ERROR_STOP=1 < R136_PG17_CASE_LINK_QA_ONLY.sql > qa-evidence-r136/schema.log
+          grep -Fxq R136_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r136/schema.log
+      - name: Six-way concurrent bookings case creation role and idempotency QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r136_pg17_case_qa.py source --cid "$CID" --evidence qa-evidence-r136/source.json | tee qa-evidence-r136/source.log
+          grep -Fxq R136_PG17_BOOKING_CASE_ATOMICITY_RLS_PASS qa-evidence-r136/source.log
+          grep -Fxq R136_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r136/source.log
+      - name: Reject corrupt backup and verify isolated restore without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          docker exec -i "$CID" pg_dump -U postgres -d car02_r136_qa_ci --format=custom --no-owner > /tmp/car02-r136-disposable.dump
+          sha256sum /tmp/car02-r136-disposable.dump | awk '{print $1}' > qa-evidence-r136/dump-sha256.txt
+          docker exec -i "$CID" pg_restore -l < /tmp/car02-r136-disposable.dump > /dev/null
+          head -c 16 /tmp/car02-r136-disposable.dump > /tmp/car02-r136-corrupt.dump
+          if docker exec -i "$CID" pg_restore -l < /tmp/car02-r136-corrupt.dump > /dev/null 2>&1; then
+            echo R136_CORRUPT_DUMP_ACCEPTED >&2
+            exit 1
+          fi
+          echo R136_CORRUPT_DUMP_REJECTED > qa-evidence-r136/corrupt-dump.txt
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r136_restore_ci;'
+          docker exec -i "$CID" pg_restore -U postgres -d car02_r136_restore_ci --no-owner < /tmp/car02-r136-disposable.dump
+          python3 car02_r136_pg17_case_qa.py restore --cid "$CID" --source-evidence qa-evidence-r136/source.json --evidence qa-evidence-r136/restore.json | tee qa-evidence-r136/restore.log
+          grep -Fxq R136_PG17_RESTORE_READONLY_REPLAY_PASS qa-evidence-r136/restore.log
+          grep -Fxq R136_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r136/restore.log
+      - name: Always destroy both disposable databases test roles and backups
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r136_restore_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r136_qa_ci WITH (FORCE);'
+          for role in car02_r136_a_staff_ci car02_r136_a_customer_ci car02_r136_b_staff_ci car02_r136_b_customer_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname IN ('car02_r136_restore_ci','car02_r136_qa_ci')) AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r136_%_ci') THEN 'R136_DISPOSABLE_RESOURCES_DELETED' ELSE 'R136_CLEANUP_FAILED' END" | grep -Fxq R136_DISPOSABLE_RESOURCES_DELETED
+          rm -f /tmp/car02-r136-disposable.dump /tmp/car02-r136-corrupt.dump
+          echo R136_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r136/cleanup.txt
+      - name: Verify release NO_GO database migration HOLD and synthetic evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for fn in ('source.json','restore.json'):
+            data=json.loads((Path('qa-evidence-r136')/fn).read_text())
+            assert data['release']=='NO_GO' and data['migration']=='HOLD'
+            assert data['syntheticOnly'] is True
+            assert data['snapshot']['A']['service_cases']==1
+            assert data['snapshot']['B']['service_cases']==1
+            assert data['snapshot']['A']['case_operations']==4
+            assert data['snapshot']['B']['case_operations']==3
+          assert Path('qa-evidence-r136/cleanup.txt').read_text().strip()=='R136_DISPOSABLE_RESOURCES_DELETED'
+          print('R136_ISOLATED_PG17_NO_GO_HOLD_PASS')
+          PY
+      - name: Upload sanitized nonsecret synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r136-disposable-booking-case-link-proof
+          path: qa-evidence-r136/
+          retention-days: 7
+          if-no-files-found: warn
