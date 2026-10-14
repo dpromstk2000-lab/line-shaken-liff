@@ -115,17 +115,53 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-          for fn in ('source.json','restore.json'):
-            x=json.loads((Path('qa-evidence-r138')/fn).read_text())
-            assert x['release']=='NO_GO' and x['migration']=='HOLD' and x['syntheticOnly'] is True
-            assert x['snapshot']['a1']['counts']['service_cases']==1
-            assert x['snapshot']['a2']['counts']['service_cases']==1
-            assert x['snapshot']['as']['counts']['service_cases']==2
-            if fn=='source.json':
-              assert all(x['lifecycleChecks'].values())
-            else:
-              assert x['lifecycleVerifiedRestore'] is True
-          assert Path('qa-evidence-r138/cleanup.txt').read_text().strip()=='R138_DISPOSABLE_RESOURCES_DELETED'
+          folder=Path('qa-evidence-r138')
+          source=json.loads((folder/'source.json').read_text(encoding='utf-8'))
+          restored=json.loads((folder/'restore.json').read_text(encoding='utf-8'))
+          
+          def require(condition, code):
+              if not condition:
+                  raise AssertionError('R138B_GATE_'+code)
+          
+          for name, evidence in [('source',source),('restore',restored)]:
+              require(evidence.get('mode')==name, name+'_MODE')
+              require(evidence.get('release')=='NO_GO' and evidence.get('migration')=='HOLD',name+'_RELEASE_HOLD')
+              require(evidence.get('syntheticOnly') is True, name+'_SYNTHETIC_ONLY')
+              require(evidence.get('version')=='R138',name+'_EVIDENCE_VERSION')
+              require(set(evidence['snapshot'])=={'as','a1','a2','bs','b1'},name+'_ACTOR_SET')
+              for role, entry in evidence['snapshot'].items():
+                  require(len(entry['sha256'])==64 and all(c in '0123456789abcdef' for c in entry['sha256']),name+'_'+role+'_SHA')
+          
+          # Counts reflect all post-lifecycle records, not the earlier pre-lifecycle state.
+          expected={
+              'a1': {'bookings':3,'service_cases':2,'case_operations':4,'audit_events':11},
+              'a2': {'bookings':3,'service_cases':1,'case_operations':3,'audit_events':7},
+              'as': {'bookings':6,'service_cases':3,'case_operations':7,'audit_events':18},
+              'b1': {'bookings':2,'service_cases':1,'case_operations':4,'audit_events':7},
+              'bs': {'bookings':2,'service_cases':1,'case_operations':4,'audit_events':7},
+          }
+          for role, counts in expected.items():
+              require(source['snapshot'][role]['counts']==counts,'SOURCE_'+role.upper()+'_FINAL_COUNTS')
+              require(restored['snapshot'][role]['counts']==counts,'RESTORE_'+role.upper()+'_FINAL_COUNTS')
+          
+          require(restored['snapshot']==source['snapshot'],'BACKUP_RESTORE_DIGEST_PARITY')
+          require(source.get('customerObjectAccessVerified') is True,'CUSTOMER_OWNERSHIP')
+          require(source.get('realCustomerAuthenticated') is False,'NO_REAL_AUTH')
+          require(source.get('customersPerShop')==['A1','A2'],'TWO_SAME_SHOP_CUSTOMERS')
+          require(source.get('lifecycleBookingIds',{}).keys()=={'cancelled','caseBound','otherCustomer'},'LIFECYCLE_IDS')
+          expected_checks={'sixWayMove','sixWayCancel','crossCustomerDenied','caseBoundBookingImmutable',
+              'cancelledKeyNotReused','slotReuse','tenantIsolation'}
+          require(set(source.get('lifecycleChecks',{}))==expected_checks,'LIFECYCLE_CHECK_KEYS')
+          require(all(source['lifecycleChecks'].values()),'LIFECYCLE_CHECK_PASS')
+          require(restored.get('matchesSource') is True,'RESTORE_MATCHES_SOURCE')
+          require(restored.get('lifecycleVerifiedRestore') is True,'RESTORE_LIFECYCLE')
+          require((folder/'cleanup.txt').read_text().strip()=='R138_DISPOSABLE_RESOURCES_DELETED','CLEANUP')
+          require((folder/'corrupt-backup.txt').read_text().strip()=='R138_CORRUPT_BACKUP_REJECTED','CORRUPT_DUMP_REJECTED')
+          report={'name':'R138B-POST-LIFECYCLE-EVIDENCE-GATE-PATCH','status':'PASS','release':'NO_GO',
+                  'migration':'HOLD','syntheticOnly':True,'sourceRestoredSnapshotEqual':True,
+                  'lifecycleChecks':sorted(expected_checks),'customerCounts':expected,'productionTouched':False}
+          (folder/'gate-verification.json').write_text(json.dumps(report,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('R138B_POST_LIFECYCLE_EVIDENCE_PARITY_PASS')
           print('R138B_ISOLATED_PG17_NO_GO_HOLD_PASS')
           PY
       - name: Upload sanitized synthetic-only QA evidence
