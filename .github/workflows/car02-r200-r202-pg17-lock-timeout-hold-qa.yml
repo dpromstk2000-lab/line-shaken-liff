@@ -1,0 +1,145 @@
+name: CAR02 R200-R202 PG17 Lock Timeout Retry HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r200-r202-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-pg17-row-lock-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r200-disposable-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R200_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout without stored credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Pin eight original sources and NO GO HOLD before QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r200
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          test "$(git rev-parse HEAD:car02_r188_role_escalation_isolated.py)" = 'd61fc9d6d2248e1851187a6b20dea4184fea564d'
+          test "$(git rev-parse HEAD:car02_r191_transaction_rollback_isolated.py)" = '7bf3c1b690db14e6dcbe27831d18231488c91d5f'
+          test "$(git rev-parse HEAD:car02_r194_savepoint_atomicity_isolated.py)" = 'b30b081cc019692739e8a4182be00bed73ed1ecc'
+          test "$(git rev-parse HEAD:car02_r197_error_recovery_isolated.py)" = '561a282301a5133f37881a04a8459a0ca87b05e1'
+          echo R200_R202_SOURCE_PINS_PASS > qa-evidence-r200/pins.log
+          echo R200_R202_RELEASE_NO_GO_MIGRATION_HOLD > qa-evidence-r200/release-lock.log
+      - name: R201 86 negative evidence tests repeated three full rounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r201_lock_timeout.py 2>&1 | tee "qa-evidence-r200/r201-negative-${round}.log"
+            grep -Eq '^Ran 86 tests in ' "qa-evidence-r200/r201-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r200/r201-negative-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r200/r201-negative-${round}.log"
+          done
+      - name: R202 workflow no production access contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r202_workflow_contract.py 2>&1 | tee qa-evidence-r200/r202-workflow-contract.log
+          grep -Fxq OK qa-evidence-r200/r202-workflow-contract.log
+      - name: Create exact disposable PG17 database and synthetic roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r200/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r200/schema.log
+      - name: Verify all five synthetic business tables empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          for table in bookings service_cases case_operations booking_operations audit_events; do
+            docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc "SELECT count(*) FROM car02_r138_qa.$table;" | grep -Fxq 0
+          done
+          echo R200_EMPTY_PG17_FIXTURE_PASS > qa-evidence-r200/empty-fixture.log
+      - name: Run R200 actual PG17 lock timeouts and exactly once retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r200_lock_timeout_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r200/r200-probe.log
+          grep -Fxq R200_DISPOSABLE_PG17_FOUR_LOCK_TIMEOUT_RETRY_AUDIT_PASS_NO_GO_HOLD qa-evidence-r200/r200-probe.log
+          python3 - <<'PYVERIFY'
+          import json,os
+          from pathlib import Path
+          from car02_r200_lock_timeout_isolated import verify_report,SCENARIOS
+          r=json.loads(Path('qa-evidence-r200/r200-lock-timeout-proof.json').read_text(encoding='ascii'))
+          assert verify_report(r) and r['githubCommit']==os.environ['GITHUB_SHA']
+          assert len(r['scenarios'])==len(SCENARIOS)==4
+          assert all(v['timeoutSqlstate']=='55P03' and v['auditRows']==1 for v in r['scenarios'].values())
+          assert r['release']=='NO_GO' and r['migration']=='HOLD' and r['realWorldGatesOpen']==12
+          print('R200_FOUR_REAL_LOCK_TIMEOUT_RECOVERIES_RECHECKED')
+          PYVERIFY
+      - name: Always delete disposable PG17 database and five throwaway roles
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R200_ALL_THROWAWAY_RESOURCES_DELETED' ELSE 'R200_CLEANUP_FAILED' END" | grep -Fxq R200_ALL_THROWAWAY_RESOURCES_DELETED
+          echo R200_ALL_THROWAWAY_RESOURCES_DELETED > qa-evidence-r200/cleanup.log
+      - name: Recheck eight immutable source pins and NO GO HOLD after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R200_ALL_THROWAWAY_RESOURCES_DELETED qa-evidence-r200/cleanup.log
+          grep -Fxq R200_R202_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r200/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          test "$(git rev-parse HEAD:car02_r188_role_escalation_isolated.py)" = 'd61fc9d6d2248e1851187a6b20dea4184fea564d'
+          test "$(git rev-parse HEAD:car02_r191_transaction_rollback_isolated.py)" = '7bf3c1b690db14e6dcbe27831d18231488c91d5f'
+          test "$(git rev-parse HEAD:car02_r194_savepoint_atomicity_isolated.py)" = 'b30b081cc019692739e8a4182be00bed73ed1ecc'
+          test "$(git rev-parse HEAD:car02_r197_error_recovery_isolated.py)" = '561a282301a5133f37881a04a8459a0ca87b05e1'
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r200_lock_timeout_isolated import verify_report
+          r=json.loads(Path('qa-evidence-r200/r200-lock-timeout-proof.json').read_text(encoding='ascii'))
+          assert verify_report(r) and r['githubCommit']==os.environ['GITHUB_SHA']
+          assert r['release']=='NO_GO' and r['migration']=='HOLD' and r['realWorldGatesOpen']==12
+          assert r['productionTouched'] is False and r['realAuthenticationVerified'] is False
+          print('R200_R202_DISPOSABLE_CLEANUP_NO_GO_HOLD_PASS')
+          PYHOLD
+      - name: Preserve only short retention synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: car02-r200-r202-disposable-pg17-lock-timeouts
+          path: qa-evidence-r200/
+          if-no-files-found: warn
+          retention-days: 7
