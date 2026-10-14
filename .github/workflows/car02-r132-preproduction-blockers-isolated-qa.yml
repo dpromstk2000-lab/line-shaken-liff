@@ -1,0 +1,90 @@
+name: DPRO CAR02 R132 Preproduction No-Go Blockers QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r132-qa-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r132-readiness-no-go-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R132_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect original seven production sources and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r132
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r132/protected-originals.json | tee qa-evidence-r132/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r132/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Syntax check and contract preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-r131-independent-hold-seal-isolated.mjs car02-r132-readiness-gate-isolated.mjs test-car02-r132-readiness-gate.mjs test-car02-r132-contract.mjs; do node --check "$f"; done
+          node --test test-car02-r132-contract.mjs | tee qa-evidence-r132/preflight.log
+          grep -Fq '# pass 28' qa-evidence-r132/preflight.log
+          grep -Fq '# fail 0' qa-evidence-r132/preflight.log
+      - name: Repeat 12-gate fail-closed evidence inventory tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r132-readiness-gate.mjs > "qa-evidence-r132/functional-${i}.log" 2>&1
+            grep -Fq '# pass 52' "qa-evidence-r132/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r132/functional-${i}.log"
+            node --test test-car02-r132-contract.mjs > "qa-evidence-r132/contract-${i}.log" 2>&1
+            grep -Fq '# pass 28' "qa-evidence-r132/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r132/contract-${i}.log"
+          done
+          echo R132_ISOLATED_GATE_240_TESTS_PASS | tee qa-evidence-r132/result.txt
+      - name: Generate safe synthetic readiness blockers summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node car02-r132-readiness-gate-isolated.mjs --report > qa-evidence-r132/no-go-blockers.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('qa-evidence-r132/no-go-blockers.json')
+          j=json.loads(p.read_text())
+          assert j['release']=='NO_GO' and j['migration']=='HOLD'
+          assert j['openBlockingGates']==12 and j['candidateCoverage']==0
+          assert j['productionReady'] is False and j['deployAuthorized'] is False
+          assert j['databaseMigrationAuthorized'] is False and j['automaticHoldReleaseAuthorized'] is False
+          assert j['externalProofVerified'] is False and j['realAuthVerified'] is False
+          q={'version':'R132','status':'OFFLINE_INVENTORY_ONLY','functionalCases':52,'contractCases':28,'rounds':3,'passed':240,
+             'productionReady':False,'release':'NO_GO','migration':'HOLD','productionChanges':False,
+             'limitations':['12 requirements are proposed manual staging/production verification gates; none are verified in R132',
+               'Synthetic document references cannot prove real identity, keys, time, storage, LINE, DB or deployment',
+               'Report SHA-256 is unkeyed and is not an independently trusted signature or release approval',
+               'R131 success on GitHub was confirmed separately and is not reverified by this offline script']}
+          Path('qa-evidence-r132/nonproduction-summary.json').write_text(json.dumps(q,indent=2)+'\n')
+          print('R132_NO_GO_HOLD_GATE_PASS')
+          PY
+      - name: Preserve release NO_GO and migration HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R132_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          grep -Fxq R132_NO_GO_HOLD_GATE_PASS <(python3 -c "import json; q=json.load(open('qa-evidence-r132/no-go-blockers.json')); assert q['openBlockingGates']==12 and q['release']=='NO_GO' and q['migration']=='HOLD'; print('R132_NO_GO_HOLD_GATE_PASS')")
+      - name: Upload sanitized synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r132-offline-preproduction-blockers-proof
+          path: qa-evidence-r132/
+          retention-days: 7
+          if-no-files-found: warn
