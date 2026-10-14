@@ -1,0 +1,152 @@
+name: CAR02 R209-R211 PG17 Committed Response Discarded Idempotent Retry HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r209-r211-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-pg17-commit-ack-loss-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r209-disposable-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R209_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read only without stored credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Pin eleven immutable prior sources and NO GO HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r209
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          test "$(git rev-parse HEAD:car02_r188_role_escalation_isolated.py)" = 'd61fc9d6d2248e1851187a6b20dea4184fea564d'
+          test "$(git rev-parse HEAD:car02_r191_transaction_rollback_isolated.py)" = '7bf3c1b690db14e6dcbe27831d18231488c91d5f'
+          test "$(git rev-parse HEAD:car02_r194_savepoint_atomicity_isolated.py)" = 'b30b081cc019692739e8a4182be00bed73ed1ecc'
+          test "$(git rev-parse HEAD:car02_r197_error_recovery_isolated.py)" = '561a282301a5133f37881a04a8459a0ca87b05e1'
+          test "$(git rev-parse HEAD:car02_r200_lock_timeout_isolated.py)" = '565d6d0528b23202bbb61910b83bad0b8678370a'
+          test "$(git rev-parse HEAD:car02_r203_deadlock_recovery_isolated.py)" = '084906c336dcd2011fdadc1eca8f264ccd423327'
+          test "$(git rev-parse HEAD:car02_r206_disconnect_atomicity_isolated.py)" = '110c7640b9cdf233741ea9fdc59d903517f983eb'
+          echo R209_R211_ELEVEN_IMMUTABLE_SOURCES_LOCKED > qa-evidence-r209/source-pins.log
+          echo R209_R211_RELEASE_NO_GO_MIGRATION_HOLD > qa-evidence-r209/release-lock.log
+      - name: R210 response-discard and evidence falsification tests three rounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r210_commit_ack_loss.py 2>&1 | tee "qa-evidence-r209/r210-negative-${round}.log"
+            grep -Eq '^Ran 86 tests in ' "qa-evidence-r209/r210-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r209/r210-negative-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r209/r210-negative-${round}.log"
+          done
+      - name: R211 static no-production workflow contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r211_workflow_contract.py 2>&1 | tee qa-evidence-r209/r211-workflow-contract.log
+          grep -Fxq OK qa-evidence-r209/r211-workflow-contract.log
+      - name: Create only exact disposable PostgreSQL17 fixture and five synthetic roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r209/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r209/schema.log
+      - name: Verify five synthetic business tables start empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          for table in bookings service_cases case_operations booking_operations audit_events; do
+            docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc "SELECT count(*) FROM car02_r138_qa.$table;" | grep -Fxq 0
+          done
+          echo R209_FIVE_TABLES_EMPTY_BEFORE_PROBE > qa-evidence-r209/empty-fixture.log
+      - name: R209 PG17 committed response-discarded idempotency and conflict denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r209_commit_ack_loss_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r209/r209-probe.log
+          grep -Fxq R209_DISPOSABLE_PG17_COMMITTED_RESPONSE_DISCARDED_FOUR_IDEMPOTENT_RETRIES_NO_GO_HOLD_PASS qa-evidence-r209/r209-probe.log
+          python3 - <<'PYVERIFY'
+          import json,os
+          from pathlib import Path
+          from car02_r209_commit_ack_loss_isolated import verify_report,SCENARIOS
+          r=json.loads(Path('qa-evidence-r209/r209-commit-ack-loss-proof.json').read_text(encoding='ascii'))
+          assert verify_report(r) and r['githubCommit']==os.environ['GITHUB_SHA']
+          assert len(r['scenarios'])==len(SCENARIOS)==4
+          assert all(x['conflictSqlstate']=='22023' and x['auditRows']==1 and x['identicalReplayResult']=='IDEMPOTENT' and x['firstClientResponseObserved'] is False for x in r['scenarios'].values())
+          assert r['release']=='NO_GO' and r['migration']=='HOLD' and r['realWorldGatesOpen']==12
+          assert r['productionAuthorized'] is False and r['realAuthenticationVerified'] is False
+          print('R209_FOUR_COMMITTED_UNKNOWN_OUTCOME_IDEMPOTENCY_PROOFS_VERIFIED')
+          PYVERIFY
+      - name: Always drop disposable database and five roles
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R209_ALL_THROWAWAY_RESOURCES_DELETED' ELSE 'R209_CLEANUP_FAILED' END" | grep -Fxq R209_ALL_THROWAWAY_RESOURCES_DELETED
+          echo R209_ALL_THROWAWAY_RESOURCES_DELETED > qa-evidence-r209/cleanup.log
+      - name: Recheck eleven source pins and unconditional NO GO HOLD after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R209_ALL_THROWAWAY_RESOURCES_DELETED qa-evidence-r209/cleanup.log
+          grep -Fxq R209_R211_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r209/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          test "$(git rev-parse HEAD:car02_r188_role_escalation_isolated.py)" = 'd61fc9d6d2248e1851187a6b20dea4184fea564d'
+          test "$(git rev-parse HEAD:car02_r191_transaction_rollback_isolated.py)" = '7bf3c1b690db14e6dcbe27831d18231488c91d5f'
+          test "$(git rev-parse HEAD:car02_r194_savepoint_atomicity_isolated.py)" = 'b30b081cc019692739e8a4182be00bed73ed1ecc'
+          test "$(git rev-parse HEAD:car02_r197_error_recovery_isolated.py)" = '561a282301a5133f37881a04a8459a0ca87b05e1'
+          test "$(git rev-parse HEAD:car02_r200_lock_timeout_isolated.py)" = '565d6d0528b23202bbb61910b83bad0b8678370a'
+          test "$(git rev-parse HEAD:car02_r203_deadlock_recovery_isolated.py)" = '084906c336dcd2011fdadc1eca8f264ccd423327'
+          test "$(git rev-parse HEAD:car02_r206_disconnect_atomicity_isolated.py)" = '110c7640b9cdf233741ea9fdc59d903517f983eb'
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r209_commit_ack_loss_isolated import verify_report
+          r=json.loads(Path('qa-evidence-r209/r209-commit-ack-loss-proof.json').read_text(encoding='ascii'))
+          assert verify_report(r) and r['githubCommit']==os.environ['GITHUB_SHA']
+          assert r['release']=='NO_GO' and r['migration']=='HOLD' and r['realWorldGatesOpen']==12
+          assert r['productionTouched'] is False and r['realAuthenticationVerified'] is False
+          print('R209_R211_CLEANUP_NO_GO_HOLD_PASS')
+          PYHOLD
+      - name: Preserve only synthetic seven-day evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: car02-r209-r211-disposable-pg17-commit-ack-loss-only
+          path: qa-evidence-r209/
+          if-no-files-found: warn
+          retention-days: 7
