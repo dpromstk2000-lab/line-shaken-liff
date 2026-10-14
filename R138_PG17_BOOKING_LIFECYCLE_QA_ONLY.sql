@@ -1,4 +1,5 @@
--- DPRO CAR02 R138: disposable PostgreSQL 17 fixture ONLY; not a migration.
+-- DPRO CAR02 R138B: disposable PostgreSQL 17 fixture ONLY; not a migration.
+-- R138B stores immutable initial request parameters independently of the current booking slot.
 -- NEVER execute in Supabase, staging, production, or any retained database.
 \set ON_ERROR_STOP on
 BEGIN;
@@ -28,6 +29,7 @@ CREATE TABLE car02_r138_qa.bookings (
    OR (shop_code='other_demo' AND owner_login='car02_r138_b_one_ci')),
   request_key text NOT NULL CHECK(request_key ~ '^[a-zA-Z0-9_-]{12,64}$'),
   booking_day date NOT NULL, begins_at time(0) NOT NULL,
+  original_booking_day date NOT NULL, original_begins_at time(0) NOT NULL,
   state text NOT NULL DEFAULT 'ACTIVE' CHECK(state IN ('ACTIVE','CANCELLED')),
   version integer NOT NULL DEFAULT 1 CHECK(version BETWEEN 1 AND 100000),
   UNIQUE(shop_code,request_key), UNIQUE(id,shop_code,owner_login),
@@ -120,15 +122,16 @@ BEGIN
  OR extract(minute from p_time) NOT IN(0,30) OR p_time<'09:00'::time OR p_time>'17:30'::time
  OR (p_day=v_now::date AND p_time<=v_now::time)
  THEN RAISE EXCEPTION 'R138_INVALID_BOOKING' USING ERRCODE='22023'; END IF;
- INSERT INTO car02_r138_qa.bookings(shop_code,owner_login,request_key,booking_day,begins_at)
- VALUES (v_shop,p_owner,p_key,p_day,p_time) ON CONFLICT DO NOTHING RETURNING id INTO v_id;
+ INSERT INTO car02_r138_qa.bookings(shop_code,owner_login,request_key,booking_day,begins_at,original_booking_day,original_begins_at)
+ VALUES (v_shop,p_owner,p_key,p_day,p_time,p_day,p_time) ON CONFLICT DO NOTHING RETURNING id INTO v_id;
  IF v_id IS NOT NULL THEN
   INSERT INTO car02_r138_qa.audit_events(shop_code,owner_login,entity_id,action) VALUES(v_shop,p_owner,v_id,'BOOKED');
   RETURN 'CREATED';
  END IF;
  SELECT * INTO v_old FROM car02_r138_qa.bookings WHERE shop_code=v_shop AND request_key=p_key;
  IF FOUND THEN
-  IF v_old.owner_login<>p_owner OR v_old.booking_day<>p_day OR v_old.begins_at<>p_time
+  -- Replay identity is the ORIGINAL request, never the mutable current slot.
+  IF v_old.owner_login<>p_owner OR v_old.original_booking_day<>p_day OR v_old.original_begins_at<>p_time
   THEN RAISE EXCEPTION 'R138_BOOKING_REPLAY_CONFLICT' USING ERRCODE='22023'; END IF;
   IF v_old.state='CANCELLED' THEN RETURN 'CANCELLED_ALREADY'; END IF;
   RETURN 'IDEMPOTENT';

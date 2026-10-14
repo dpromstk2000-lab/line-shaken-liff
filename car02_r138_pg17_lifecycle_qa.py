@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""R138 synthetic customer-level ownership QA, disposable GitHub PG17 only."""
+"""R138B synthetic customer-level ownership QA, disposable GitHub PG17 only."""
 import argparse
 import concurrent.futures
 import datetime as dt
@@ -35,7 +35,7 @@ def lit(x):
     return "'" + x + "'"
 
 
-def psql(cid, db, actor, sql, success=True):
+def psql(cid, db, actor, sql, success=True, expected_error=None):
     require(re.fullmatch(r'[a-f0-9]{12,64}', cid) is not None, 'UNKNOWN_CONTAINER')
     require(db in DBS.values() and actor in ROLES, 'UNKNOWN_DISPOSABLE_DB_OR_ROLE')
     command = ['docker', 'exec', '-i', cid, 'env', 'PGPASSWORD=' + PASSWORD,
@@ -44,14 +44,16 @@ def psql(cid, db, actor, sql, success=True):
     result = subprocess.run(command, capture_output=True, text=True, timeout=25)
     if not success:
         require(result.returncode != 0, 'EXPECTED_REJECTION')
+        if expected_error is not None:
+            require(expected_error in result.stderr, 'WRONG_REJECTION_REASON')
         return 'REJECTED'
     require(result.returncode == 0, 'SQL_' + result.stderr[-300:])
     return result.stdout.strip()
 
 
-def booking(cid, db, who, key, owner, day, clock='10:00', success=True):
+def booking(cid, db, who, key, owner, day, clock='10:00', success=True, expected_error=None):
     sql = f'SELECT car02_r138_qa.claim_booking({lit(key)},{lit(owner)},{lit(day)}::date,{lit(clock)}::time);'
-    return psql(cid, db, who, sql, success)
+    return psql(cid, db, who, sql, success, expected_error)
 
 
 def case(cid, db, who, key, booking_id, success=True):
@@ -83,7 +85,7 @@ def digest(cid, db):
     for actor in ROLES:
         tables = []
         for table, expression in (
-            ('bookings', "request_key||':'||owner_login||':'||state||':'||version::text||':'||booking_day::text||':'||begins_at::text"),
+            ('bookings', "request_key||':'||owner_login||':'||state||':'||version::text||':'||booking_day::text||':'||begins_at::text||':'||original_booking_day::text||':'||original_begins_at::text"),
             ('service_cases', "request_key||':'||owner_login||':'||state||':'||version::text||':'||coalesce(total_yen::text,'-')"),
             ('case_operations', "request_key||':'||actor_login||':'||op"),
             ('booking_operations', "request_key||':'||actor_login||':'||op||':'||request_hash"),
@@ -221,6 +223,10 @@ def lifecycle_source(cid, path):
     moves=pool(lambda _:change_booking(cid,db,'a1','r138_move_a1_00001',id1,'MOVE',1,day,'13:30'))
     require(moves.count('MOVED')==1 and moves.count('IDEMPOTENT')==5,'LC_SIX_WAY_MOVE')
     require(integer(cid,db,'a1',f'SELECT version FROM car02_r138_qa.bookings WHERE id={id1};')==2,'LC_VERSION')
+    # Original booking request remains idempotent even after a MOVE; the new clock is not the original payload.
+    require(booking(cid,db,'as','r138_lifecycle_a1_01',a1,day,'13:00')=='IDEMPOTENT','LC_MOVED_OLD_REQUEST_IDEMPOTENT')
+    require(booking(cid,db,'as','r138_lifecycle_a1_01',a1,day,'13:30',False,'R138_BOOKING_REPLAY_CONFLICT')=='REJECTED','LC_MOVED_NEW_CLOCK_REPLAY_REJECTED')
+    require(integer(cid,db,'a1',f'SELECT count(*) FROM car02_r138_qa.bookings WHERE request_key=\'r138_lifecycle_a1_01\';')==1,'LC_OLD_REQUEST_NOT_DUPLICATED')
     require(change_booking(cid,db,'a1','r138_move_a1_00001',id1,'MOVE',1,day,'15:00',False)=='REJECTED','LC_MOVE_REPLAY_CHANGED')
     require(change_booking(cid,db,'a1','r138_move_stale0001',id1,'MOVE',1,day,'15:00',False)=='REJECTED','LC_STALE_VERSION')
     require(change_booking(cid,db,'a1','r138_move_sunday001',id1,'MOVE',2,'2030-01-06','15:00',False)=='REJECTED','LC_OUT_OF_RANGE')
@@ -231,6 +237,8 @@ def lifecycle_source(cid, path):
     cancels=pool(lambda _:change_booking(cid,db,'a1','r138_cancel_a1_001',id1,'CANCEL',2))
     require(cancels.count('CANCELLED')==1 and cancels.count('IDEMPOTENT')==5,'LC_SIX_WAY_CANCEL')
     require(booking(cid,db,'as','r138_lifecycle_a1_01',a1,day,'13:00')=='CANCELLED_ALREADY','LC_OLD_KEY_NOT_REACTIVATED')
+    require(booking(cid,db,'as','r138_lifecycle_a1_01',a1,day,'13:30',False,'R138_BOOKING_REPLAY_CONFLICT')=='REJECTED','LC_CANCELLED_WRONG_REPLAY_BLOCKED')
+    require(integer(cid,db,'a1',f'SELECT count(*) FROM car02_r138_qa.bookings WHERE id={id1} AND state=\'CANCELLED\' AND version=3;')==1,'LC_CANCELLED_REPLAY_IMMUTABLE')
     require(change_booking(cid,db,'a1','r138_cancel_again001',id1,'CANCEL',3,success=False)=='REJECTED','LC_CANCEL_IMMUTABLE')
     require(change_booking(cid,db,'a1','r138_move_cancelled1',id1,'MOVE',3,day,'14:30',False)=='REJECTED','LC_MOVE_CANCELLED')
     require(change_booking(cid,db,'a2','r138_cross_replay001',id1,'CANCEL',2,success=False)=='REJECTED','LC_FOREIGN_CANCEL')
@@ -264,6 +272,8 @@ def lifecycle_restore(cid, path, source_path):
     require(before==source_data['snapshot'],'LC_RESTORE_MISMATCH')
     ids=source_data['lifecycleBookingIds']
     require(change_booking(cid,db,'a1','r138_cancel_a1_001',ids['cancelled'],'CANCEL',2)=='IDEMPOTENT','LC_RESTORED_CANCEL_REPLAY')
+    require(booking(cid,db,'as','r138_lifecycle_a1_01',ROLES['a1'],source_data['day'],'13:00')=='CANCELLED_ALREADY','LC_RESTORED_ORIGINAL_BOOKING_REPLAY')
+    require(booking(cid,db,'as','r138_lifecycle_a1_01',ROLES['a1'],source_data['day'],'13:30',False,'R138_BOOKING_REPLAY_CONFLICT')=='REJECTED','LC_RESTORED_ALTERED_BOOKING_REPLAY')
     require(change_booking(cid,db,'a2','r138_wrong_owner_restore',ids['cancelled'],'CANCEL',3,success=False)=='REJECTED','LC_RESTORED_OTHER_CUSTOMER')
     require(change_booking(cid,db,'as','r138_restore_case_move',ids['caseBound'],'MOVE',1,source_data['day'],'15:00',False)=='REJECTED','LC_RESTORED_CASE_BLOCK')
     require(digest(cid,db)==before,'LC_RESTORED_MUTATION')

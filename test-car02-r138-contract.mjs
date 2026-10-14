@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const sql=readFileSync(new URL('./R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql',import.meta.url),'utf8');
 const py=readFileSync(new URL('./car02_r138_pg17_lifecycle_qa.py',import.meta.url),'utf8');
-const yaml=readFileSync(new URL('./.github/workflows/car02-r138-pg17-lifecycle-isolated-qa.yml',import.meta.url),'utf8');
+const yaml=readFileSync(new URL('./.github/workflows/car02-r138b-pg17-immutable-replay-isolated-qa.yml',import.meta.url),'utf8');
 const tests=[
  ['requires_exact_disposable_db',()=>assert.match(sql,/current_database\(\)\s*<>\s*'car02_r138_qa_ci'/)],
  ['requires_postgresql17_only',()=>{assert.match(sql,/server_version_num'\)::integer\s*<\s*170000/);assert.match(sql,/server_version_num'\)::integer\s*>=\s*180000/)}],
@@ -39,7 +39,7 @@ const tests=[
  ['python_cross_customer_negative_tests',()=>{assert.match(py,/SAME_SHOP_OTHER_CUSTOMER_APPROVES/);assert.match(py,/A1_APPROVES_A2/);assert.match(py,/A2_SEES_A1/)}],
  ['python_backup_restore_and_readonly',()=>{assert.match(py,/RESTORE_SNAPSHOT_MISMATCH/);assert.match(py,/RESTORED_CROSS_CUSTOMER/);assert.match(py,/RESTORE_MUTATED/)}],
  ['workflow_readonly_and_safe_pg17',()=>{assert.match(yaml,/permissions:\s*\n\s+contents: read/);assert.match(yaml,/persist-credentials: false/);assert.match(yaml,/image: postgres:17/);assert.doesNotMatch(yaml,/\b(wrangler|supabase db push|secrets\.|deploy\b)/i)}],
- ['workflow_cleanup_release_lock_and_artifacts',()=>{assert.match(yaml,/car02_r118_readonly_source_gate.py --strict/);assert.match(yaml,/if: always\(\)/);assert.match(yaml,/R138_DISPOSABLE_RESOURCES_DELETED/);assert.match(yaml,/R138_ISOLATED_PG17_NO_GO_HOLD_PASS/);assert.match(yaml,/retention-days: 7/)}],
+ ['workflow_cleanup_release_lock_and_artifacts',()=>{assert.match(yaml,/car02_r118_readonly_source_gate.py --strict/);assert.match(yaml,/if: always\(\)/);assert.match(yaml,/R138_DISPOSABLE_RESOURCES_DELETED/);assert.match(yaml,/R138B_ISOLATED_PG17_NO_GO_HOLD_PASS/);assert.match(yaml,/retention-days: 7/)}],
  ['booking_version_optimistic_lock',()=>{assert.match(sql,/version integer NOT NULL DEFAULT 1 CHECK\(version BETWEEN 1 AND 100000\)/);assert.match(sql,/R138_STALE_BOOKING/)}],
  ['booking_cancel_and_move_only',()=>{assert.match(sql,/op text NOT NULL CHECK\(op IN \('CANCEL','MOVE'\)\)/);assert.match(sql,/p_op NOT IN \('CANCEL','MOVE'\)/)}],
  ['booking_operation_owner_fk',()=>assert.match(sql,/FOREIGN KEY\(booking_id,shop_code,owner_login\) REFERENCES car02_r138_qa\.bookings\(id,shop_code,owner_login\)/)],
@@ -57,5 +57,11 @@ const tests=[
  ['case_lock_and_rebook',()=>{assert.match(py,/LC_CASE_LOCKED_MOVE/);assert.match(py,/LC_REBOOK_NEW_KEY/)}],
  ['read_only_restore_snapshot',()=>assert.match(py,/LC_RESTORED_MUTATION/)],
  ['workflow_lifecycle_success_markers',()=>{assert.match(yaml,/R138_PG17_BOOKING_LIFECYCLE_OWNERSHIP_PASS/);assert.match(yaml,/R138_PG17_RESTORE_LIFECYCLE_READONLY_PASS/)}],
+ ['original_request_day_and_time_persisted',()=>{assert.match(sql,/original_booking_day date NOT NULL, original_begins_at time\(0\) NOT NULL/);assert.match(sql,/p_day,p_time,p_day,p_time\)/)}],
+ ['idempotency_checks_original_payload_not_current_slot',()=>{assert.match(sql,/v_old\.original_booking_day<>p_day OR v_old\.original_begins_at<>p_time/);assert.doesNotMatch(sql,/v_old\.booking_day<>p_day OR v_old\.begins_at<>p_time/)}],
+ ['moved_cancelled_and_restored_replay_covered',()=>{for(const marker of ['LC_MOVED_OLD_REQUEST_IDEMPOTENT','LC_MOVED_NEW_CLOCK_REPLAY_REJECTED','LC_OLD_REQUEST_NOT_DUPLICATED','LC_CANCELLED_WRONG_REPLAY_BLOCKED','LC_CANCELLED_REPLAY_IMMUTABLE','LC_RESTORED_ORIGINAL_BOOKING_REPLAY','LC_RESTORED_ALTERED_BOOKING_REPLAY'])assert.ok(py.includes(marker),marker)}],
+ ['digest_includes_immutable_origins',()=>assert.match(py,/original_booking_day::text\|\|':'\|\|original_begins_at::text/)],
+ ['negative_replay_checks_rejection_reason',()=>{assert.match(py,/def psql\(cid, db, actor, sql, success=True, expected_error=None\)/);assert.match(py,/expected_error in result\.stderr/);assert.match(py,/False,'R138_BOOKING_REPLAY_CONFLICT'/)}],
+ ['mutable_slot_cannot_override_initial_payload',()=>{assert.match(sql,/UPDATE car02_r138_qa\.bookings SET booking_day=p_new_day,begins_at=p_new_time,version=version\+1/);assert.doesNotMatch(sql,/SET[^;]*original_booking_day=/i)}],
 ];
 for(const [name,fn] of tests)test('R138_contract_'+name,fn);
