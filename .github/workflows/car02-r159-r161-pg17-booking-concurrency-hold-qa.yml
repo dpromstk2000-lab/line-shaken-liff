@@ -1,0 +1,126 @@
+name: CAR02 R159-R161 Disposable PG17 Booking Concurrency HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r159-r161-pg17-concurrency-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r159-r161-disposable-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r159-disposable-postgres-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R159_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify pinned R138B disposable fixture and original sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r159
+          echo '6453a322cf6ab96ca00a22c8b83babadd6499f5a0ad3016616e7eabc80edb374  R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql' | sha256sum -c -
+          echo '64c7d9ff4aefff0df65e05371c32555124351ac60a4bc7831feb52160bd2a7e7  car02_r138_pg17_lifecycle_qa.py' | sha256sum -c -
+          echo R159_R161_RELEASE_NO_GO_DB_MIGRATION_HOLD > qa-evidence-r159/release-lock.log
+      - name: R160 negative and concurrency classifier unit tests repeated three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r160_concurrency_contract.py 2>&1 | tee "qa-evidence-r159/r160-negative-${round}.log"
+            grep -Eq '^Ran 55 tests in ' "qa-evidence-r159/r160-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r159/r160-negative-${round}.log"
+            if grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r159/r160-negative-${round}.log"; then exit 1; fi
+          done
+      - name: R161 isolated workflow safety test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r161_workflow_contract.py 2>&1 | tee qa-evidence-r159/r161-workflow-contract.log
+          grep -Fxq OK qa-evidence-r159/r161-workflow-contract.log
+      - name: Create only disposable PG17 database and synthetic roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r159/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r159/schema.log
+      - name: R159 real parallel request move cancellation and case-versus-cancel probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r159_concurrent_booking_isolated.py --cid "$CID" --commit "$GITHUB_SHA" | tee qa-evidence-r159/r159-probe.log
+          grep -Fxq R159_PG17_CONCURRENT_BOOKING_ATOMICITY_SYNTHETIC_PASS_NO_GO_HOLD qa-evidence-r159/r159-probe.log
+          python3 - <<'PYVERIFY'
+          import json,os
+          from pathlib import Path
+          from car02_r159_concurrent_booking_isolated import verify_release
+          p=Path('qa-evidence-r159/r159-concurrency-proof.json')
+          x=json.loads(p.read_text(encoding='ascii'))
+          assert x['githubCommit']==os.environ['GITHUB_SHA']
+          assert x['syntheticDb']=='car02_r138_qa_ci'
+          assert x['originalSqlUnchanged'] is True
+          assert verify_release(x)
+          print('R159_INDEPENDENT_PROOF_REREAD_OK_NO_GO_HOLD')
+          PYVERIFY
+      - name: Remove disposable PG17 database and throwaway identities
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R159_ALL_DISPOSABLE_RESOURCES_DELETED' ELSE 'R159_CLEANUP_FAILED' END" | grep -Fxq R159_ALL_DISPOSABLE_RESOURCES_DELETED
+          echo R159_ALL_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r159/cleanup.log
+      - name: Independently confirm post-cleanup release hold and original hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R159_ALL_DISPOSABLE_RESOURCES_DELETED qa-evidence-r159/cleanup.log
+          grep -Fxq R159_R161_RELEASE_NO_GO_DB_MIGRATION_HOLD qa-evidence-r159/release-lock.log
+          echo '6453a322cf6ab96ca00a22c8b83babadd6499f5a0ad3016616e7eabc80edb374  R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql' | sha256sum -c -
+          echo '64c7d9ff4aefff0df65e05371c32555124351ac60a4bc7831feb52160bd2a7e7  car02_r138_pg17_lifecycle_qa.py' | sha256sum -c -
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r159_concurrent_booking_isolated import verify_release
+          report=json.loads(Path('qa-evidence-r159/r159-concurrency-proof.json').read_text())
+          assert report['githubCommit']==os.environ['GITHUB_SHA']
+          assert report['release']=='NO_GO' and report['migration']=='HOLD'
+          assert report['realWorldGatesOpen']==12 and report['productionAuthorized'] is False
+          assert report['realAuthenticationVerified'] is False and report['realRLSVerified'] is False
+          assert verify_release(report)
+          print('R159_R161_DISPOSABLE_CONCURRENCY_CLEANUP_PASS_NO_GO_HOLD')
+          PYHOLD
+      - name: Preserve isolated QA evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r159-r161-disposable-concurrency-only
+          path: qa-evidence-r159/
+          if-no-files-found: warn
+          retention-days: 7
