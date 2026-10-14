@@ -1,0 +1,137 @@
+name: DPRO CAR02 R139 Independent PG17 Reconciliation QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r139-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r139-readonly-audit-pg17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r139-disposable-container-admin
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R138_DISPOSABLE_QA: 'yes'
+      R139_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect original sources and ensure old fixture remains frozen
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r139
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r139/protected-originals.json | tee qa-evidence-r139/protected.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r139/protected.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          echo '6453a322cf6ab96ca00a22c8b83babadd6499f5a0ad3016616e7eabc80edb374  R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql' | sha256sum -c -
+          echo '64c7d9ff4aefff0df65e05371c32555124351ac60a4bc7831feb52160bd2a7e7  car02_r138_pg17_lifecycle_qa.py' | sha256sum -c -
+          echo 'R139_RELEASE_NO_GO_MIGRATION_HOLD' > qa-evidence-r139/release-gate.log
+      - name: Offline tamper tests three passes and syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m ast car02_r139_pg17_reconciliation_qa.py > /dev/null
+          python3 -m ast test_car02_r139_reconciliation.py > /dev/null
+          for i in 1 2 3; do
+            python3 -m unittest -q test_car02_r139_reconciliation.py > "qa-evidence-r139/unit-${i}.log" 2>&1
+            grep -Fxq 'Ran 30 tests in 0.002s' "qa-evidence-r139/unit-${i}.log" || grep -Eq 'Ran 30 tests in [0-9.]+s' "qa-evidence-r139/unit-${i}.log"
+            grep -Fxq OK "qa-evidence-r139/unit-${i}.log"
+          done
+      - name: Create ephemeral PostgreSQL17 fixture and synthetic roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r139/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r139/schema.log
+      - name: Generate lifecycle history and independently reconcile all five tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r138_pg17_lifecycle_qa.py source --cid "$CID" --evidence qa-evidence-r139/r138-source.json | tee qa-evidence-r139/r138-source.log
+          grep -Fxq R138_PG17_BOOKING_LIFECYCLE_OWNERSHIP_PASS qa-evidence-r139/r138-source.log
+          python3 car02_r139_pg17_reconciliation_qa.py source --cid "$CID" --out qa-evidence-r139/r139-source.json | tee qa-evidence-r139/r139-source.log
+          grep -Fxq R139_PG17_INDEPENDENT_AUDIT_RECONCILIATION_PASS qa-evidence-r139/r139-source.log
+      - name: Reject broken backup then restore independently for parity audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          docker exec -i "$CID" pg_dump -U postgres -d car02_r138_qa_ci --format=custom --no-owner > /tmp/r139-fixture.dump
+          sha256sum /tmp/r139-fixture.dump | awk '{print $1}' > qa-evidence-r139/dump-sha256.txt
+          docker exec -i "$CID" pg_restore -l < /tmp/r139-fixture.dump > /dev/null
+          head -c 16 /tmp/r139-fixture.dump > /tmp/r139-broken.dump
+          if docker exec -i "$CID" pg_restore -l < /tmp/r139-broken.dump > /dev/null 2>&1; then
+            echo R139_CORRUPT_BACKUP_ACCEPTED >&2; exit 1
+          fi
+          echo R139_CORRUPT_BACKUP_REJECTED > qa-evidence-r139/broken-backup.txt
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_restore_ci;'
+          docker exec -i "$CID" pg_restore -U postgres -d car02_r138_restore_ci --no-owner < /tmp/r139-fixture.dump
+          python3 car02_r138_pg17_lifecycle_qa.py restore --cid "$CID" --source-evidence qa-evidence-r139/r138-source.json --evidence qa-evidence-r139/r138-restore.json | tee qa-evidence-r139/r138-restore.log
+          grep -Fxq R138_PG17_RESTORE_LIFECYCLE_READONLY_PASS qa-evidence-r139/r138-restore.log
+          python3 car02_r139_pg17_reconciliation_qa.py restore --cid "$CID" --source-proof qa-evidence-r139/r139-source.json --out qa-evidence-r139/r139-restore.json | tee qa-evidence-r139/r139-restore.log
+          grep -Fxq R139_PG17_CROSS_DATABASE_PARITY_PASS qa-evidence-r139/r139-restore.log
+          grep -Fxq R139_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r139/r139-restore.log
+      - name: Always destroy disposable databases and principals
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_restore_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname IN ('car02_r138_qa_ci','car02_r138_restore_ci')) AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R139_DISPOSABLE_RESOURCES_DELETED' ELSE 'R139_CLEANUP_FAILED' END" | grep -Fxq R139_DISPOSABLE_RESOURCES_DELETED
+          rm -f /tmp/r139-fixture.dump /tmp/r139-broken.dump
+          echo R139_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r139/cleanup.log
+      - name: Confirm no-go gates and publish synthetic results only
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          grep -Fxq R139_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r139/release-gate.log
+          grep -Fxq R139_DISPOSABLE_RESOURCES_DELETED qa-evidence-r139/cleanup.log
+          grep -Fxq R139_CORRUPT_BACKUP_REJECTED qa-evidence-r139/broken-backup.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from car02_r139_pg17_reconciliation_qa import attest_snapshot
+          f=Path('qa-evidence-r139')
+          s=json.loads((f/'r139-source.json').read_text())
+          r=json.loads((f/'r139-restore.json').read_text())
+          assert s['mode']=='source' and r['mode']=='restore'
+          assert attest_snapshot(s,r)
+          assert all(v['eventsReconciled']>0 for v in s['shops'].values())
+          print('R139_OFFICIAL_READONLY_RECONCILIATION_NO_GO_HOLD_PASS')
+          PY
+      - name: Upload synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r139-independent-reconciliation-synthetic-proof
+          path: qa-evidence-r139/
+          retention-days: 7
+          if-no-files-found: warn
