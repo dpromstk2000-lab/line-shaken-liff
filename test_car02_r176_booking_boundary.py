@@ -22,7 +22,10 @@ def reseal(d):d['sha256']=r.seal(d);return d
 class R176(unittest.TestCase):
     def reject(self,d):
         with self.assertRaises(r.BoundaryError):r.verify_report(reseal(d))
-    def test_valid(self):self.assertTrue(r.verify_report(sample()))
+    def test_valid(self):
+        self.assertTrue(r.verify_report(sample()))
+        self.assertEqual(r.EXPECTED['customer_cannot_create'],
+                         'permission denied for function claim_booking')
     def test_bad_commit(self):d=sample();d['githubCommit']='F'*40;self.reject(d)
     def test_invalid_snapshot_shape(self):d=sample();d['snapshots']['seconds']['before'].pop('audit_events');self.reject(d)
     def test_invalid_snapshot_digest(self):d=sample();d['snapshots']['seconds']['before']['bookings']='G'*32;self.reject(d)
@@ -55,6 +58,16 @@ class R176(unittest.TestCase):
         q=r.query_create('r175_valid_token', 'car02_r138_a_one_ci', '2026-11-01','09:00')
         self.assertTrue(q.startswith('SELECT car02_r138_qa.claim_booking('))
         self.assertTrue(q.endswith(');'))
+        # Source-based regression for the exact ACL responsible for GitHub QA #1 failure.
+        fixture = Path('R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql').read_text(encoding='utf-8')
+        self.assertIn('REVOKE ALL ON FUNCTION car02_r138_qa.claim_booking(text,text,date,time) FROM PUBLIC;',fixture)
+        grant = fixture.split('GRANT EXECUTE ON FUNCTION car02_r138_qa.claim_booking(text,text,date,time),car02_r138_qa.open_case(text,bigint)',1)
+        self.assertEqual(len(grant), 2)
+        grantees=grant[1].split('TO ',1)[1].split(';',1)[0]
+        self.assertIn('car02_r138_a_staff_ci',grantees)
+        self.assertIn('car02_r138_b_staff_ci',grantees)
+        for forbidden in ('car02_r138_a_one_ci','car02_r138_a_two_ci','car02_r138_b_one_ci'):
+            self.assertNotIn(forbidden, grantees)
     def test_sql_builder_injection(self):
         with self.assertRaises(AssertionError):r.query_create('r175_inject', 'anything', '2026-11-01',"09:00'; DROP TABLE")
     def test_move_negative_ver(self):

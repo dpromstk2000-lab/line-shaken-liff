@@ -20,7 +20,7 @@ EXPECTED={
  'over_60_days':'R138_INVALID_BOOKING','before_open':'R138_INVALID_BOOKING',
  'after_close':'R138_INVALID_BOOKING','quarter_hour':'R138_INVALID_BOOKING',
  'seconds':'R138_INVALID_BOOKING','invalid_key':'R138_INVALID_BOOKING',
- 'foreign_tenant_owner':'R138_OWNER_SHOP_MISMATCH','customer_cannot_create':'R138_STAFF_REQUIRED',
+ 'foreign_tenant_owner':'R138_OWNER_SHOP_MISMATCH','customer_cannot_create':'permission denied for function claim_booking',
  'changed_time_replay':'R138_BOOKING_REPLAY_CONFLICT',
  'changed_owner_replay':'R138_BOOKING_REPLAY_CONFLICT',
  'move_past':'R138_INVALID_MOVE_SLOT','move_sunday':'R138_INVALID_MOVE_SLOT',
@@ -135,6 +135,8 @@ def probe(cid,commit,out=OUT):
         bad_create(name,'r175_'+name,owner,day['valid'],clock)
     bad_create('invalid_key','tiny',owner,day['valid'],'11:00')
     bad_create('foreign_tenant_owner','r175_wrong_shop',b_owner,day['valid'],'12:00')
+    # R138B intentionally REVOKEs EXECUTE from PUBLIC and grants claim_booking only to staff.
+    # This customer request is denied at PostgreSQL function ACL before SECURITY DEFINER runs.
     bad_create('customer_cannot_create','r175_no_staff',owner,day['valid'],'12:00','a1')
     bad_create('changed_time_replay','r175_edge_0900',owner,day['valid'],'09:30')
     bad_create('changed_owner_replay','r175_edge_0900',other,day['valid'],'09:00')
