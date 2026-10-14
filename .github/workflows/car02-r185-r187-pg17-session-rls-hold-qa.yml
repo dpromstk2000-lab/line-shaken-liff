@@ -1,0 +1,137 @@
+name: CAR02 R185-R187 Disposable PG17 Session RLS Spoof HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r185-r187-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-pg17-session-rls-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r185-throwaway-pg17-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R185_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read-only without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Pin immutable SQL helper and R171 R182 prior sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r185
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          test "$(git rev-parse HEAD:car02_r182_acl_catalog_isolated.py)" = 'e63558a7fca0684e4f144d61363fc3b3b9db9718'
+          echo R185_R187_IMMUTABLE_SOURCE_PINS_PASS > qa-evidence-r185/source-pins.log
+          echo R185_R187_RELEASE_NO_GO_DB_MIGRATION_HOLD > qa-evidence-r185/release-lock.log
+      - name: Run R186 adversarial offline tests three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r186_rls_session_spoof.py 2>&1 | tee "qa-evidence-r185/r186-negative-${round}.log"
+            grep -Eq '^Ran 139 tests in ' "qa-evidence-r185/r186-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r185/r186-negative-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r185/r186-negative-${round}.log"
+          done
+      - name: Run R187 workflow guard checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r187_workflow_contract.py 2>&1 | tee qa-evidence-r185/r187-workflow-contract.log
+          grep -Fxq OK qa-evidence-r185/r187-workflow-contract.log
+      - name: Create only fresh disposable PostgreSQL 17 fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r185/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r185/schema.log
+      - name: Assert all five isolated business tables begin empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          for table in bookings service_cases case_operations booking_operations audit_events; do
+            docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc "SELECT count(*) FROM car02_r138_qa.$table;" | grep -Fxq 0
+          done
+          echo R185_SYNTHETIC_PG17_TABLES_EMPTY > qa-evidence-r185/empty-fixture.log
+      - name: Exercise real PG17 synthetic session GUC and search path spoof RLS checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r185_rls_session_spoof_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r185/r185-session-probe.log
+          grep -Fxq R185_DISPOSABLE_PG17_SYNTHETIC_SESSION_RLS_INVARIANCE_PASS_NO_GO_HOLD qa-evidence-r185/r185-session-probe.log
+          python3 - <<'PYVERIFY'
+          import json,os
+          from pathlib import Path
+          from car02_r185_rls_session_spoof_isolated import verify_report, ACTORS, PROFILES, TABLES
+          d=json.loads(Path('qa-evidence-r185/r185-synthetic-session-spoof-proof.json').read_text(encoding='ascii'))
+          assert verify_report(d) and d['githubCommit']==os.environ['GITHUB_SHA']
+          assert len(d['spoofReadbacks']) == len(ACTORS)*len(PROFILES)
+          assert sum(len(x['tables']) for x in d['spoofReadbacks'].values()) == len(ACTORS)*len(PROFILES)*len(TABLES)
+          assert d['realWorldGatesOpen']==12 and d['release']=='NO_GO' and d['migration']=='HOLD'
+          print('R185_READBACK_INDEPENDENT_LOCAL_PROOF_PASS_NO_GO_HOLD')
+          PYVERIFY
+      - name: Always drop disposable database and throwaway identities
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R185_DISPOSABLE_DB_AND_FIVE_ROLES_DELETED' ELSE 'R185_CLEANUP_FAILED' END" | grep -Fxq R185_DISPOSABLE_DB_AND_FIVE_ROLES_DELETED
+          echo R185_DISPOSABLE_DB_AND_FIVE_ROLES_DELETED > qa-evidence-r185/cleanup.log
+      - name: Recheck source pins cleaned DB and unconditional NO GO HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R185_DISPOSABLE_DB_AND_FIVE_ROLES_DELETED qa-evidence-r185/cleanup.log
+          grep -Fxq R185_R187_RELEASE_NO_GO_DB_MIGRATION_HOLD qa-evidence-r185/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          test "$(git rev-parse HEAD:car02_r182_acl_catalog_isolated.py)" = 'e63558a7fca0684e4f144d61363fc3b3b9db9718'
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r185_rls_session_spoof_isolated import verify_report
+          proof=json.loads(Path('qa-evidence-r185/r185-synthetic-session-spoof-proof.json').read_text(encoding='ascii'))
+          assert verify_report(proof) and proof['githubCommit']==os.environ['GITHUB_SHA']
+          assert proof['realAuthenticationVerified'] is False and proof['realRLSVerified'] is False
+          assert proof['productionTouched'] is False and proof['realWorldGatesOpen']==12
+          print('R185_R187_DISPOSABLE_SYNTHETIC_RLS_CLEANUP_PASS_NO_GO_HOLD')
+          PYHOLD
+      - name: Preserve only short-retention synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r185-r187-synthetic-session-rls-evidence
+          path: qa-evidence-r185/
+          if-no-files-found: warn
+          retention-days: 7
