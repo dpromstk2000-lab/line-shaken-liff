@@ -147,8 +147,9 @@ def probe(cid,source=SOURCE_FILE,output=PROOF_FILE):
             'visibleCounts':before,'sourceSynthetic':True,
             'sourceCaseIds':caseids}
     report['sha256']=hashlib.sha256(json.dumps(report,sort_keys=True,ensure_ascii=True,separators=(',',':')).encode()).hexdigest()
-    output.parent.mkdir(exist_ok=True)
-    output.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+    proof_path=Path(output)
+    proof_path.parent.mkdir(parents=True,exist_ok=True)
+    proof_path.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
     print('R143_R144_PG17_SYNTHETIC_ACCESS_BOUNDARY_PASS_NO_GO_HOLD')
     return report
 

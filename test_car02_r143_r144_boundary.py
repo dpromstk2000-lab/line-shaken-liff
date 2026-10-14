@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import tempfile
 import unittest
 from unittest.mock import patch
 import car02_r143_pg17_boundary_probe_isolated as r143
@@ -126,14 +127,20 @@ class Guard(unittest.TestCase):
              patch.object(r143,'scalar',side_effect=fake_scalar),\
              patch.object(r143,'integer',side_effect=fake_integer),\
              patch.object(r143,'run',side_effect=fake_run),\
-             patch.object(r143.Path,'write_text',return_value=0) as saved:
-            proof=r143.probe('a'*16)
+             tempfile.TemporaryDirectory(prefix='car02_r146_qa_') as tmpdir:
+            old_cwd=os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                proof=r143.probe('a'*16,str(r143.SOURCE_FILE),str(r143.PROOF_FILE))
+                saved_proof=json.loads(r143.PROOF_FILE.read_text(encoding='utf8'))
+            finally:
+                os.chdir(old_cwd)
+        self.assertEqual(saved_proof,proof)
         self.assertEqual(proof['checkCount'],56)
         self.assertEqual(proof['realWorldGatesOpen'],12)
         self.assertEqual(proof['migration'],'HOLD')
         self.assertEqual(len(proof['visibleCounts']),5)
         self.assertEqual(len(proof['sha256']),64)
-        self.assertEqual(saved.call_count,1)
         self.assertTrue(r144.verify(copy.deepcopy(SNAP),copy.deepcopy(SNAP),proof)['fiveTableParity'])
 
 class Parity(unittest.TestCase):
