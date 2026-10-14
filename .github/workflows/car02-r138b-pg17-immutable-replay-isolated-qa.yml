@@ -1,0 +1,138 @@
+name: DPRO CAR02 R138B PG17 Immutable Replay Repair QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r138b-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r138b-booking-lifecycle-pg17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r138-disposable-container-admin
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R138_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven originals and enforce closed production gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r138
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r138/protected-originals.json | tee qa-evidence-r138/protected.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r138/protected.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Python syntax and repeated offline contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m ast car02_r138_pg17_lifecycle_qa.py > /dev/null
+          node --check test-car02-r138-contract.mjs
+          for i in 1 2 3; do
+            node --test test-car02-r138-contract.mjs > "qa-evidence-r138/contract-${i}.log" 2>&1
+            grep -Fxq '# pass 57' "qa-evidence-r138/contract-${i}.log"
+            grep -Fxq '# fail 0' "qa-evidence-r138/contract-${i}.log"
+          done
+      - name: Create exact disposable PostgreSQL 17 schema and customer principals
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r138/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r138/schema.log
+      - name: Verify per-customer ownership and booking lifecycle concurrent approval RLS and idempotency
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r138_pg17_lifecycle_qa.py source --cid "$CID" --evidence qa-evidence-r138/source.json | tee qa-evidence-r138/source.log
+          grep -Fxq R138_PG17_CUSTOMER_OBJECT_ISOLATION_PASS qa-evidence-r138/source.log
+          grep -Fxq R138_PG17_BOOKING_LIFECYCLE_OWNERSHIP_PASS qa-evidence-r138/source.log
+          echo R138B_IMMUTABLE_ORIGINAL_REQUEST_REPLAY_PASS
+          grep -Fxq R138_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r138/source.log
+      - name: Reject corrupt backup and verify restored customer ownership and booking lifecycle boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          docker exec -i "$CID" pg_dump -U postgres -d car02_r138_qa_ci --format=custom --no-owner > /tmp/car02-r138-disposable.dump
+          sha256sum /tmp/car02-r138-disposable.dump | awk '{print $1}' > qa-evidence-r138/dump-sha256.txt
+          docker exec -i "$CID" pg_restore -l < /tmp/car02-r138-disposable.dump > /dev/null
+          head -c 16 /tmp/car02-r138-disposable.dump > /tmp/car02-r138-corrupt.dump
+          if docker exec -i "$CID" pg_restore -l < /tmp/car02-r138-corrupt.dump > /dev/null 2>&1; then
+            echo R138_CORRUPT_BACKUP_ACCEPTED >&2
+            exit 1
+          fi
+          echo R138_CORRUPT_BACKUP_REJECTED > qa-evidence-r138/corrupt-backup.txt
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_restore_ci;'
+          docker exec -i "$CID" pg_restore -U postgres -d car02_r138_restore_ci --no-owner < /tmp/car02-r138-disposable.dump
+          python3 car02_r138_pg17_lifecycle_qa.py restore --cid "$CID" --source-evidence qa-evidence-r138/source.json --evidence qa-evidence-r138/restore.json | tee qa-evidence-r138/restore.log
+          grep -Fxq R138_PG17_RESTORE_CUSTOMER_RLS_REPLAY_PASS qa-evidence-r138/restore.log
+          grep -Fxq R138_PG17_RESTORE_LIFECYCLE_READONLY_PASS qa-evidence-r138/restore.log
+          echo R138B_RESTORED_ORIGINAL_REQUEST_REPLAY_PASS
+          grep -Fxq R138_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r138/restore.log
+      - name: Always destroy disposable databases principals and backup files
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_restore_ci WITH (FORCE);'
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname IN ('car02_r138_restore_ci','car02_r138_qa_ci')) AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R138_DISPOSABLE_RESOURCES_DELETED' ELSE 'R138_CLEANUP_FAILED' END" | grep -Fxq R138_DISPOSABLE_RESOURCES_DELETED
+          rm -f /tmp/car02-r138-disposable.dump /tmp/car02-r138-corrupt.dump
+          echo R138_DISPOSABLE_RESOURCES_DELETED > qa-evidence-r138/cleanup.txt
+      - name: Confirm public release NO_GO migration HOLD and synthetic only evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for fn in ('source.json','restore.json'):
+            x=json.loads((Path('qa-evidence-r138')/fn).read_text())
+            assert x['release']=='NO_GO' and x['migration']=='HOLD' and x['syntheticOnly'] is True
+            assert x['snapshot']['a1']['counts']['service_cases']==1
+            assert x['snapshot']['a2']['counts']['service_cases']==1
+            assert x['snapshot']['as']['counts']['service_cases']==2
+            if fn=='source.json':
+              assert all(x['lifecycleChecks'].values())
+            else:
+              assert x['lifecycleVerifiedRestore'] is True
+          assert Path('qa-evidence-r138/cleanup.txt').read_text().strip()=='R138_DISPOSABLE_RESOURCES_DELETED'
+          print('R138B_ISOLATED_PG17_NO_GO_HOLD_PASS')
+          PY
+      - name: Upload sanitized synthetic-only QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r138b-disposable-original-payload-proof
+          path: qa-evidence-r138/
+          retention-days: 7
+          if-no-files-found: warn
