@@ -1,0 +1,85 @@
+name: DPRO CAR02 R133 Integrated Customer Journey QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r133-readonly-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r133-journey-readonly-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R132_OFFLINE_QA: 'yes'
+      R133_OFFLINE_QA: 'yes'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect seven original production files and release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r133
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r133/protected-originals.json | tee qa-evidence-r133/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r133/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Syntax check and offline contract preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-r132-readiness-gate-isolated.mjs car02-r133-integrated-journey-isolated.mjs test-car02-r133-integrated-journey.mjs test-car02-r133-contract.mjs; do node --check "$f"; done
+          node --test test-car02-r133-contract.mjs | tee qa-evidence-r133/contract-preflight.log
+          grep -Fq '# pass 30' qa-evidence-r133/contract-preflight.log
+          grep -Fq '# fail 0' qa-evidence-r133/contract-preflight.log
+      - name: Three rounds of synthetic booking report estimate approval lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r133-integrated-journey.mjs > "qa-evidence-r133/functional-${i}.log" 2>&1
+            grep -Fq '# pass 76' "qa-evidence-r133/functional-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r133/functional-${i}.log"
+            node --test test-car02-r133-contract.mjs > "qa-evidence-r133/contract-${i}.log" 2>&1
+            grep -Fq '# pass 30' "qa-evidence-r133/contract-${i}.log"
+            grep -Fq '# fail 0' "qa-evidence-r133/contract-${i}.log"
+          done
+          echo R133_INTEGRATED_JOURNEY_318_TESTS_PASS | tee qa-evidence-r133/result.txt
+      - name: Write nonproduction scope and unresolved real world gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j={'version':'R133','result':'OFFLINE_SYNTHETIC_INTEGRATED_UX_ONLY','functional':76,'contract':30,'rounds':3,'passed':318,'release':'NO_GO','migration':'HOLD','productionReady':False,'realBookingMade':False,'lineDispatched':False,'photoUploaded':False,'externalProofVerified':False,'openBlockingGates':12,
+          'limitations':['Simulation uses no customer identity or production data','Booking collision is passed in-memory only and is not atomic','No real server auth, RLS, data persistence, LINE/HP endpoints, photo Storage or payments','The 12 R132 external gate items are unverified','This HTML demo is not an accessible production customer-facing booking implementation']}
+          Path('qa-evidence-r133/nonproduction-summary.json').write_text(json.dumps(j,ensure_ascii=False,indent=2)+'\n')
+          PY
+      - name: Enforce NO_GO / HOLD before evidence archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R133_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          p=json.load(open('qa-evidence-r133/nonproduction-summary.json'))
+          assert p['release']=='NO_GO' and p['migration']=='HOLD'
+          assert p['passed']==318 and p['openBlockingGates']==12
+          assert p['productionReady'] is False and p['realBookingMade'] is False
+          assert p['lineDispatched'] is False and p['photoUploaded'] is False
+          print('R133_NO_GO_HOLD_GATE_PASS')
+          PY
+      - name: Upload sanitized synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r133-integrated-journey-offline-proof
+          path: qa-evidence-r133/
+          retention-days: 7
+          if-no-files-found: warn
