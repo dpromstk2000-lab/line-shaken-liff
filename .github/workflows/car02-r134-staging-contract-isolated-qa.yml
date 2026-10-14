@@ -1,0 +1,94 @@
+name: DPRO CAR02 R134 Staging API Contract QA (Isolated)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r134-readonly-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  r134-api-contract-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R134_OFFLINE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Read-only checkout without retained credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Protect original production sources and closed release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r134
+          python3 car02_r118_readonly_source_gate.py --strict --out qa-evidence-r134/protected-originals.json | tee qa-evidence-r134/source-gate.log
+          grep -Fxq R118_READONLY_GATE_PASS qa-evidence-r134/source-gate.log
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+      - name: Syntax and synthetic contract preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-r132-readiness-gate-isolated.mjs car02-r133-integrated-journey-isolated.mjs car02-r134-staging-contract-isolated.mjs test-car02-r134-staging-contract.mjs test-car02-r134-contract.mjs; do node --check "$f"; done
+          node --test test-car02-r134-contract.mjs | tee qa-evidence-r134/preflight.log
+          grep -Fxq '# pass 31' qa-evidence-r134/preflight.log
+          grep -Fxq '# fail 0' qa-evidence-r134/preflight.log
+      - name: Three rounds of synthetic tenant role idempotency workflow tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            node --test test-car02-r134-staging-contract.mjs > "qa-evidence-r134/functional-${i}.log" 2>&1
+            grep -Fxq '# pass 71' "qa-evidence-r134/functional-${i}.log"
+            grep -Fxq '# fail 0' "qa-evidence-r134/functional-${i}.log"
+            node --test test-car02-r134-contract.mjs > "qa-evidence-r134/contract-${i}.log" 2>&1
+            grep -Fxq '# pass 31' "qa-evidence-r134/contract-${i}.log"
+            grep -Fxq '# fail 0' "qa-evidence-r134/contract-${i}.log"
+          done
+          echo R134_ISOLATED_CONTRACT_306_TESTS_PASS | tee qa-evidence-r134/result.txt
+      - name: Write synthetic-only limitations and unresolved external gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          x={'version':'R134','status':'ISOLATED_STAGING_API_CONTRACT_SIMULATION_ONLY','functional':71,
+             'contract':31,'rounds':3,'passed':306,'release':'NO_GO','migration':'HOLD',
+             'productionReady':False,'deployed':False,'realAuthentication':False,
+             'realDbAtomicity':False,'realTenantRLS':False,'realBookingMade':False,
+             'lineDispatched':False,'openBlockingGates':12,
+             'limitations':['No real HTTP API or deployment was created',
+               'Roles/customer identities are synthetic strings, not verified credentials',
+               'Optimistic memory version checks do NOT prove concurrent real-database atomicity',
+               'Idempotency and audit history live only in process memory and do not survive restarts',
+               'No external HP, LINE, Storage, DB, booking or payment connection exists',
+               'R132 preproduction external verification gates remain open; this contract cannot authorize GO']}
+          Path('qa-evidence-r134/nonproduction-summary.json').write_text(json.dumps(x,indent=2,ensure_ascii=False)+'\n')
+          PY
+      - name: Verify production release NO_GO and migration HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$R134_OFFLINE_QA" = yes
+          grep -Fq 'const CAR02_RELEASE_LOCK=true' car02-edge-entry-r52.ts
+          python3 - <<'PY'
+          import json
+          q=json.load(open('qa-evidence-r134/nonproduction-summary.json'))
+          assert q['passed']==306 and q['release']=='NO_GO' and q['migration']=='HOLD'
+          assert q['productionReady'] is False and q['deployed'] is False
+          assert q['realDbAtomicity'] is False and q['realAuthentication'] is False
+          assert q['openBlockingGates']==12 and q['realBookingMade'] is False
+          print('R134_NO_GO_HOLD_GATE_PASS')
+          PY
+      - name: Upload sanitized synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r134-isolated-staging-api-contract-proof
+          path: qa-evidence-r134/
+          retention-days: 7
+          if-no-files-found: warn
