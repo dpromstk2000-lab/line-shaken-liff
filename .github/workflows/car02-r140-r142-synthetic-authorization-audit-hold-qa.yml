@@ -1,0 +1,73 @@
+name: CAR02 R140-R142 Synthetic Authorization Audit HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r140-r142-synthetic-qa-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-only-readonly-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R140_SYNTHETIC_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+      R141_PROOF_OUTPUT: r141-synthetic-proof.json
+    steps:
+      - name: Checkout sources read-only (without persisted token)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fail-closed source integrity and release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          python car02_r142_provenance_lock_isolated.py | tee r142-protected-originals.log
+          grep -F 'R142_ORIGINAL_SOURCE_INTEGRITY_PASS_PRODUCTION_NO_GO_DB_HOLD' r142-protected-originals.log
+      - name: R140-R142 full unit and adversarial suites 3 independent rounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python -m unittest -v \
+              test_car02_r140_auth_boundary.py \
+              test_car02_r141_independent_audit.py \
+              test_car02_r142_provenance_lock.py 2>&1 | tee "r140-r142-unit-${round}.log"
+            grep -E '^Ran 102 tests in' "r140-r142-unit-${round}.log"
+            grep -E '^OK$' "r140-r142-unit-${round}.log"
+            if grep -E 'skipped=|FAILED|ERROR' "r140-r142-unit-${round}.log"; then
+              echo 'R140_R142_UNIT_GATE_FAIL'; exit 1
+            fi
+          done
+      - name: Generate independent synthetic audit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python car02_r141_generate_synthetic_proof.py
+          python - <<'PY'
+          import json
+          p=json.load(open('r141-synthetic-proof.json',encoding='utf-8'))
+          assert p['parity'] is True
+          assert p['release']=='NO_GO' and p['migration']=='HOLD'
+          assert p['realWorldGatesOpen']==12
+          assert p['source']==p['independentCopy']
+          assert set(p['source']['tenants'])=={'street_house_demo','other_demo'}
+          print('R140_R142_SYNTHETIC_ONLY_NO_GO_HOLD_GATE_PASS')
+          PY
+      - name: Upload synthetic QA-only logs (not production evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r140-r142-synthetic-auth-boundary-audit-evidence
+          path: |
+            r140-r142-unit-*.log
+            r142-protected-originals.log
+            r141-synthetic-proof.json
+          if-no-files-found: warn
+          retention-days: 7
