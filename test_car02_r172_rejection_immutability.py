@@ -106,6 +106,18 @@ class R172Report(unittest.TestCase):
         with self.assertRaises(r.RegressionError):r.sql_step('key',1,'REPORT',0)
     def test_sql_step_only_scoped_function(self):
         self.assertTrue(r.sql_step('r172_valid_key',5,'REPORT',1,note='valid note').startswith('SELECT car02_r138_qa.case_step('))
+        # GitHub PG17 run #2: the original comma caused R138_BAD_LITERAL before SQL.
+        self.assertEqual(r.lit(r.REPORT_NOTE), "'Synthetic brake pads checked with no user data'")
+        self.assertIn(r.lit(r.REPORT_NOTE), r.sql_step('r172_valid_report',5,'REPORT',1,note=r.REPORT_NOTE))
+        with self.assertRaisesRegex(AssertionError,'R138_BAD_LITERAL'):
+            r.lit('Synthetic brake pads checked, no user data')
+        # The next negative-quote probe needs a literal -1 for DB-level validation;
+        # R138B lit() continues to reject it for all other callers.
+        with self.assertRaisesRegex(AssertionError,'R138_BAD_NUMBER'):
+            r.lit(-1)
+        self.assertIn(',-1,100,NULL', r.sql_step('r172_negative_quote',5,'QUOTE',2,part=-1,labor=100))
+        with self.assertRaisesRegex(AssertionError,'R138_BAD_NUMBER'):
+            r.sql_step('r172_bad_amount',5,'QUOTE',2,part=-2,labor=100)
     def test_no_mutation_refuses_invalid_reason_without_db(self):
         with self.assertRaises(r.RegressionError):r.no_mutation('a'*12,'a1','DELETE...','UNTRUSTED')
     def test_no_mutation_accepts_expected_rejection(self):

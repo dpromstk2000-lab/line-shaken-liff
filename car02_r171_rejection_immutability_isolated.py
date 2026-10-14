@@ -19,6 +19,8 @@ from car02_r159_concurrent_booking_isolated import DB, CID, COMMIT
 from car02_r162_booking_stress_isolated import next_business_days
 
 OUT='qa-evidence-r171/r171-rejected-command-immutability.json'
+# The immutable R138B lit() guard intentionally rejects commas in SQL strings.
+REPORT_NOTE='Synthetic brake pads checked with no user data'
 TABLES=('bookings','service_cases','case_operations','booking_operations','audit_events')
 REASONS=('R138_ROLE_DENIED','R138_REPORT_RULE','R138_REPLAY_MISMATCH',
          'R138_STALE_VERSION','R138_QUOTE_RULE','R138_OWNER_DENIED',
@@ -110,7 +112,11 @@ def snapshot(cid):
 
 def sql_step(key,case_id,op,version,note=None,part=None,labor=None,choice=None):
     require(type(case_id) is int and case_id>0 and type(version) is int and version>0,'ARGS')
-    args=[lit(key),str(case_id),lit(op),str(version),lit(note),lit(part),lit(labor),lit(choice)]
+    # Only this disposable negative-amount QA probe may emit the signed integer -1.
+    # All other values still pass the unchanged R138B literal allowlist.
+    def amount(value):
+        return '-1' if type(value) is int and value == -1 else lit(value)
+    args=[lit(key),str(case_id),lit(op),str(version),lit(note),amount(part),amount(labor),lit(choice)]
     return 'SELECT car02_r138_qa.case_step('+','.join(args)+');'
 
 def no_mutation(cid,role,query,reason,capture=None,label=None):
@@ -156,7 +162,7 @@ def probe(cid,commit,out=OUT):
     def deny(label,actor,cmd,reason):denied[label]=no_mutation(cid,actor,cmd,reason,evidence,label)
     deny('reportRole','a1',sql_step('r171_owner_report',c,'REPORT',1,note='A valid but forbidden owner report'),'R138_ROLE_DENIED')
     deny('reportEmpty','as',sql_step('r171_empty_note',c,'REPORT',1,note='x'),'R138_REPORT_RULE')
-    note='Synthetic brake pads checked, no user data'
+    note=REPORT_NOTE
     require(step(cid,DB,'as','r171_valid_report',c,'REPORT',1,note=note)=='REPORT_SAVED','REPORT')
     deny('reportAlteredReplay','as',sql_step('r171_valid_report',c,'REPORT',1,note=note+' changed'),'R138_REPLAY_MISMATCH')
     deny('reportStale','as',sql_step('r171_stale_report',c,'REPORT',1,note=note),'R138_STALE_VERSION')
