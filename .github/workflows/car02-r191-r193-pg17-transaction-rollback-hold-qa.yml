@@ -1,0 +1,139 @@
+name: CAR02 R191-R193 PG17 Transaction Rollback HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: car02-r191-r193-disposable-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthetic-pg17-rollback-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r191-disposable-admin-only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      R191_DISPOSABLE_QA: 'yes'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout read only without stored credentials
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Pin five original source identities and NO GO HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence-r191
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r162_booking_stress_isolated.py)" = 'd6dd3a48a48ffe045ce4ab5df3c2fdd86b3e0e5e'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          echo R191_R193_RELEASE_NO_GO_MIGRATION_HOLD > qa-evidence-r191/release-lock.log
+          echo R191_ORIGINAL_FIVE_SOURCES_MATCH > qa-evidence-r191/source-pins.log
+      - name: R192 proof and rollback guard tests three rounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            python3 -m unittest -v test_car02_r192_transaction_rollback.py 2>&1 | tee "qa-evidence-r191/r192-negative-${round}.log"
+            grep -Eq '^Ran 67 tests in ' "qa-evidence-r191/r192-negative-${round}.log"
+            grep -Fxq OK "qa-evidence-r191/r192-negative-${round}.log"
+            ! grep -Eq 'FAILED|ERROR|skipped=' "qa-evidence-r191/r192-negative-${round}.log"
+          done
+      - name: R193 static workflow read only and cleanup safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_car02_r193_workflow_contract.py 2>&1 | tee qa-evidence-r191/r193-workflow-contract.log
+          grep -Fxq OK qa-evidence-r191/r193-workflow-contract.log
+      - name: Create only disposable PostgreSQL17 database and five synthetic roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE car02_r138_qa_ci;'
+          docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -v ON_ERROR_STOP=1 < R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql > qa-evidence-r191/schema.log
+          grep -Fxq R138_DISPOSABLE_PG17_SCHEMA_READY qa-evidence-r191/schema.log
+      - name: Verify all five synthetic business tables start empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          for table in bookings service_cases case_operations booking_operations audit_events; do
+            docker exec -i "$CID" psql -X -U postgres -d car02_r138_qa_ci -Atqc "SELECT count(*) FROM car02_r138_qa.$table;" | grep -Fxq 0
+          done
+          echo R191_FIXTURE_EMPTY > qa-evidence-r191/empty-fixture.log
+      - name: Run R191 actual PG17 rollback and five table audit atomicity probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          python3 car02_r191_transaction_rollback_isolated.py --cid "$CID" --commit "$GITHUB_SHA" 2>&1 | tee qa-evidence-r191/r191-probe.log
+          grep -Fxq R191_DISPOSABLE_PG17_EIGHT_OPERATION_ROLLBACK_ATOMICITY_PASS_NO_GO_HOLD qa-evidence-r191/r191-probe.log
+          python3 - <<'PYVERIFY'
+          import json, os
+          from pathlib import Path
+          from car02_r191_transaction_rollback_isolated import verify_report, OPS
+          r=json.loads(Path('qa-evidence-r191/r191-rollback-atomicity-proof.json').read_text(encoding='ascii'))
+          assert verify_report(r) and r['githubCommit']==os.environ['GITHUB_SHA']
+          assert len(r['operations'])==len(OPS)==8
+          assert r['release']=='NO_GO' and r['migration']=='HOLD'
+          assert r['realWorldGatesOpen']==12 and r['productionAuthorized'] is False
+          print('R191_EIGHT_ROLLBACK_PROOFS_RECHECKED')
+          PYVERIFY
+      - name: Always delete disposable PG17 database and five throwaway identities
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID='${{ job.services.postgres.id }}'
+          test -n "$CID"
+          docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS car02_r138_qa_ci WITH (FORCE);'
+          for role in car02_r138_a_staff_ci car02_r138_a_one_ci car02_r138_a_two_ci car02_r138_b_staff_ci car02_r138_b_one_ci; do
+            docker exec -i "$CID" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DROP ROLE IF EXISTS $role;"
+          done
+          docker exec -i "$CID" psql -X -U postgres -d postgres -Atqc "SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='car02_r138_qa_ci') AND NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname LIKE 'car02_r138_%_ci') THEN 'R191_ALL_THROWAWAY_RESOURCES_DELETED' ELSE 'R191_CLEANUP_FAILED' END" | grep -Fxq R191_ALL_THROWAWAY_RESOURCES_DELETED
+          echo R191_ALL_THROWAWAY_RESOURCES_DELETED > qa-evidence-r191/cleanup.log
+      - name: Recheck original source identities and NO GO HOLD after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq R191_ALL_THROWAWAY_RESOURCES_DELETED qa-evidence-r191/cleanup.log
+          grep -Fxq R191_R193_RELEASE_NO_GO_MIGRATION_HOLD qa-evidence-r191/release-lock.log
+          test "$(git rev-parse HEAD:R138_PG17_BOOKING_LIFECYCLE_QA_ONLY.sql)" = '3784f8a28549bc40343646bf88657c9d9b0b80f2'
+          test "$(git rev-parse HEAD:car02_r138_pg17_lifecycle_qa.py)" = 'ff98dd74916ff3ea77412b986138151a4fddab90'
+          test "$(git rev-parse HEAD:car02_r159_concurrent_booking_isolated.py)" = '318921e951cf1578bb00f32eb77f2054ca350ed6'
+          test "$(git rev-parse HEAD:car02_r162_booking_stress_isolated.py)" = 'd6dd3a48a48ffe045ce4ab5df3c2fdd86b3e0e5e'
+          test "$(git rev-parse HEAD:car02_r171_rejection_immutability_isolated.py)" = '23f082a6b247d26cb772c6eee5084000f12d72a2'
+          python3 - <<'PYHOLD'
+          import json,os
+          from pathlib import Path
+          from car02_r191_transaction_rollback_isolated import verify_report
+          r=json.loads(Path('qa-evidence-r191/r191-rollback-atomicity-proof.json').read_text())
+          assert verify_report(r) and r['githubCommit']==os.environ['GITHUB_SHA']
+          assert r['release']=='NO_GO' and r['migration']=='HOLD' and r['realWorldGatesOpen']==12
+          assert r['productionTouched'] is False and r['realAuthenticationVerified'] is False
+          print('R191_R193_POST_CLEANUP_NO_GO_HOLD_PASS')
+          PYHOLD
+      - name: Preserve only synthetic short retention QA evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: car02-r191-r193-disposable-pg17-rollback-only
+          path: qa-evidence-r191/
+          if-no-files-found: warn
+          retention-days: 7
