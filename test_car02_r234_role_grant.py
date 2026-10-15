@@ -31,7 +31,20 @@ class Report(unittest.TestCase):
     def reject(self,d,reseal=True):
         if reseal and 'sha256' in d:d['sha256']=r.seal(d)
         with self.assertRaises(r.GrantError):r.verify_proof(d)
-    def test_valid(self):self.assertTrue(r.verify_proof(valid()))
+    def test_valid(self):
+        self.assertTrue(r.verify_proof(valid()))
+        d=valid()
+        d['rejections'][2]['sqlstate']='01007' # table GRANT ineffective, no rights added
+        d['sha256']=r.seal(d)
+        self.assertTrue(r.verify_proof(d))
+        d['rejections'][2]['sqlstate']='00000' # silent successful GRANT is NEVER safe
+        self.reject(d)
+        for op in ('grant_execute','grant_select_option'):
+            d=valid()
+            pos=r.OPERATIONS.index(op)
+            d['rejections'][pos]['sqlstate']='01007'
+            d['sha256']=r.seal(d)
+            self.assertTrue(r.verify_proof(d))
     def test_denial_count(self):self.assertEqual(len(valid()['rejections']),25)
     def test_ops_exact(self):self.assertEqual(set(r.SQL),set(r.OPERATIONS))
     def test_sql_no_delete(self):self.assertFalse(any('DELETE ' in q or 'DROP ' in q for q in r.SQL.values()))
@@ -69,6 +82,49 @@ class Report(unittest.TestCase):
         p=type('Fake',(),{'returncode':0,'stderr':''})()
         with patch.object(r.subprocess,'run',return_value=p):
             with self.assertRaises(r.GrantError):r.reject_grant('a'*16,'as','grant_staff_role')
+        # PostgreSQL WARNING 01007 means *no privileges were granted*, but
+        # it is accepted only if independent catalog/role/data checks agree.
+        warning=type('Fake',(),{'returncode':0,
+            'stderr':'WARNING:  01007: no privileges were granted for "bookings"\n'})()
+        args=('a'*16,'as','grant_table_mutate',catalog(),roles(),snap(1))
+        with patch.object(r.subprocess,'run',return_value=warning),\
+             patch.object(r,'protected_catalog',return_value=catalog()),\
+             patch.object(r,'role_catalog',return_value=roles()),\
+             patch.object(r,'snapshot',return_value=snap(1)):
+            self.assertEqual(r.reject_grant(*args)['sqlstate'],'01007')
+            with self.assertRaises(r.GrantError):
+                r.reject_grant('a'*16,'as','grant_table_mutate')
+            with self.assertRaises(r.GrantError):
+                r.reject_grant('a'*16,'as','grant_staff_role',catalog(),roles(),snap(1))
+        # Each grantable-object operation can warn, but no other GRANT action can.
+        with patch.object(r.subprocess,'run',return_value=warning),\
+             patch.object(r,'protected_catalog',return_value=catalog()),\
+             patch.object(r,'role_catalog',return_value=roles()),\
+             patch.object(r,'snapshot',return_value=snap(1)):
+            for op in ('grant_execute','grant_select_option'):
+                self.assertEqual(r.reject_grant('a'*16,'as',op,catalog(),roles(),snap(1))['sqlstate'],'01007')
+        # A warning is not sufficient proof if even one ACL, role or row changed.
+        changed=catalog();changed['tables'][0]['acl']='unexpected grant'
+        with patch.object(r.subprocess,'run',return_value=warning),\
+             patch.object(r,'protected_catalog',return_value=changed):
+            with self.assertRaises(r.GrantError):r.reject_grant(*args)
+        changed_roles=roles();changed_roles['memberships']=1
+        with patch.object(r.subprocess,'run',return_value=warning),\
+             patch.object(r,'protected_catalog',return_value=catalog()),\
+             patch.object(r,'role_catalog',return_value=changed_roles):
+            with self.assertRaises(r.GrantError):r.reject_grant(*args)
+        with patch.object(r.subprocess,'run',return_value=warning),\
+             patch.object(r,'protected_catalog',return_value=catalog()),\
+             patch.object(r,'role_catalog',return_value=roles()),\
+             patch.object(r,'snapshot',return_value=snap(2)):
+            with self.assertRaises(r.GrantError):r.reject_grant(*args)
+        # Other warnings, fabricated SQLSTATEs and silent successes fail closed.
+        for response in ('WARNING:  01006: privilege not revoked',
+                         'WARNING:  01007: some privileges granted',
+                         'ERROR:  01007: no privileges were granted for "bookings"'):
+            with patch.object(r.subprocess,'run',return_value=type('Fake',(),{
+                    'returncode':0,'stderr':response})()):
+                with self.assertRaises(r.GrantError):r.reject_grant(*args)
     def test_other_error_refused(self):
         p=type('Fake',(),{'returncode':1,'stderr':'ERROR:  42P01: fake'})()
         with patch.object(r.subprocess,'run',return_value=p):

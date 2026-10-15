@@ -76,9 +76,18 @@ def verify_proof(doc):
     require(doc['rolesBefore']==doc['rolesAfter'],'ROLE_DRIFT')
     validate_snap(doc['before']);validate_snap(doc['after'])
     require(doc['before']==doc['after'],'DATA_DRIFT')
-    require(type(doc['rejections']) is list and doc['rejections']==[
-        {'actor':a,'operation':op,'sqlstate':'42501'} for a in ACTORS for op in OPERATIONS],
-        'DENIAL_MATRIX')
+    # PostgreSQL can signal an ineffective GRANT with SQLSTATE 01007 (WARNING),
+    # not 42501 (ERROR).  The probe accepts 01007 only after independently
+    # proving that role membership, ACLs and all five tables were unchanged.
+    require(type(doc['rejections']) is list and len(doc['rejections'])==25,'DENIAL_COUNT')
+    for entry,(actor,operation) in zip(doc['rejections'],
+                                       ((a,op) for a in ACTORS for op in OPERATIONS)):
+        allowed={'42501','01007'} if operation in (
+            'grant_table_mutate','grant_execute','grant_select_option') else {'42501'}
+        require(type(entry) is dict and set(entry)=={'actor','operation','sqlstate'}
+            and entry['actor']==actor and entry['operation']==operation
+            and type(entry['sqlstate']) is str and entry['sqlstate'] in allowed,
+            'DENIAL_MATRIX')
     for name in ('visibleBefore','visibleAfter'):
         require(type(doc[name]) is dict and set(doc[name])==set(ACTORS),'VISIBLE_KEYS')
         require(all(type(v) is int and v>=0 for v in doc[name].values()),'VISIBLE_TYPES')
@@ -104,15 +113,30 @@ def role_catalog(cid):
     validate_roles(doc)
     return doc
 
-def reject_grant(cid,actor,operation):
+def reject_grant(cid,actor,operation,baseline_catalog=None,baseline_roles=None,baseline_data=None):
     require(type(cid) is str and CID.fullmatch(cid) is not None and actor in ACTORS,'ACTOR')
     require(operation in OPERATIONS,'OPERATION')
     p=subprocess.run(['docker','exec','-i',cid,'env','PGPASSWORD='+PASSWORD,'psql',
         '-h','127.0.0.1','-X','-qAt','-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose',
         '-U',ROLES[actor],'-d',DB,'-c',SQL[operation]],capture_output=True,text=True,timeout=25)
-    require(p.returncode!=0 and re.search(r'ERROR:\s+42501:',p.stderr) is not None,
-            'EXPECTED_42501_'+actor+'_'+operation)
-    return {'actor':actor,'operation':operation,'sqlstate':'42501'}
+    stderr=p.stderr if type(p.stderr) is str else ''
+    if p.returncode!=0 and re.search(r'(?m)^ERROR:\s+42501:',stderr):
+        return {'actor':actor,'operation':operation,'sqlstate':'42501'}
+    # An ineffective GRANT may end with status 0 and WARNING 01007.
+    # Never treat an ordinary successful GRANT, another warning, or another
+    # SQLSTATE as a rejection.  Only object GRANTs have this alternate path.
+    allowed_warning=operation in ('grant_table_mutate','grant_execute','grant_select_option')
+    no_grant_warning=(p.returncode==0 and allowed_warning
+        and re.search(r'(?m)^WARNING:\s+01007:\s+no privileges were granted for\s+',stderr)
+        and re.search(r'(?m)^ERROR:',stderr) is None)
+    require(bool(no_grant_warning),'EXPECTED_42501_OR_01007_'+actor+'_'+operation)
+    # Status 0 is accepted ONLY after independent, immediate non-mutation checks.
+    require(baseline_catalog is not None and baseline_roles is not None
+        and baseline_data is not None,'WARNING_BASELINE_MISSING')
+    require(protected_catalog(cid)==baseline_catalog,'WARNING_ACL_MUTATED')
+    require(role_catalog(cid)==baseline_roles,'WARNING_ROLE_MUTATED')
+    require(snapshot(cid)==baseline_data,'WARNING_DATA_MUTATED')
+    return {'actor':actor,'operation':operation,'sqlstate':'01007'}
 
 def save(doc,path):
     require(isinstance(path,Path) and path.parent.is_dir() and not path.parent.is_symlink()
@@ -138,7 +162,8 @@ def probe(cid,commit,out=OUT):
     before=snapshot(cid)
     visible=lambda:{a:integer(cid,DB,a,'SELECT count(*) FROM car02_r138_qa.bookings;') for a in ACTORS}
     visible_before=visible();roles_before=role_catalog(cid);catalog_before=protected_catalog(cid)
-    denied=[reject_grant(cid,a,op) for a in ACTORS for op in OPERATIONS]
+    denied=[reject_grant(cid,a,op,catalog_before,roles_before,before)
+            for a in ACTORS for op in OPERATIONS]
     roles_after=role_catalog(cid);catalog_after=protected_catalog(cid)
     after=snapshot(cid);visible_after=visible()
     doc=dict(LOCK,githubCommit=commit,catalogBefore=catalog_before,catalogAfter=catalog_after,
