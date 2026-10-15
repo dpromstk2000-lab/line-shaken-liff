@@ -1,0 +1,61 @@
+name: CAR02 R255 Basic HTTP Journey Synthetic HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r255-basic-api-journey-hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_R255_ISOLATED: 'yes'
+      NODE_ENV: test
+    steps:
+      - name: Checkout only checked-in files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify approved unchanged core/API and hard release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-core.mjs)" = '8748ea9d79c4a5bc35321472f48cd06e3e435f1f'
+          test "$(git hash-object car02-api.mjs)" = 'e3216bf265bbb6fc6ac1c893334b76a2f429ccc1'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Fq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test -f test_car02_r255_basic_http_journey.mjs
+      - name: Check test syntax
+        run: node --check test_car02_r255_basic_http_journey.mjs
+      - name: Three consecutive isolated HTTP integration QA passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa_evidence_r255
+          for i in 1 2 3; do
+            node --test test_car02_r255_basic_http_journey.mjs | tee "qa_evidence_r255/R255_QA_${i}.tap"
+            grep -q '^# pass 7$' "qa_evidence_r255/R255_QA_${i}.tap"
+            grep -q '^# fail 0$' "qa_evidence_r255/R255_QA_${i}.tap"
+          done
+          git hash-object car02-core.mjs car02-api.mjs car02-edge-entry-r52.ts test_car02_r255_basic_http_journey.mjs > qa_evidence_r255/COMMITTED_BLOBS.txt
+          printf 'R255 synthetic HTTP/DOMAIN integration only. NO_GO / HOLD. No production environment was accessed.\n' > qa_evidence_r255/STATUS.txt
+      - name: Verify protected sources remain unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-core.mjs)" = '8748ea9d79c4a5bc35321472f48cd06e3e435f1f'
+          test "$(git hash-object car02-api.mjs)" = 'e3216bf265bbb6fc6ac1c893334b76a2f429ccc1'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+      - name: Save QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r255-synthetic-hold-qa
+          path: qa_evidence_r255/
+          if-no-files-found: warn
+          retention-days: 7
