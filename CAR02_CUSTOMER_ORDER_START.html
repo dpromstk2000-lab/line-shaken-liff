@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>DPRO CAR02｜お客様導入準備センター</title>
+<style>
+:root{font-family:system-ui,"Yu Gothic",Meiryo,sans-serif;font-size:16px;color:#182c43;background:#f4f7fb;line-height:1.65}*{box-sizing:border-box}body{margin:0}.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}aside{background:#122944;color:white;padding:25px 18px}aside strong{font-size:20px}aside small{display:block;color:#c3d5e7;margin-top:5px}nav{display:grid;gap:9px;margin-top:35px}nav a{color:#e6f1ff;padding:11px 13px;border:1px solid #3f5c78;border-radius:10px;text-decoration:none}main{max-width:1150px;width:100%;padding:32px 28px 70px;margin:auto;min-width:0}h1{font-size:clamp(25px,3vw,34px);margin:0}h2{font-size:21px;margin:0 0 12px}.intro{color:#52657b;margin:9px 0 22px}.panel{background:#fff;border:1px solid #d9e3ed;border-radius:15px;padding:23px;margin:0 0 18px;box-shadow:0 4px 15px #14274009}.alert{background:#fff6e8;border-left:5px solid #c28222;padding:13px 16px;border-radius:9px;margin:15px 0 24px;font-weight:650}.tag{display:inline-block;padding:4px 10px;background:#ebf3fd;color:#204b7c;border-radius:99px;font-size:13px;font-weight:800}.stack{display:grid;gap:12px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{display:grid;gap:6px}.field label{font-weight:760}input,select{padding:11px 12px;min-height:47px;font-size:16px;border:1px solid #b6c8d8;border-radius:9px;background:white;width:100%;color:#172b41}input[type=checkbox]{width:21px;height:21px;min-height:0;accent-color:#154f88}.check{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;background:#f6f9fc;border:1px solid #dce6f0;border-radius:10px}.check label{flex:1;cursor:pointer}.check p{margin:2px 0 0;color:#637387;font-size:13px}button{padding:12px 19px;min-height:47px;background:#174d83;border:0;border-radius:10px;color:white;font-size:16px;font-weight:800;cursor:pointer}button.secondary{background:#e9eff5;color:#173550;border:1px solid #b9c9d9}.actions{display:flex;flex-wrap:wrap;gap:10px}.result{padding:14px;border:1px solid #c9d9eb;border-radius:10px;background:#f8fbff}.missing{font-weight:700;color:#9b4515}.quiet{color:#60738a;font-size:13px}.bullet{margin-top:5px}.bullet li{margin:7px 0}a{color:#0a5791}code{font-size:13px;overflow-wrap:anywhere}@media(max-width:850px){.layout{display:block}aside{padding:15px}nav{display:none}main{padding:19px 13px}.panel{padding:18px}.grid{grid-template-columns:1fr}}@media print{aside,.actions{display:none!important}.layout{display:block}main{padding:0}.panel{break-inside:avoid;box-shadow:none}}
+</style></head><body><div class="layout"><aside><strong>DPRO CAR02</strong><small>お客様導入準備センター</small><nav><a href="#intake">① 受注・基本設定</a><a href="#modules">② 納品する機能</a><a href="#approvals">③ 事前の確認</a><a href="#result">④ 次の導入作業</a></nav></aside><main>
+<div class="tag">受注当日から使う社内用シート</div><h1>お客様専用の構築準備</h1><p class="intro">お客様の依頼内容を整理し、構築に必要な操作を漏らさず進めるためのオフライン準備画面です。</p>
+<div class="alert">この画面から本番Worker・DB・LINEは変更されません。導入準備の完了と、実際にお客様が使える状態の確認は別です。現在の本番公開は NO_GO／DB移行 HOLD。</div>
+<section class="panel" id="intake"><h2>① 受注・基本設定</h2><p class="quiet">顧客氏名、電話番号、パスワード、APIキー、アクセストークン、実メールアドレスは入力しないでください。店舗情報の詳細は承認された非公開の顧客管理側で扱います。</p><div class="grid">
+<div class="field"><label for="type">導入形態</label><select id="type"><option value="">未選択</option><option value="new">新規導入</option><option value="existing">既存環境から導入</option></select></div>
+<div class="field"><label for="code">仮の施設コード（公開可能な識別子のみ）</label><input id="code" placeholder="例：carshop_001" maxlength="48" autocomplete="off" spellcheck="false"></div>
+<div class="field"><label for="domain">ドメイン方針</label><select id="domain"><option value="">未選択</option><option value="existing_domain">既存ドメイン</option><option value="new_domain">新規取得</option><option value="pending">後日決定</option></select></div>
+<div class="field"><label for="minutes">予約枠の候補</label><select id="minutes"><option value="30">30分（暫定標準）</option><option value="15">15分（確認が必要）</option><option value="10">10分（確認が必要）</option></select></div></div></section>
+<section class="panel" id="modules"><h2>② 納品する機能を選択</h2><div id="serviceChecks" class="stack"></div><p class="quiet">写真・LINEを使わない場合は、未設定の状態で納品範囲から除外できます。ただし予約・整備管理の実DB連携、認証と公開承認は必要です。</p></section>
+<section class="panel" id="approvals"><h2>③ 受注確認の9項目</h2><div id="approvalChecks" class="stack"></div><p class="quiet">チェックは打合せの記録整理に使用します。完了と記録しただけでは第三者検証や公開承認の代わりにはなりません。</p></section>
+<section class="panel" id="result"><h2>④ 導入準備の判定</h2><div id="status" class="result" aria-live="polite">未確認</div><h3>構築時に必要な安全確認</h3><ol id="gates" class="bullet"></ol><div class="actions"><button id="check" type="button">内容を確認</button><button id="json" type="button" class="secondary">社内用・設定JSON出力</button><button id="txt" type="button" class="secondary">作業一覧TXT出力</button><button id="buildplan" type="button">顧客別の構築計画JSONを出力</button><button id="matrix" type="button" class="secondary">機能別・検査表CSVを出力</button><button type="button" class="secondary" id="print">印刷</button></div><p class="quiet">データは自動送信・自動保存されません。JSONやTXTはPC内のファイルとして出力します。顧客ごとの設定を公開GitHubにアップロードしないでください。</p></section>
+<section class="panel"><h2>既存の公式画面へ</h2><ul class="bullet"><li><a href="https://dpromstk2000-lab.github.io/line-shaken-liff/CAR02_R98_ORDER_INTAKE_WORKSHEET.html" target="_blank" rel="noopener noreferrer">R98 受注ヒアリング原本</a></li><li><a href="https://dpromstk2000-lab.github.io/line-shaken-liff/CAR02_R92_COMPANY_PC_START.html" target="_blank" rel="noopener noreferrer">R92 会社PC受入検査</a></li><li><a href="https://dpromstk2000-lab.github.io/line-shaken-liff/CAR02_R133_INTEGRATED_JOURNEY_ISOLATED_DEMO.html" target="_blank" rel="noopener noreferrer">R133 予約〜整備の隔離デモ</a></li></ul></section>
+</main></div>
+<script>
+'use strict';
+const services=[['HP','ホームページ'],['LINE_OFFICIAL','LINE公式アカウント連携'],['RESERVATION_WEB','予約WEB'],['CAR02_MANAGEMENT','整備報告・見積・顧客承認・管理'],['PRIVATE_PHOTO','非公開写真（追加確認が必要）']];
+const approvals=[['scope_and_price','機能範囲と価格'],['contract_and_billing','契約・請求条件'],['privacy_and_data_controller','個人情報・管理責任'],['line_message_and_consent','LINE通知と顧客同意の要否'],['owner_identity','オーナー本人確認方針'],['staff_and_tenant_roles','スタッフ権限・店舗分離'],['calendar_and_booking_rules','予約ルール・営業時間'],['domain_and_public_pages','ドメインと公開ページ'],['support_and_incident_contact','サポート・障害窓口']];
+const gates=[['OWNER_IDENTITY','オーナー本人確認・承認された管理者招待'],['STAGING','顧客専用の非公開ステージング構築'],['WORKER_DB','Worker/API/DBの実結合と秘密情報管理'],['RLS_AUTH','実認証と顧客・店舗・スタッフの分離'],['BOOKING','予約・取消・重複防止の実動作'],['REPORT_QUOTE','整備報告・見積・承認・完了の実動作'],['PHOTO','非公開写真の保護・保存/削除/回復の実検査'],['LINE','LINE連携・同意・通知の実検査'],['BACKUP','バックアップ・隔離復元の証拠'],['ACCEPT','PC・スマホ受入検査とオーナー承認'],['OPERATE','監視・障害復旧・ロールバックの確認'],['RELEASE','別途の正式公開判定']];
+const serviceRoot=document.getElementById('serviceChecks');
+const approvalRoot=document.getElementById('approvalChecks');
+function checks(root,rows,prefix,defaults){for(const [key,name] of rows){const line=document.createElement('div');line.className='check';const box=document.createElement('input');box.type='checkbox';box.id=prefix+key;box.checked=defaults.includes(key);const label=document.createElement('label');label.htmlFor=box.id;label.textContent=name;line.append(box,label);root.append(line);}}
+checks(serviceRoot,services,'srv_',['HP','RESERVATION_WEB','CAR02_MANAGEMENT']);checks(approvalRoot,approvals,'ap_',[]);
+function plan(){const sels=services.filter(([id])=>document.getElementById('srv_'+id).checked).map(([id])=>id);
+ const aps=Object.fromEntries(approvals.map(([id])=>[id,document.getElementById('ap_'+id).checked]));
+ const x={schema:'DPRO_CAR02_CUSTOMER_BUILD_DRAFT_V1',version:1,customerType:document.getElementById('type').value||null,facilityCode:document.getElementById('code').value.trim()||null,domainPlan:document.getElementById('domain').value||null,bookingMinutes:Number(document.getElementById('minutes').value),services:sels,approvals:aps};
+ const missing=approvals.filter(([k])=>!aps[k]).map(([,n])=>n);
+ if(!x.customerType)missing.push('導入形態');if(!x.facilityCode)missing.push('仮の施設コード');if(!x.domainPlan||x.domainPlan==='pending')missing.push('ドメイン方針');
+ if(!/^[a-z][a-z0-9_]{5,47}$/.test(x.facilityCode||''))missing.push('施設コードの形式');
+ if(!x.services.length)missing.push('対象機能');if(x.services.includes('PRIVATE_PHOTO')&&!x.services.includes('CAR02_MANAGEMENT'))missing.push('写真には整備管理が必要');
+ return {x,missing:[...new Set(missing)]};}
+function refresh(){const {x,missing}=plan();const out=document.getElementById('status');out.textContent=missing.length?`受注情報：残り ${missing.length}項目。${missing.join('、')}。本番公開：NO_GO／DB移行：HOLD。`:'受注情報の入力は完了しました。顧客環境の構築準備へ進めます。ただし実接続・実機QA・公開承認は未完了（NO_GO／HOLD）です。';out.className='result '+(missing.length?'missing':'');const list=document.getElementById('gates');list.replaceChildren();for(const [id,name] of gates){if(id==='PHOTO'&&!x.services.includes('PRIVATE_PHOTO'))continue;if(id==='LINE'&&!x.services.includes('LINE_OFFICIAL'))continue;const li=document.createElement('li');li.textContent=name+'：未確認';list.append(li);}return {x,missing};}
+function save(name,content,mime){const blob=new Blob([content],{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+document.getElementById('check').addEventListener('click',refresh);
+document.getElementById('json').addEventListener('click',()=>{const r=refresh();save('CAR02_CUSTOMER_SETUP_DRAFT.json',JSON.stringify(r.x,null,2)+'\n','application/json;charset=utf-8');});
+document.getElementById('txt').addEventListener('click',()=>{const r=refresh();const lines=['DPRO CAR02 顧客導入準備 (社内用/非公開)','公開 NO_GO / DB移行 HOLD','注文受付情報の残項目: '+r.missing.join('、'),'対象機能: '+r.x.services.join(', '),'予約枠: '+r.x.bookingMinutes+'分','',...Array.from(document.getElementById('gates').children).map(x=>'□ '+x.textContent),'','この出力は納品許可証明ではありません。'];save('CAR02_CUSTOMER_NEXT_ACTION.txt',lines.join('\n')+'\n','text/plain;charset=utf-8');});
+
+const securityAdoption=[
+ ['BOOKING_CONCURRENT_IDEMPOTENCY','R139-R181','ACCEPTANCE_TEST'],
+ ['TENANT_OWNER_RLS_ROW_SCOPE','R182-R245','ACCEPTANCE_TEST'],
+ ['DB_SESSION_PREPARED_PLAN','R246-R251','ACCEPTANCE_TEST'],
+ ['RESET_DISCARD_SESSION','R252-R254','PENDING_OFFICIAL_QA'],
+ ['SAFE_PHOTO_DELETE_QUARANTINE','R93D-R114','SEPARATE_STAGING_REVIEW']
+];
+const photoGateIds=['R50_UPLOAD_COMPOSITION','R51_UPLOAD_ROUTE','R51_BODY_CAP_CONFLICT','R82_DURABLE_INTENT_KEY','R47_DIRECT_STORAGE_DELETE','R93Q_PROCESS_LOCAL_RECEIPTS'];
+const entries={HP:'index.html',LINE_OFFICIAL:'index.html',RESERVATION_WEB:'CAR02_R133_INTEGRATED_JOURNEY_ISOLATED_DEMO.html',CAR02_MANAGEMENT:'CAR02_DEMO.html',PRIVATE_PHOTO:'CAR02_R112_QUARANTINE_REVIEW_DEMO.html'};
+const coreGates=['CUSTOMER_TENANT_STAGING_AND_AUTH','WORKER_API_DB_WIRING','REAL_BOOKING_AND_ESTIMATE_E2E','HUMAN_ACCEPTANCE','BACKUP_RESTORE_PROOF','OWNER_RELEASE_SIGNOFF'];
+const serviceGates={HP:['CUSTOMER_DOMAIN','HP_ROUTE_QA'],LINE_OFFICIAL:['LINE_IF_ENABLED','LINE_LIFF_REAL_AUTH_QA'],
+ RESERVATION_WEB:['BOOKING_E2E','BOOKING_ATOMICITY_REAL_QA'],
+ CAR02_MANAGEMENT:['REPORT_ESTIMATE_E2E','STAFF_API_PRODUCTION_WIRING'],
+ PRIVATE_PHOTO:['PHOTO_STORAGE_IF_ENABLED','PHOTO_RECONCILIATION_REAL_QA']};
+function makeCustomerPlan(){const r=refresh(),x=r.x;
+ const selected=x.services.map(id=>({service:id,entry:entries[id],status:'STAGING_IMPLEMENTATION_REQUIRED',realLiveProof:false}));
+ const extra=x.services.includes('PRIVATE_PHOTO')?photoGateIds:[];
+ const all=[...new Set([...coreGates,...x.services.flatMap(id=>serviceGates[id]||[]),...extra])];
+ return {schema:'DPRO_CAR02_CUSTOMER_BUILD_PLAN_V2',schemaVersion:2,facilityCode:x.facilityCode,
+ customerType:x.customerType,domainPlan:x.domainPlan,bookingMinutes:x.bookingMinutes,
+ selectedServices:x.services,sourceState:'NOT_CHECKED_IN_BROWSER',intakeComplete:r.missing.length===0,
+ missing:r.missing,selected,adoption:securityAdoption.map(([id,from,apply])=>({id,from,apply})),
+ pendingGates:all.map(id=>({id,state:'NOT_VERIFIED',evidenceRequired:true})),
+ customerEnvironmentCreated:false,workerDeployed:false,databaseMigrated:false,
+ realAuthenticationVerified:false,realBookingVerified:false,releaseAuthorized:false,
+ releaseDecision:'NO_GO',migrationDecision:'HOLD',customerGoLiveReady:false,
+ preservedReleaseLock:true,productionTouched:false};}
+document.getElementById('buildplan').addEventListener('click',()=>{
+ const p=makeCustomerPlan();save('CAR02_CUSTOMER_BUILD_PLAN.json',JSON.stringify(p,null,2)+'\n','application/json;charset=utf-8');
+});
+document.getElementById('matrix').addEventListener('click',()=>{
+ const p=makeCustomerPlan();const rows=[['section','name','state'],
+ ...p.selected.map(x=>['service',x.service,x.status]),
+ ...p.pendingGates.map(x=>['gate',x.id,x.state]),
+ ...p.adoption.map(x=>['improvement',x.id,x.apply])];
+ const csv=rows.map(cols=>cols.map(z=>'"'+String(z).replaceAll('"','""')+'"').join(',')).join('\r\n')+'\r\n';
+ save('CAR02_CUSTOMER_BUILD_MATRIX.csv','\ufeff'+csv,'text/csv;charset=utf-8');
+});
+document.getElementById('print').addEventListener('click',()=>window.print());refresh();
+</script></body></html>
