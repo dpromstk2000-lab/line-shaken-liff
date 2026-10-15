@@ -1,0 +1,111 @@
+name: CAR02 Customer Build Factory V2 – Synthetic HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  customer-build-factory-v2-hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_DEPLOY_ALLOWED: 'false'
+      CAR02_MIGRATION_ALLOWED: 'false'
+      CAR02_LINE_DISPATCH_ALLOWED: 'false'
+    steps:
+      - name: Checkout committed source only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up test-only Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm hard release lock and runtime source baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {auditWorkingTree} from './car02_customer_delivery_factory.mjs';
+          import {readFileSync} from 'node:fs';
+          const doc=readFileSync('car02-edge-entry-r52.ts','utf8');
+          if(!/\bconst CAR02_RELEASE_LOCK=true;/.test(doc))throw Error('RELEASE_LOCK_MISSING');
+          const audit=await auditWorkingTree(process.cwd());
+          if(!audit.allMatch||audit.checked!==7)throw Error('PROTECTED_SOURCE_DRIFT');
+          console.log('7/7 pinned sources; release NO_GO / migration HOLD');
+          NODE
+      - name: Check Node and browser JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02_customer_provisioning_readonly.mjs
+          node --check car02_customer_delivery_factory.mjs
+          node --check test_car02_customer_provisioning.mjs
+          node --check test_car02_customer_delivery_factory.mjs
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import vm from 'node:vm';
+          const doc=readFileSync('CAR02_CUSTOMER_ORDER_START.html','utf8');
+          const match=doc.match(/<script>([\s\S]*?)<\/script>/);
+          if(!match)throw Error('SCRIPT_MISSING');
+          new vm.Script(match[1]);
+          for(const id of ['buildplan','matrix','json','txt','check']){
+            if(!doc.includes(`id="${id}"`))throw Error('BUTTON_MISSING_'+id);
+          }
+          console.log('Customer entry page syntax and export buttons PASS');
+          NODE
+      - name: Run delivery generation regression and tampering tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test test_car02_customer_provisioning.mjs test_car02_customer_delivery_factory.mjs
+      - name: Generate synthetic customer delivery plan and validate SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .car02_v2_qa
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          import {blankDraft} from './car02_customer_provisioning_readonly.mjs';
+          const draft=blankDraft();
+          draft.customerType='new';draft.facilityCode='synthetic_ci_facility';
+          draft.domainPlan='new_domain';draft.services=['HP','LINE_OFFICIAL','RESERVATION_WEB','CAR02_MANAGEMENT'];
+          for(const key of Object.keys(draft.approvals))draft.approvals[key]=true;
+          writeFileSync('.car02_v2_qa/intake.json',JSON.stringify(draft)+'\n',{mode:0o600});
+          NODE
+          node car02_customer_delivery_factory.mjs --intake .car02_v2_qa/intake.json --out .car02_v2_qa/generated --repo "$PWD"
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const p='.car02_v2_qa/generated/';
+          const plan=JSON.parse(readFileSync(p+'DELIVERY_PLAN.json'));
+          const manifest=JSON.parse(readFileSync(p+'MANIFEST_SHA256.json'));
+          if(plan.releaseDecision!=='NO_GO'||plan.migrationDecision!=='HOLD'||plan.workerDeployed||plan.customerGoLiveReady||plan.productionTouched||plan.sourceAudit?.checked!==7||plan.sourceAudit?.allMatch!==true)throw Error('RELEASE_GATE_UNSAFE');
+          for(const [name,sha] of Object.entries(manifest.sha256)){
+            const actual=createHash('sha256').update(readFileSync(p+name)).digest('hex');
+            if(actual!==sha)throw Error('MANIFEST_MISMATCH_'+name);
+          }
+          console.log('Synthetic delivery pack SHA256 and no-go gating PASS');
+          NODE
+      - name: Export synthetic QA evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-v2-synthetic-delivery-plan-no-go
+          path: |
+            .car02_v2_qa/generated/DELIVERY_PLAN.json
+            .car02_v2_qa/generated/CHECKLIST.md
+            .car02_v2_qa/generated/BUILD_STEPS.md
+            .car02_v2_qa/generated/MANIFEST_SHA256.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Verify frozen release denial
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = 'true'
+          test "$CAR02_DEPLOY_ALLOWED" = 'false'
+          test "$CAR02_MIGRATION_ALLOWED" = 'false'
+          test "$CAR02_LINE_DISPATCH_ALLOWED" = 'false'
+          echo 'CAR02 V2 is customer build planning ONLY. Production NO_GO / DB HOLD.'
