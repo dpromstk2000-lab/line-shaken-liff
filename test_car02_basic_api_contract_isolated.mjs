@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {MODE,prepareWorkOrderCreate,auditDemoRecord} from './car02-basic-api-contract-isolated.mjs';
+const U='11111111-1111-4111-8111-111111111111',V='22222222-2222-4222-8222-222222222222',R='33333333-3333-4333-8333-333333333333';
+const base={customerId:U,vehicleId:V,reservationId:R,idempotencyKey:'synthetic-unique-key-001'};
+test('release and migration remain locked',()=>{assert.equal(MODE.release,'NO_GO');assert.equal(MODE.migration,'HOLD');assert.equal(MODE.productionReady,false)});
+test('approved UUID create maps only approved R45 fields',()=>{const p=prepareWorkOrderCreate(base);assert.equal(p.path,'/api/car02');assert.deepEqual(p.body,{customerId:U,vehicleId:V,reservationId:R});assert.equal(p.method,'POST')});
+test('optional reservation ID can be omitted',()=>{const p=prepareWorkOrderCreate({...base,reservationId:null});assert.deepEqual(Object.keys(p.body),['customerId','vehicleId'])});
+test('demo labels cannot be submitted as UUIDs',()=>{assert.throws(()=>prepareWorkOrderCreate({...base,customerId:'架空顧客A'}),/CAR02_CONTRACT_REFERENCE_REQUIRED/)});
+test('extra client-side role and shop rejected',()=>{assert.throws(()=>prepareWorkOrderCreate({...base,role:'owner',shop:'x'}),/CAR02_CONTRACT_FIELDS_INVALID/)});
+test('missing key rejected',()=>{assert.throws(()=>prepareWorkOrderCreate({...base,idempotencyKey:''}),/CAR02_CONTRACT_IDEMPOTENCY_REQUIRED/)});
+test('in-memory demo always fails production readiness',()=>{const a=auditDemoRecord({customer:'架空顧客A',vehicle:'デモ車両A'});assert.equal(a.ready,false);assert.ok(a.gaps.includes('CUSTOMER_UUID_NOT_RESOLVED'));assert.ok(a.gaps.includes('SERVER_VERIFIED_IDENTITY_NOT_PROVEN'))});
+test('even complete IDs cannot bypass server identity and lock',()=>{const a=auditDemoRecord(base);assert.equal(a.ready,false);assert.ok(a.gaps.includes('RELEASE_GATE_CLOSED'))});
