@@ -16,3 +16,7 @@ test('complete lifecycle',()=>{const[d,c]=created();let x=d.act(staff,c.id,'repo
 test('stale version rejected',()=>{const[d,c]=created();d.act(staff,c.id,'report',{expectedVersion:1,observation:'検査'});rejects(()=>d.act(staff,c.id,'quote',{expectedVersion:1,items:[{name:'点検',price:2000}]}),'VERSION_CONFLICT')});
 test('declined estimate prevents completion',()=>{const[d,c]=created();let x=d.act(staff,c.id,'report',{expectedVersion:1,observation:'検査'});x=d.act(staff,c.id,'quote',{expectedVersion:x.version,items:[{name:'点検',price:2000}]});x=d.act(customer,c.id,'decision',{expectedVersion:x.version,decision:'declined'});rejects(()=>d.act(staff,c.id,'complete',{expectedVersion:x.version}),'TRANSITION_DENIED')});
 test('negative estimate amount rejected',()=>{const[d,c]=created();const x=d.act(staff,c.id,'report',{expectedVersion:1,observation:'検査'});rejects(()=>d.act(staff,c.id,'quote',{expectedVersion:x.version,items:[{name:'点検',price:-1}]}),'TRANSITION_DENIED')});
+
+test('impossible calendar dates rejected',()=>{const d=make();rejects(()=>d.create(owner,{...data,start:'2026-02-30T10:30'}),'BOOKING_INVALID');rejects(()=>d.create(owner,{...data,start:'2026-13-16T10:30'}),'BOOKING_INVALID')});
+test('duplicate slot same shop rejected',()=>{const d=make();d.create(owner,data);rejects(()=>d.create(owner,{...data,customer:'架空顧客B'}),'BOOKING_SLOT_OCCUPIED')});
+test('same slot across shops remains isolated',()=>{const d=make();d.create(owner,data);const other=d.create({shop:'shop-b',role:'owner'},data);assert.equal(other.shop,'shop-b')});

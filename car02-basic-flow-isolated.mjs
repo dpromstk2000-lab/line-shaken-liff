@@ -4,7 +4,14 @@
 export const DELIVERY_MODE = Object.freeze({environment:'isolated_demo',release:'NO_GO',migration:'HOLD',externalAccess:false,photoStorage:false});
 const error=(code)=>{const e=new Error(code);e.code=code;throw e};
 const requireText=(v,max=160)=>typeof v==='string'&&v.trim().length>0&&v.trim().length<=max;
-const validDate=(v)=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:(00|30)$/.test(v)&&!Number.isNaN(Date.parse(v));
+// Local wall-clock datetime: reject rollover (e.g. February 30) and off-grid times.
+const validDate=(v)=>{
+ if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:(00|30)$/.test(v))return false;
+ const [year,month,day,hour,minute]=v.match(/\d+/g).map(Number);
+ const d=new Date(year,month-1,day,hour,minute,0,0);
+ return year>=2000&&year<=9999&&d.getFullYear()===year&&d.getMonth()===month-1&&
+  d.getDate()===day&&d.getHours()===hour&&d.getMinutes()===minute;
+};
 export function makeCar02Demo({now=()=>new Date()}={}) {
   const cases=new Map();let seq=0;
   function requireCase(id,shop){let c=cases.get(id);if(!c)error('CASE_NOT_FOUND');if(c.shop!==shop)error('TENANT_DENIED');return c;}
@@ -13,7 +20,9 @@ export function makeCar02Demo({now=()=>new Date()}={}) {
   function version(c,expected){if(!Number.isSafeInteger(expected)||expected!==c.version)error('VERSION_CONFLICT')}
   const copy=(c)=>structuredClone(c);
   return Object.freeze({
-    create(actor,data){role('create',actor);if(!data||!requireText(data.customer,80)||!requireText(data.vehicle,80)||!validDate(data.start)||Date.parse(data.start)<=now().getTime())error('BOOKING_INVALID');
+    create(actor,data){role('create',actor);if(!data||!requireText(data.customer,80)||!requireText(data.vehicle,80)||!validDate(data.start)||new Date(data.start).getTime()<=now().getTime())error('BOOKING_INVALID');
+      // Conservative model: one reservation per store/time slot. Real DB must enforce atomic uniqueness.
+      if([...cases.values()].some(c=>c.shop===actor.shop&&c.start===data.start))error('BOOKING_SLOT_OCCUPIED');
       const id=`DEMO-${String(++seq).padStart(4,'0')}`;let c={id,shop:actor.shop,customer:data.customer.trim(),vehicle:data.vehicle.trim(),start:data.start,status:'booked',report:'',quote:[],decision:null,version:1,history:['予約作成']};cases.set(id,c);return copy(c)},
     view(actor,id){if(!actor||!requireText(actor.shop,80))error('ROLE_DENIED');const c=requireCase(id,actor.shop);if(actor.role==='customer'&&actor.customer!==c.customer)error('CUSTOMER_DENIED');if(!['customer','staff','owner'].includes(actor.role))error('ROLE_DENIED');return copy(c)},
     act(actor,id,action,data={}){if(!(action in roles))error('ACTION_DENIED');role(action,actor);const c=requireCase(id,actor.shop);version(c,data.expectedVersion);
