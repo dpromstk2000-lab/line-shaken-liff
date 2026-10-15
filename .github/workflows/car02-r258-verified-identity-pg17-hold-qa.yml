@@ -1,0 +1,150 @@
+name: CAR02 R258 Verified Identity Edge to PG17 Synthetic HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r258-verified-identity-disposable-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITHUB_ACTIONS: 'true'
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_R257_ISOLATED: 'yes'
+      CAR02_R258_ISOLATED: 'yes'
+      NODE_ENV: test
+      PGHOST: '127.0.0.1'
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: qa_only_local
+      PGDATABASE: car02_qa
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: qa_only_local
+          POSTGRES_DB: car02_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d car02_qa"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - name: Checkout fixed source snapshot
+        uses: actions/checkout@v4
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify approved sources and hard release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$CAR02_R258_ISOLATED" = yes
+          for pin in \
+          'BASELINE_QA_ONLY.sql 47fa141bcc3cf6f9d54a8dcd8c11290f72abd2be' \
+          'R13_MIGRATION_QA_ONLY.sql 5136872276b3403f036bae768410c937119398b2' \
+          'R13_EMPTY_ONLY_ROLLBACK_QA.sql 012875c4aabc7f0e6f66e6868d94c1949cae8cc9' \
+          'R46_STAFF_GRANTS_QA_ONLY.sql 2a63ac0788cb6b0deb6bb3f9ca30db4da752b9fc' \
+          'car02-core.mjs 8748ea9d79c4a5bc35321472f48cd06e3e435f1f' \
+          'car02-api.mjs e3216bf265bbb6fc6ac1c893334b76a2f429ccc1' \
+          'car02-identity-r44.mjs 91c3ef3475c837828ae7640d9cab75bcc46e3ced' \
+          'car02-pg-adapter.mjs dc57effaec3ed9b6ec309420b3506a57ec7a599f' \
+          'car02-pg-photo-repo.mjs 993997de0211b97591671813f6a8e6129e04291a' \
+          'car02-photo-flow.mjs b1b974165038384bc368975fd44b42d6c2199934' \
+          'car02-runtime-r45.mjs f53cc297c2e968845cccd54a258bf0d2006f7007' \
+          'car02-runtime-verified-r46.mjs fe121663a7b52c148fcdf04a0ecd2bb7d4d128a6' \
+          'car02-auth-providers-r46.mjs d90404a880c06b809c30685654029a938913ec09' \
+          'car02-edge-boundary-r51.mjs 6614f2ed1933aa787576cb8074cb7d4bc704efa0' \
+          'car02-r257-basic-staging-gateway-isolated.mjs 24a214fd045c67078672b623464845d77b104823' \
+          'pg17-integration.mjs ce8ca15fd78db2cd3dd8a8fcaa415428b9e7bbf1' \
+          'pg17-http-integration-r45.mjs f492da96f22d2d787f009eb5933713c734339fbf' \
+          'test_car02_r257_gateway.mjs 92381e692e37133cae70e600c25df3810372bc68' \
+          'pg17-r257-basic-edge-http-qa.mjs 1900d94fbe11ce4697af621cffc368e898a31e8f' \
+          'car02-edge-entry-r52.ts f0e31fb9f9d98524519d01dffd3489893d3d3302'; do
+            path="${pin%% *}"
+            expected="${pin##* }"
+            test -f "$path" || { echo "MISSING $path"; exit 1; }
+            test "$(git hash-object "$path")" = "$expected" || { echo "SOURCE_DRIFT $path"; exit 1; }
+          done
+          grep -q 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for file in car02-r258-verified-staging-gateway-isolated.mjs test_car02_r258_verified_gateway.mjs pg17-r258-verified-auth-gateway-qa.mjs; do
+            test -f "$file"
+          done
+          echo R258_20_APPROVED_SOURCES_MATCH_NO_GO_HOLD
+      - name: Syntax and synthetic boundary tests 3 times
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p r258_qa_evidence
+          for file in car02-r258-verified-staging-gateway-isolated.mjs test_car02_r258_verified_gateway.mjs pg17-r258-verified-auth-gateway-qa.mjs; do
+            node --check "$file"
+          done
+          for attempt in 1 2 3; do
+            node --test test_car02_r258_verified_gateway.mjs | tee "r258_qa_evidence/unit_${attempt}.tap"
+            grep -q '# pass 12' "r258_qa_evidence/unit_${attempt}.tap"
+            grep -q '# fail 0' "r258_qa_evidence/unit_${attempt}.tap"
+          done
+      - name: Install pg solely in disposable QA
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund pg@8
+      - name: Exercise R13 domain in disposable PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-integration.mjs | tee r258_qa_evidence/r43_pg17.log
+          grep -q 'R43 PG17 INTEGRATION: .* PASS' r258_qa_evidence/r43_pg17.log
+      - name: Exercise R45 existing HTTP and PG integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-http-integration-r45.mjs | tee r258_qa_evidence/r45_http.log
+          grep -q 'R45 HTTP PG17 INTEGRATION: .* PASS' r258_qa_evidence/r45_http.log
+      - name: Exercise R258 verified-auth provider wiring to PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-r258-verified-auth-gateway-qa.mjs | tee r258_qa_evidence/r258_pg17.log
+          grep -q 'R258_VERIFIED_IDENTITY_R46_EDGE_R13_PG17_SYNTHETIC_PASS 12/12 NO_GO HOLD' r258_qa_evidence/r258_pg17.log
+      - name: Recheck immutable sources and release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-auth-providers-r46.mjs)" = 'd90404a880c06b809c30685654029a938913ec09'
+          test "$(git hash-object car02-r257-basic-staging-gateway-isolated.mjs)" = '24a214fd045c67078672b623464845d77b104823'
+          printf '%s\n' 'SYNTHETIC_ONLY=TRUE' 'REAL_AUTH_VERIFIED=FALSE' 'NO_GO=TRUE' 'DB_MIGRATION_HOLD=TRUE' > r258_qa_evidence/RELEASE_HOLD.txt
+      - name: Store redacted isolated evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r258-synthetic-verified-auth-pg17-evidence
+          path: r258_qa_evidence/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Destroy disposable PG17 databases
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PGHOST" = '127.0.0.1'
+          test "$PGDATABASE" = 'car02_qa'
+          if ! node -e "require.resolve('pg')" >/dev/null 2>&1; then
+            echo 'pg dependency absent; runner destroys service container automatically.'
+            exit 0
+          fi
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const c=new pg.Client({host:'127.0.0.1',user:'postgres',password:'qa_only_local',database:'postgres',port:5432});
+          await c.connect();
+          try{
+            for(const name of ['car02_empty_rollback_qa','car02_qa'])await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+            const r=await c.query("SELECT datname FROM pg_database WHERE datname IN ('car02_qa','car02_empty_rollback_qa')");
+            if(r.rowCount)throw Error('R258_CLEANUP_FAILED');
+            console.log('R258_DISPOSABLE_DATABASES_REMOVED');
+          }finally{await c.end()}
+          NODE
