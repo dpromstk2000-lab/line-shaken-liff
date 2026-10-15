@@ -18,7 +18,7 @@ export const PINNED={
  'car02-edge-entry-r52.ts':'f0e31fb9f9d98524519d01dffd3489893d3d3302',
  'car02-private-photo-upload-http-r82.mjs':'78f8b0f80fcc1f89d15fd25e4593c660cd197ea3',
  'car02-r93q-single-schema-lifecycle-isolated.mjs':'be1cd3feb78e26fb4759d9a86ecbd835d7ada144',
- 'car02-r93s-durable-upload-intent-isolated.mjs':'64e907008448264512594573cdcd8773c4c29d'
+ 'car02-r93s-durable-upload-intent-isolated.mjs':'64e907008448264512594573cdcdcd8773c4c29d'
 };
 const FEATURES=Object.freeze({
  HP:{entry:'index.html',require:['CUSTOMER_DOMAIN','HP_ROUTE_QA'],note:'既存画面の存在はCAR02用HP公開の確認ではない'},

@@ -15,6 +15,11 @@ const clone=x=>structuredClone(x);
 const sum=x=>createHash('sha256').update(x).digest('hex');
 
 test('factory identifiers and protected pin count fixed',()=>{assert.equal(FACTORY,'DPRO_CAR02_CUSTOMER_DELIVERY_FACTORY_V2');assert.equal(Object.keys(PINNED).length,7);});
+test('all protected Git blob pins are 40-character SHA-1 hex strings',()=>{
+ for(const [name,sha] of Object.entries(PINNED)){
+  assert.match(sha,/^[a-f0-9]{40}$/,`Invalid Git blob SHA for ${name}`);
+ }
+});
 test('incomplete order never releases / creates tenant / deploys worker',()=>{
  const p=makeBuildPlan(blankDraft());assert.equal(p.intakeComplete,false);
  for(let k of ['customerGoLiveReady','customerEnvironmentCreated','workerDeployed','databaseMigrated','releaseAuthorized','productionTouched'])assert.equal(p[k],false);
