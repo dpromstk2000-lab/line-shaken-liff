@@ -1,0 +1,146 @@
+name: CAR02 R257 Edge Prefix Basic Business PG17 HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r257-disposable-pg17-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_R257_ISOLATED: 'yes'
+      NODE_ENV: test
+      PGHOST: '127.0.0.1'
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: qa_only_local
+      PGDATABASE: car02_qa
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: qa_only_local
+          POSTGRES_DB: car02_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d car02_qa"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - name: Checkout immutable approved sources
+        uses: actions/checkout@v4
+      - name: Setup Node.js 22 for disposable CI
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fail closed on source drift and release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$CAR02_R257_ISOLATED" = yes
+          for pin in \
+            'BASELINE_QA_ONLY.sql 47fa141bcc3cf6f9d54a8dcd8c11290f72abd2be' \
+            'R13_MIGRATION_QA_ONLY.sql 5136872276b3403f036bae768410c937119398b2' \
+            'R13_EMPTY_ONLY_ROLLBACK_QA.sql 012875c4aabc7f0e6f66e6868d94c1949cae8cc9' \
+            'car02-core.mjs 8748ea9d79c4a5bc35321472f48cd06e3e435f1f' \
+            'car02-api.mjs e3216bf265bbb6fc6ac1c893334b76a2f429ccc1' \
+            'car02-identity-r44.mjs 91c3ef3475c837828ae7640d9cab75bcc46e3ced' \
+            'car02-edge-boundary-r51.mjs 6614f2ed1933aa787576cb8074cb7d4bc704efa0' \
+            'car02-runtime-r45.mjs f53cc297c2e968845cccd54a258bf0d2006f7007' \
+            'car02-pg-adapter.mjs dc57effaec3ed9b6ec309420b3506a57ec7a599f' \
+            'car02-pg-photo-repo.mjs 993997de0211b97591671813f6a8e6129e04291a' \
+            'car02-photo-flow.mjs b1b974165038384bc368975fd44b42d6c2199934' \
+            'pg17-integration.mjs ce8ca15fd78db2cd3dd8a8fcaa415428b9e7bbf1' \
+            'pg17-http-integration-r45.mjs f492da96f22d2d787f009eb5933713c734339fbf'; do
+            path="${pin%% *}"
+            expected="${pin##* }"
+            test -f "$path" || { echo "R257_MISSING_SOURCE $path"; exit 1; }
+            actual="$(git hash-object "$path")"
+            test "$actual" = "$expected" || { echo "R257_SOURCE_DRIFT $path"; exit 1; }
+          done
+          test -f car02-r257-basic-staging-gateway-isolated.mjs
+          test -f test_car02_r257_gateway.mjs
+          test -f pg17-r257-basic-edge-http-qa.mjs
+          grep -q 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          echo R257_13_PROTECTED_GIT_BLOBS_OK_NO_GO_HOLD
+      - name: Check new code syntax and run Edge gateway unit QA three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p r257_qa_evidence
+          for file in car02-r257-basic-staging-gateway-isolated.mjs test_car02_r257_gateway.mjs pg17-r257-basic-edge-http-qa.mjs; do
+            node --check "$file"
+          done
+          for i in 1 2 3; do
+            node --test test_car02_r257_gateway.mjs | tee "r257_qa_evidence/r257_unit_${i}.tap"
+            grep -q '# pass 10' "r257_qa_evidence/r257_unit_${i}.tap"
+            grep -q '# fail 0' "r257_qa_evidence/r257_unit_${i}.tap"
+          done
+      - name: Install node-postgres only for disposable QA
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund pg@8
+      - name: Exercise real R13 PostgreSQL 17 schema and domain
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-integration.mjs | tee r257_qa_evidence/r43_db_regression.log
+          grep -q 'R43 PG17 INTEGRATION: .* PASS' r257_qa_evidence/r43_db_regression.log
+      - name: Exercise existing R45 HTTP to PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-http-integration-r45.mjs | tee r257_qa_evidence/r45_http_regression.log
+          grep -q 'R45 HTTP PG17 INTEGRATION: .* PASS' r257_qa_evidence/r45_http_regression.log
+      - name: Exercise R257 Edge-shaped entry through R45 to PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-r257-basic-edge-http-qa.mjs | tee r257_qa_evidence/r257_pg17_result.log
+          grep -q 'R257_EDGE_PREFIX_R45_REAL_PG17_SYNTHETIC_QA_PASS 10 / 10' r257_qa_evidence/r257_pg17_result.log
+      - name: Reconfirm hard release lock and protected Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = '6614f2ed1933aa787576cb8074cb7d4bc704efa0'
+          test "$(git hash-object car02-core.mjs)" = '8748ea9d79c4a5bc35321472f48cd06e3e435f1f'
+          test "$(git hash-object car02-api.mjs)" = 'e3216bf265bbb6fc6ac1c893334b76a2f429ccc1'
+          printf '%s\n' 'NO_GO / DB_MIGRATION_HOLD / PRODUCTION_DEPLOY_NOT_AUTHORIZED' > r257_qa_evidence/RELEASE_HOLD.txt
+      - name: Save CI-only redacted results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r257-disposable-pg17-gateway-evidence
+          path: r257_qa_evidence/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Destroy disposable PostgreSQL 17 QA databases
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_R257_ISOLATED" = yes
+          test "$PGHOST" = 127.0.0.1
+          test "$PGDATABASE" = car02_qa
+          if ! node -e "require.resolve('pg')" >/dev/null 2>&1; then
+            echo 'QA pg module not installed; GitHub destroys PostgreSQL service container automatically.'
+            exit 0
+          fi
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const db=new pg.Client({host:'127.0.0.1',user:'postgres',password:'qa_only_local',database:'postgres',port:5432});
+          await db.connect();
+          try {
+            for(const name of ['car02_empty_rollback_qa','car02_qa']){
+              await db.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+            }
+            const r=await db.query("SELECT datname FROM pg_database WHERE datname IN ('car02_empty_rollback_qa','car02_qa')");
+            if(r.rowCount)throw Error('R257_QA_DATABASE_CLEANUP_FAILED');
+            console.log('R257_PG17_DISPOSABLE_DATABASES_DESTROYED');
+          }finally{await db.end()}
+          NODE
