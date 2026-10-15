@@ -1,0 +1,75 @@
+name: CAR02 R256 Identity HTTP Boundary Synthetic HOLD QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r256-identity-http-boundary-hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_R256_ISOLATED: 'yes'
+      NODE_ENV: test
+    steps:
+      - name: Checkout committed source without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original R41 R43 R44 identity and hard release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-core.mjs)" = '8748ea9d79c4a5bc35321472f48cd06e3e435f1f'
+          test "$(git hash-object car02-api.mjs)" = 'e3216bf265bbb6fc6ac1c893334b76a2f429ccc1'
+          test "$(git hash-object car02-identity-r44.mjs)" = '91c3ef3475c837828ae7640d9cab75bcc46e3ced'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Fq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test -f test_car02_r256_identity_http_boundary.mjs
+      - name: Reject production and accidental unguarded invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check test_car02_r256_identity_http_boundary.mjs
+          if env -u CAR02_R256_ISOLATED node --test test_car02_r256_identity_http_boundary.mjs > /tmp/r256_no_guard.txt 2>&1; then
+            echo 'R256 accepted missing isolation guard'; exit 1
+          fi
+          if NODE_ENV=production node --test test_car02_r256_identity_http_boundary.mjs > /tmp/r256_prod.txt 2>&1; then
+            echo 'R256 accepted production mode'; exit 1
+          fi
+          grep -Eq 'isolated QA|synthetic QA|R256' /tmp/r256_no_guard.txt
+          grep -Eq 'production' /tmp/r256_prod.txt
+      - name: Run synthetic staff LINE API integration contract three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa_evidence_r256
+          for i in 1 2 3; do
+            node --test test_car02_r256_identity_http_boundary.mjs | tee "qa_evidence_r256/R256_QA_${i}.tap"
+            grep -q '^# pass 9$' "qa_evidence_r256/R256_QA_${i}.tap"
+            grep -q '^# fail 0$' "qa_evidence_r256/R256_QA_${i}.tap"
+          done
+          git hash-object car02-core.mjs car02-api.mjs car02-identity-r44.mjs car02-edge-entry-r52.ts test_car02_r256_identity_http_boundary.mjs > qa_evidence_r256/SOURCE_BLOBS.txt
+          printf 'R256 identity/HTTP integration uses synthetic tokens and in-memory fixture only. Production NO_GO; DB migration HOLD.\n' > qa_evidence_r256/STATUS.txt
+      - name: Verify protected sources after tests
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object car02-core.mjs)" = '8748ea9d79c4a5bc35321472f48cd06e3e435f1f'
+          test "$(git hash-object car02-api.mjs)" = 'e3216bf265bbb6fc6ac1c893334b76a2f429ccc1'
+          test "$(git hash-object car02-identity-r44.mjs)" = '91c3ef3475c837828ae7640d9cab75bcc46e3ced'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Fq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+      - name: Upload isolated QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-r256-synthetic-identity-hold-evidence
+          path: qa_evidence_r256/
+          if-no-files-found: warn
+          retention-days: 7
