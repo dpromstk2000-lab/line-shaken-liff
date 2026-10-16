@@ -12,6 +12,9 @@ on:
       - 'CAR02_BASIC_BOOKING_ATOMIC_PG17_QA_ONLY.sql'
       - 'pg17-car02-basic-booking-to-work-order-isolated.mjs'
       - 'pg17-car02-basic-full-journey-isolated.mjs'
+      - 'car02-basic-booking-http-isolated.mjs'
+      - 'test_car02_basic_booking_http_isolated.mjs'
+      - 'pg17-car02-basic-booking-http-isolated.mjs'
       - '.github/workflows/car02-basic-reference-pg17-qa.yml'
 permissions:
   contents: read
@@ -134,6 +137,21 @@ jobs:
           node --check pg17-car02-basic-full-journey-isolated.mjs
           node pg17-car02-basic-full-journey-isolated.mjs | tee car02_basic_pg17_evidence/full_journey.log
           grep -q 'CAR02_BASIC_FULL_JOURNEY_R57_R45_R13_PG17_PASS 16/16 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/full_journey.log
+      - name: Verify staff-assisted synthetic HTTP booking input contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-basic-booking-http-isolated.mjs
+          node --check pg17-car02-basic-booking-http-isolated.mjs
+          node --test test_car02_basic_booking_http_isolated.mjs | tee car02_basic_pg17_evidence/booking_http_unit.tap
+          grep -q '# pass 21' car02_basic_pg17_evidence/booking_http_unit.tap
+          grep -q '# fail 0' car02_basic_pg17_evidence/booking_http_unit.tap
+      - name: Verify staff-assisted HTTP booking to R45 R13 in disposable PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-car02-basic-booking-http-isolated.mjs | tee car02_basic_pg17_evidence/booking_http_pg17.log
+          grep -q 'CAR02_BASIC_BOOKING_HTTP_R44_R57_R45_R13_PG17_PASS 15/15 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/booking_http_pg17.log
       - name: Store redacted QA proof
         if: always()
         uses: actions/upload-artifact@v4
