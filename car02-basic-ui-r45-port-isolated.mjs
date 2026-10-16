@@ -78,10 +78,18 @@ export function createCar02BasicUiR45Port({environment,allowIsolatedQa=false,cli
    async history(id){
      if(!uuid(id))error('CAR02_UI_CASE_ID_REQUIRED');
      const value=await client.history(id);
-     if(!Array.isArray(value)||value.length>1000||!value.every(x=>plain(x)&&typeof x.event_type==='string'&&x.event_type.length<=80))
+     // R45 exposes createCar02Service.history(), which returns the hydrated
+     // order.events DTO: {type, actorRole, actorFingerprint, createdAt}.
+     // SQL-only {event_type, actor_role, created_at} rows are NOT the HTTP contract.
+     if(!Array.isArray(value)||value.length>1000||!value.every(x=>
+       plain(x)&&typeof x.type==='string'&&x.type.length>0&&x.type.length<=80&&
+       typeof x.actorRole==='string'&&typeof x.createdAt==='string'&&
+       x.createdAt.length>0&&x.createdAt.length<=80&&!Number.isNaN(Date.parse(x.createdAt))))
        error('CAR02_UI_HISTORY_INVALID');
-     return Object.freeze(value.map(x=>Object.freeze({event:x.event_type,role:['owner','staff','customer'].includes(x.actor_role)?x.actor_role:'unknown',
-       createdAt:typeof x.created_at==='string'?x.created_at:String(x.created_at??'')})));
+     // Allow-list returned fields: do not expose actorFingerprint or unknown DTO fields.
+     return Object.freeze(value.map(x=>Object.freeze({event:x.type,
+       role:['owner','staff','customer'].includes(x.actorRole)?x.actorRole:'unknown',
+       createdAt:x.createdAt})));
    },
  });
 }

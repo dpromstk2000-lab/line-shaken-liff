@@ -10,7 +10,7 @@ const key='qa-only-ui-key-000001';
 const args={customerId:CUSTOMER,vehicleId:VEHICLE,reservationId:BOOKING,idempotencyKey:key};
 const observed=[];
 function fake(value=case0){return {create:async (...v)=>(observed.push(['create',...v]),value),get:async(...v)=>(observed.push(['get',...v]),value),
- history:async(...v)=>(observed.push(['history',...v]),[{event_type:'created',actor_role:'staff',created_at:'2026-10-16T01:00:00Z'}]),
+ history:async(...v)=>(observed.push(['history',...v]),[{type:'created',actorRole:'staff',actorFingerprint:'synthetic-internal-fingerprint',createdAt:'2026-10-16T01:00:00Z'}]),
  saveReport:async(...v)=>(observed.push(['report',...v]),value),presentQuote:async(...v)=>(observed.push(['quote',...v]),value),
  decision:async(...v)=>(observed.push(['decision',...v]),value),complete:async(...v)=>(observed.push(['complete',...v]),value)};}
 const port=(client=fake())=>createCar02BasicUiR45Port({environment:'disposable_qa',allowIsolatedQa:true,client});
@@ -29,4 +29,16 @@ test('pending/approved/completed labels and allowed actions',()=>{const quote={r
 test('reject malformed status, version, quote totals and non-UUID records',()=>{for(const r of [{...case0,status:'awaiting_approval'},{...case0,version:0},{...case0,id:'DEMO-0001'},{...case0,quote:{subtotal:10,tax:1,total:12}}])assert.throws(()=>projectCar02R45Order(r),/CAR02_UI_(RESPONSE|QUOTE)_INVALID/)});
 test('read and history do not leak auth, shop or actor fingerprints',async()=>{const p=port();const x=await p.read(ORDER);assert.ok(!('customerId' in x));const hist=await p.history(ORDER);assert.deepEqual(hist,[{event:'created',role:'staff',createdAt:'2026-10-16T01:00:00Z'}]);assert.ok(!('actorFingerprint' in hist[0]))});
 test('cannot create booking or upload photos or send/deploy',()=>{const p=port();for(const name of ['createBooking','uploadPhoto','send','deploy'])assert.equal(typeof p[name],'undefined')});
-test('history rejects non-array/unrecognized event data',async()=>{const p=port({...fake(),history:async()=>({bad:true})});await assert.rejects(p.history(ORDER),/CAR02_UI_HISTORY_INVALID/)});
+test('history rejects non-array/unrecognized event data',async()=>{
+ const invalid=[
+   {bad:true},
+   [{event_type:'created',actor_role:'staff',created_at:'2026-10-16T01:00:00Z'}], // SQL row != R45 HTTP DTO
+   [{type:'created',actorRole:'staff',createdAt:'not-a-time'}],
+   [{type:'',actorRole:'staff',createdAt:'2026-10-16T01:00:00Z'}],
+   Array.from({length:1001},()=>({type:'created',actorRole:'staff',createdAt:'2026-10-16T01:00:00Z'}))
+ ];
+ for(const sample of invalid){
+   const p=port({...fake(),history:async()=>sample});
+   await assert.rejects(p.history(ORDER),/CAR02_UI_HISTORY_INVALID/);
+ }
+});
