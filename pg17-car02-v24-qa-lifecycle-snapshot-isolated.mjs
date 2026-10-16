@@ -1,10 +1,12 @@
 /** CAR02 V2.4: disposable PostgreSQL 17 synthetic lifecycle sidecar QA ONLY.
  * Creates a QA-only sidecar fixture in the ephemeral `car02_qa` database.
- * NEVER changes existing R13 booking/work-order rows, migrations, Worker or LINE.
+ * Adds ONE new synthetic R13 fixture row in disposable CI only; never edits
+ * existing booking/work-order rows, migrations, Worker or LINE.
  * A consistent snapshot does NOT authorize or atomically create an order.
  */
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
 import pg from 'pg';
 import {createCar02V24QaLifecycleReader,V24_MODE} from './car02-v24-qa-lifecycle-snapshot-isolated.mjs';
 const env=process.env;
@@ -20,7 +22,12 @@ const lock=readFileSync(new URL('./car02-edge-entry-r52.ts',import.meta.url),'ut
 if(!/const\s+CAR02_RELEASE_LOCK\s*=\s*true;/.test(lock))throw Error('CAR02_V24_RELEASE_LOCK_MISSING');
 const POOL=new pg.Pool({host:'127.0.0.1',port:5432,user:'postgres',password:'qa_only_local',database:'car02_qa',max:3});
 const SHOP='street_house_kitsuki',OTHER='other_shop';
-const ID='66666666-6666-4666-8666-666666666666',FOREIGN='77777777-7777-4777-8777-777777777777';
+// The earlier R45 integration has ALREADY created a work order for this UUID.
+// Do not hide that valid duplicate-order veto; test it explicitly below.
+const PREVIOUSLY_ORDERED='66666666-6666-4666-8666-666666666666';
+// A NEW synthetic reservation is provisioned only inside the disposable QA DB.
+// No pre-existing R13 booking or CAR02 work-order row is altered.
+const ID=randomUUID(),FOREIGN='77777777-7777-4777-8777-777777777777';
 const fakeActor=(shop=SHOP)=>({verified:true,role:'staff',subject:'synthetic-v24-actor',shopCode:shop});
 const reader=createCar02V24QaLifecycleReader({pool:POOL,env:verifiedQaEnv,environment:'disposable_qa',allowDisposableQa:true,
  branchBindings:{ksh:SHOP,wangan:OTHER}});
@@ -31,10 +38,20 @@ const countCore=async()=>{
 };
 try {
  let before;
- await pass('real disposable PG17 and expected R13 reservation exist',async()=>{
+ await pass('real disposable PG17 provisions a new synthetic booking, leaving existing work orders unchanged',async()=>{
   const v=await POOL.query('SHOW server_version_num');assert.ok(Number(v.rows[0].server_version_num)>=170000);
-  const r=await POOL.query('SELECT 1 FROM public.ksh_demo_reservations WHERE id=$1::uuid AND shop_code=$2',[ID,SHOP]);assert.equal(r.rows.length,1);
+  const previous=await POOL.query('SELECT 1 FROM public.ksh_car02_work_orders WHERE reservation_id=$1::uuid AND shop_code=$2',
+    [PREVIOUSLY_ORDERED,SHOP]);
+  assert.ok(previous.rowCount>=1,'Earlier integration must retain the existing linked order');
+  const original=await countCore();
+  // Synthetic-only INSERT in the disposable DB; never update/delete R13 baseline rows.
+  const newBooking=await POOL.query(`INSERT INTO public.ksh_demo_reservations
+    (id,shop_code,customer_id,vehicle_id) VALUES ($1,$2,$3,$4) RETURNING id`,
+    [ID,SHOP,'11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222']);
+  assert.equal(newBooking.rowCount,1);
   before=await countCore();
+  assert.equal(before.reservations,original.reservations+1);
+  assert.equal(before.work_orders,original.work_orders);
  });
  await pass('synthetic lifecycle columns created in separate disposable QA sidecar only',async()=>{
   await POOL.query(`CREATE TABLE public.car02_v24_qa_lifecycle (
@@ -44,11 +61,16 @@ try {
     reservation_date date NOT NULL,reservation_time time without time zone NOT NULL)`);
   await POOL.query(`INSERT INTO public.car02_v24_qa_lifecycle
      (reservation_id,shop_code,status,version,reservation_date,reservation_time) VALUES
-     ($1,$2,'入庫予定',4,'2026-10-20','10:30'),($3,$4,'入庫済み',2,'2026-10-21','11:00')`,[ID,SHOP,FOREIGN,OTHER]);
+     ($1,$2,'入庫予定',4,'2026-10-20','10:30'),
+     ($3,$4,'入庫済み',2,'2026-10-21','11:00'),
+     ($5,$2,'入庫予定',4,'2026-10-20','10:30')`,[ID,SHOP,FOREIGN,OTHER,PREVIOUSLY_ORDERED]);
   assert.deepEqual(await countCore(),before);
  });
- await pass('QA snapshot finds currently matching tenant booking version and status',async()=>{
+ await pass('new booking is consistent but already ordered booking correctly remains HOLD',async()=>{
   const x=await reader.inspect(request());assert.equal(x.result,'CONSISTENT_QA_SNAPSHOT');assert.equal(x.snapshotConsistent,true);
+  const old=await reader.inspect(request({reservationId:PREVIOUSLY_ORDERED}));
+  assert.equal(old.result,'HOLD');
+  assert.ok(old.checks.includes('QA_ORDER_ALREADY_EXISTS_OR_UNPROVEN'));
  });
  await pass('even consistent snapshot cannot authorize real order creation',async()=>{
   const x=await reader.inspect(request());assert.equal(x.safeToCreateOrder,false);assert.equal(x.sendable,false);
