@@ -18,6 +18,9 @@ on:
       - 'car02-basic-staff-booking-browser-isolated.mjs'
       - 'test_car02_basic_staff_booking_browser_isolated.mjs'
       - 'pg17-car02-basic-staff-booking-browser-isolated.mjs'
+      - 'car02-legacy-reservation-handoff-readonly-isolated.mjs'
+      - 'test_car02_legacy_reservation_handoff_readonly_isolated.mjs'
+      - 'pg17-car02-legacy-reservation-handoff-readonly-isolated.mjs'
       - '.github/workflows/car02-basic-reference-pg17-qa.yml'
 permissions:
   contents: read
@@ -170,6 +173,21 @@ jobs:
           set -euo pipefail
           node pg17-car02-basic-staff-booking-browser-isolated.mjs | tee car02_basic_pg17_evidence/staff_booking_browser_pg17.log
           grep -q 'CAR02_BASIC_STAFF_BOOKING_BROWSER_R44_R57_R45_R13_PG17_PASS 15/15 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/staff_booking_browser_pg17.log
+      - name: Verify V2.0 R13 reservation handoff input contract (isolated only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-legacy-reservation-handoff-readonly-isolated.mjs
+          node --check pg17-car02-legacy-reservation-handoff-readonly-isolated.mjs
+          node --test test_car02_legacy_reservation_handoff_readonly_isolated.mjs | tee car02_basic_pg17_evidence/legacy_handoff_unit.tap
+          grep -q '# pass 31' car02_basic_pg17_evidence/legacy_handoff_unit.tap
+          grep -q '# fail 0' car02_basic_pg17_evidence/legacy_handoff_unit.tap
+      - name: Verify V2.0 R13 booking to R45 preview READ ONLY in disposable PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-car02-legacy-reservation-handoff-readonly-isolated.mjs | tee car02_basic_pg17_evidence/legacy_handoff_pg17.log
+          grep -q 'CAR02_LEGACY_RESERVATION_R13_R45_READONLY_PG17_PASS 16/16 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/legacy_handoff_pg17.log
       - name: Store redacted QA proof
         if: always()
         uses: actions/upload-artifact@v4
