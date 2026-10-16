@@ -15,6 +15,9 @@ on:
       - CAR02_BASIC_UNIFIED_OPERATIONS_ISOLATED_PREVIEW.html
       - car02-basic-unified-operations-isolated.mjs
       - car02-existing-ui-readonly-preflight.mjs
+      - car02-legacy-ui-branch-review-isolated.mjs
+      - test_car02_legacy_ui_branch_review_isolated.mjs
+      - car02-legacy-ui-branch-review-runner-isolated.mjs
       - test_car02_existing_ui_readonly_preflight.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
@@ -55,6 +58,18 @@ jobs:
           grep -q 'CAR02_READONLY_PREFLIGHT' car02_legacy_preflight_evidence/compatibility_status.txt
           grep -q 'NO_GO / DB HOLD' car02_legacy_preflight_evidence/compatibility_status.txt
           grep -q 'BLOCK=0' car02_legacy_preflight_evidence/compatibility_status.txt
+      - name: V2.2 legacy WANGAN vs KSH source boundary (READ ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-legacy-ui-branch-review-isolated.mjs
+          node --check test_car02_legacy_ui_branch_review_isolated.mjs
+          node --check car02-legacy-ui-branch-review-runner-isolated.mjs
+          node --test test_car02_legacy_ui_branch_review_isolated.mjs | tee car02_legacy_preflight_evidence/v22_unit.tap
+          grep -q '# pass 41' car02_legacy_preflight_evidence/v22_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v22_unit.tap
+          node car02-legacy-ui-branch-review-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v22_branch_status.txt
+          grep -q 'CAR02_V22_LEGACY_BRANCH_READONLY_SOURCE_PASS 4/4 NO_GO HOLD' car02_legacy_preflight_evidence/v22_branch_status.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
