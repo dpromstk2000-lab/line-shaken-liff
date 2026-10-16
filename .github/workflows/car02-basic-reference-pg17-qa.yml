@@ -30,6 +30,9 @@ on:
       - 'car02-v24-qa-lifecycle-snapshot-isolated.mjs'
       - 'test_car02_v24_qa_lifecycle_snapshot_isolated.mjs'
       - 'pg17-car02-v24-qa-lifecycle-snapshot-isolated.mjs'
+      - 'car02-v25-concurrent-qa-claim-isolated.mjs'
+      - 'test_car02_v25_concurrent_qa_claim_isolated.mjs'
+      - 'pg17-car02-v25-concurrent-qa-claim-isolated.mjs'
       - '.github/workflows/car02-basic-reference-pg17-qa.yml'
 permissions:
   contents: read
@@ -242,6 +245,21 @@ jobs:
           set -euo pipefail
           node pg17-car02-v24-qa-lifecycle-snapshot-isolated.mjs | tee car02_basic_pg17_evidence/v24_snapshot_pg17.log
           grep -q 'CAR02_V24_LIFECYCLE_SNAPSHOT_PG17_PASS 17/17 QA_SIDECAR_ONLY NON_SENDABLE NO_GO HOLD' car02_basic_pg17_evidence/v24_snapshot_pg17.log
+      - name: V2.5 disposable concurrent QA claims unit safety (NO_GO)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v25-concurrent-qa-claim-isolated.mjs
+          node --check pg17-car02-v25-concurrent-qa-claim-isolated.mjs
+          node --test test_car02_v25_concurrent_qa_claim_isolated.mjs | tee car02_basic_pg17_evidence/v25_concurrent_unit.tap
+          grep -q '# pass 53' car02_basic_pg17_evidence/v25_concurrent_unit.tap
+          grep -q '# fail 0' car02_basic_pg17_evidence/v25_concurrent_unit.tap
+      - name: V2.5 concurrent claims in disposable PostgreSQL 17 sidecars only
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-car02-v25-concurrent-qa-claim-isolated.mjs | tee car02_basic_pg17_evidence/v25_concurrent_pg17.log
+          grep -q 'CAR02_V25_CONCURRENT_QA_CLAIM_PG17_PASS 20/20 QA_CLAIMS_ONLY NON_SENDABLE NO_GO HOLD' car02_basic_pg17_evidence/v25_concurrent_pg17.log
       - name: Store redacted QA proof
         if: always()
         uses: actions/upload-artifact@v4
