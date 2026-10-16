@@ -1,0 +1,40 @@
+name: CAR02 Basic Reference Integration QA (isolated)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'car02-basic-api-contract-isolated.mjs'
+      - 'test_car02_basic_api_contract_isolated.mjs'
+      - 'car02-basic-reference-resolver-isolated.mjs'
+      - 'test_car02_basic_reference_resolver_isolated.mjs'
+      - 'car02-basic-reference-bridge-isolated.mjs'
+      - 'test_car02_basic_reference_bridge_isolated.mjs'
+      - '.github/workflows/car02-basic-reference-integration-qa.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_ENVIRONMENT: isolated_qa
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify release lock source unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$CAR02_RELEASE_LOCK" = 'true'
+      - name: Run isolated reference contract suites
+        run: |
+          node --test \
+            test_car02_basic_api_contract_isolated.mjs \
+            test_car02_basic_reference_resolver_isolated.mjs \
+            test_car02_basic_reference_bridge_isolated.mjs
