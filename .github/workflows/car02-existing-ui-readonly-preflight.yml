@@ -19,6 +19,14 @@ on:
       - test_car02_legacy_ui_branch_review_isolated.mjs
       - car02-legacy-ui-branch-review-runner-isolated.mjs
       - test_car02_existing_ui_readonly_preflight.mjs
+      - car02-v26-release-readiness-audit-isolated.mjs
+      - car02-v26-release-readiness-runner-isolated.mjs
+      - test_car02_v26_release_readiness_audit_isolated.mjs
+      - car02-identity-r44.mjs
+      - car02-runtime-r45.mjs
+      - car02-v25-concurrent-qa-claim-isolated.mjs
+      - BASELINE_QA_ONLY.sql
+      - R13_MIGRATION_QA_ONLY.sql
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -70,6 +78,18 @@ jobs:
           grep -q '# fail 0' car02_legacy_preflight_evidence/v22_unit.tap
           node car02-legacy-ui-branch-review-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v22_branch_status.txt
           grep -q 'CAR02_V22_LEGACY_BRANCH_READONLY_SOURCE_PASS 4/4 NO_GO HOLD' car02_legacy_preflight_evidence/v22_branch_status.txt
+      - name: V2.6 checked-out real source release gap audit (READ ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v26-release-readiness-audit-isolated.mjs
+          node --check car02-v26-release-readiness-runner-isolated.mjs
+          node --check test_car02_v26_release_readiness_audit_isolated.mjs
+          node --test test_car02_v26_release_readiness_audit_isolated.mjs | tee car02_legacy_preflight_evidence/v26_unit.tap
+          grep -q '# pass 32' car02_legacy_preflight_evidence/v26_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v26_unit.tap
+          node car02-v26-release-readiness-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v26_release_gaps.txt
+          grep -q 'CAR02_V26_STATIC_AUDIT_PASS 10/10 RELEASE_BLOCKERS=8 NO_GO HOLD' car02_legacy_preflight_evidence/v26_release_gaps.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
