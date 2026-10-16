@@ -1,0 +1,65 @@
+name: CAR02 Existing UI Compatibility Read-only Preflight (NO_GO HOLD)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - dashboard.html
+      - owner-ipad.html
+      - index.html
+      - member.html
+      - car02-api.mjs
+      - car02-edge-entry-r52.ts
+      - car02-browser-client-r57.mjs
+      - car02-basic-booking-atomic-isolated.mjs
+      - car02-basic-staff-booking-browser-isolated.mjs
+      - CAR02_BASIC_UNIFIED_OPERATIONS_ISOLATED_PREVIEW.html
+      - car02-basic-unified-operations-isolated.mjs
+      - car02-existing-ui-readonly-preflight.mjs
+      - test_car02_existing_ui_readonly_preflight.mjs
+      - .github/workflows/car02-existing-ui-readonly-preflight.yml
+      - SUPAbasepass.txt
+      - '.env*'
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-source-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout existing sources only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Create evidence folder
+        run: mkdir -p car02_legacy_preflight_evidence
+      - name: Unit-test non-invasive route checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-existing-ui-readonly-preflight.mjs
+          node --check test_car02_existing_ui_readonly_preflight.mjs
+          node --test test_car02_existing_ui_readonly_preflight.mjs | tee car02_legacy_preflight_evidence/unit.tap
+          grep -q '# pass 25' car02_legacy_preflight_evidence/unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/unit.tap
+      - name: Verify real checked-out legacy + CAR02 boundaries (READ ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node car02-existing-ui-readonly-preflight.mjs | tee car02_legacy_preflight_evidence/compatibility_status.txt
+          grep -q 'CAR02_READONLY_PREFLIGHT' car02_legacy_preflight_evidence/compatibility_status.txt
+          grep -q 'NO_GO / DB HOLD' car02_legacy_preflight_evidence/compatibility_status.txt
+          grep -q 'BLOCK=0' car02_legacy_preflight_evidence/compatibility_status.txt
+      - name: Store non-sensitive verification status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-existing-ui-readonly-preflight-evidence
+          path: car02_legacy_preflight_evidence/
+          retention-days: 7
+          if-no-files-found: warn
