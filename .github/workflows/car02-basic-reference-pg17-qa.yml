@@ -11,6 +11,7 @@ on:
       - 'test_car02_basic_booking_atomic_isolated.mjs'
       - 'CAR02_BASIC_BOOKING_ATOMIC_PG17_QA_ONLY.sql'
       - 'pg17-car02-basic-booking-to-work-order-isolated.mjs'
+      - 'pg17-car02-basic-full-journey-isolated.mjs'
       - '.github/workflows/car02-basic-reference-pg17-qa.yml'
 permissions:
   contents: read
@@ -126,6 +127,13 @@ jobs:
           set -euo pipefail
           node pg17-car02-basic-booking-to-work-order-isolated.mjs | tee car02_basic_pg17_evidence/booking_to_work_order.log
           grep -q 'CAR02_BASIC_ATOMIC_BOOKING_R45_R13_PG17_SYNTHETIC_PASS 17/17 NO_GO HOLD' car02_basic_pg17_evidence/booking_to_work_order.log
+      - name: Verify complete booking to UI R57 R45 R13 journey in disposable PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check pg17-car02-basic-full-journey-isolated.mjs
+          node pg17-car02-basic-full-journey-isolated.mjs | tee car02_basic_pg17_evidence/full_journey.log
+          grep -q 'CAR02_BASIC_FULL_JOURNEY_R57_R45_R13_PG17_PASS 16/16 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/full_journey.log
       - name: Store redacted QA proof
         if: always()
         uses: actions/upload-artifact@v4
