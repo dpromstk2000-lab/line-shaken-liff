@@ -1,0 +1,121 @@
+name: CAR02 Basic Reference to R45 R13 PG17 (isolated)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'pg17-car02-basic-reference-to-api-isolated.mjs'
+      - '.github/workflows/car02-basic-reference-pg17-qa.yml'
+permissions:
+  contents: read
+jobs:
+  disposable-pg17-reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GITHUB_ACTIONS: 'true'
+      NODE_ENV: test
+      CAR02_RELEASE_LOCK: 'true'
+      CAR02_BASIC_PG17_QA: 'yes'
+      PGHOST: '127.0.0.1'
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: qa_only_local
+      PGDATABASE: car02_qa
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: qa_only_local
+          POSTGRES_DB: car02_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d car02_qa"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - name: Checkout existing approved CAR02 sources
+        uses: actions/checkout@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify R52 lock and existing R13 R45 reference source pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CAR02_RELEASE_LOCK" = true
+          test "$PGHOST" = 127.0.0.1
+          test "$PGDATABASE" = car02_qa
+          grep -Fq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for pin in \
+            'BASELINE_QA_ONLY.sql 47fa141bcc3cf6f9d54a8dcd8c11290f72abd2be' \
+            'R13_MIGRATION_QA_ONLY.sql 5136872276b3403f036bae768410c937119398b2' \
+            'R13_EMPTY_ONLY_ROLLBACK_QA.sql 012875c4aabc7f0e6f66e6868d94c1949cae8cc9' \
+            'car02-core.mjs 8748ea9d79c4a5bc35321472f48cd06e3e435f1f' \
+            'car02-api.mjs e3216bf265bbb6fc6ac1c893334b76a2f429ccc1' \
+            'car02-identity-r44.mjs 91c3ef3475c837828ae7640d9cab75bcc46e3ced' \
+            'car02-pg-adapter.mjs dc57effaec3ed9b6ec309420b3506a57ec7a599f' \
+            'car02-runtime-r45.mjs f53cc297c2e968845cccd54a258bf0d2006f7007' \
+            'car02-edge-entry-r52.ts f0e31fb9f9d98524519d01dffd3489893d3d3302' \
+            'car02-basic-api-contract-isolated.mjs dfdafcfbd251ae95525c68a7e331205ebd732394' \
+            'car02-basic-reference-resolver-isolated.mjs 8d630f0ad2e160800e86e5e27d9d0d13b667f746' \
+            'car02-basic-reference-bridge-isolated.mjs 7a35791e152215a4682ec28c6e8bbebefdba0712' \
+            'pg17-integration.mjs ce8ca15fd78db2cd3dd8a8fcaa415428b9e7bbf1'; do
+            path="${pin%% *}"; expected="${pin##* }"
+            test "$(git hash-object "$path")" = "$expected" || { echo "CAR02_SOURCE_DRIFT $path"; exit 1; }
+          done
+          node --check pg17-car02-basic-reference-to-api-isolated.mjs
+      - name: Run existing isolated reference unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p car02_basic_pg17_evidence
+          node --test test_car02_basic_api_contract_isolated.mjs test_car02_basic_reference_resolver_isolated.mjs test_car02_basic_reference_bridge_isolated.mjs | tee car02_basic_pg17_evidence/reference_unit.tap
+          grep -q '# fail 0' car02_basic_pg17_evidence/reference_unit.tap
+      - name: Install PostgreSQL client library for disposable job only
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund pg@8
+      - name: Initialize existing R13 and verify previous PostgreSQL QA baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-integration.mjs | tee car02_basic_pg17_evidence/r13_initialization.log
+          grep -q 'R43 PG17 INTEGRATION: 14 PASS' car02_basic_pg17_evidence/r13_initialization.log
+      - name: Verify linked reservation to real R45 API in disposable PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-car02-basic-reference-to-api-isolated.mjs | tee car02_basic_pg17_evidence/reservation_to_work_order.log
+          grep -q 'CAR02_BASIC_REFERENCE_R45_R13_PG17_ISOLATED_PASS 15/15 NO_GO HOLD SYNTHETIC_ONLY' car02_basic_pg17_evidence/reservation_to_work_order.log
+      - name: Store redacted QA proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: car02-basic-reference-pg17-isolated-evidence
+          path: car02_basic_pg17_evidence/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Remove disposable QA databases
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PGHOST" = 127.0.0.1
+          test "$PGDATABASE" = car02_qa
+          if ! node -e "require.resolve('pg')" >/dev/null 2>&1; then
+            echo 'PostgreSQL client absent; disposable service is removed by GitHub runner.'
+            exit 0
+          fi
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const c=new pg.Client({host:'127.0.0.1',port:5432,user:'postgres',password:'qa_only_local',database:'postgres'});
+          await c.connect();
+          try {
+            for (const db of ['car02_empty_rollback_qa','car02_qa']) await c.query(`DROP DATABASE IF EXISTS ${db} WITH (FORCE)`);
+            const q=await c.query("SELECT datname FROM pg_database WHERE datname IN ('car02_empty_rollback_qa','car02_qa')");
+            if(q.rowCount)throw Error('CAR02_DISPOSABLE_DB_CLEANUP_FAILED');
+            console.log('CAR02_DISPOSABLE_PG17_REMOVED');
+          } finally {await c.end()}
+          NODE
