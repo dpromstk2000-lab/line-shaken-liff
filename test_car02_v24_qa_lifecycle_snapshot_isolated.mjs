@@ -1,0 +1,73 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {V24_MODE,V24_SQL,reviewCar02V24QaSnapshot as review,
+ createCar02V24QaLifecycleReader as make} from './car02-v24-qa-lifecycle-snapshot-isolated.mjs';
+const ID='66666666-6666-4666-8666-666666666666';
+const CUSTOMER='11111111-1111-4111-8111-111111111111';
+const VEHICLE='22222222-2222-4222-8222-222222222222';
+const SHOP='street_house_kitsuki';
+const ACTOR={verified:true,role:'staff',subject:'synthetic-v24-staff',shopCode:SHOP};
+const ENV={GITHUB_ACTIONS:'true',NODE_ENV:'test',CAR02_RELEASE_LOCK:'true',CAR02_BASIC_PG17_QA:'yes',PGHOST:'127.0.0.1',PGPORT:'5432',PGUSER:'postgres',PGPASSWORD:'qa_only_local',PGDATABASE:'car02_qa'};
+const BINDINGS={ksh:SHOP,wangan:'synthetic_wangan'};
+const OPTIONS={host:'127.0.0.1',port:5432,user:'postgres',password:'qa_only_local',database:'car02_qa'};
+const ROW={reservation_id:ID,shop_code:SHOP,customer_id:CUSTOMER,vehicle_id:VEHICLE,
+ lifecycle_status:'入庫予定',lifecycle_version:4,reservation_date:'2026-10-20',reservation_time:'10:30',work_order_exists:false};
+const X={reservationId:ID,shopCode:SHOP,expectedVersion:4};
+const REQ={actor:ACTOR,branch:'ksh',reservationId:ID,expectedVersion:4};
+const mock=(row=ROW,events=[],throwSelect=false)=>({options:{...OPTIONS},connect:async()=>({
+ query:async(sql,params)=>{events.push({sql,params});if(throwSelect&&sql.includes('SELECT r.id'))throw Error('PG_OFFLINE');return sql.includes('SELECT r.id')?{rows:row?[row]:[]}:{rows:[]}},
+ release:()=>events.push({sql:'RELEASE'})})});
+const reader=(pool=mock(),other={})=>make({pool,env:{...ENV},environment:'disposable_qa',allowDisposableQa:true,branchBindings:BINDINGS,...other});
+const yes=(row=ROW,x=X)=>review(row,x).snapshotConsistent;
+const no=(row=ROW,x=X)=>review(row,x).result==='HOLD';
+const rej=async(cb,code)=>assert.rejects(cb,new RegExp(code));
+
+test('QA mode never grants production or sending',()=>{assert.equal(V24_MODE.sendable,false);assert.equal(V24_MODE.productionReady,false);assert.equal(V24_MODE.release,'NO_GO');assert.equal(V24_MODE.migration,'HOLD');assert.equal(V24_MODE.raceFreeOrderCreationProven,false)});
+test('query uses exact R13 UUID and tenant plus separate QA sidecar',()=>{assert.match(V24_SQL,/r\.id=\$1::uuid AND r\.shop_code=\$2/);assert.match(V24_SQL,/car02_v24_qa_lifecycle/);assert.match(V24_SQL,/ksh_car02_work_orders/)});
+test('query is read-only without interpolate input',()=>{assert.match(V24_SQL,/^SELECT/);assert.doesNotMatch(V24_SQL,/\b(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b/i)});
+test('consistent fixture is QA-only never order-ready',()=>{let r=review(ROW,X);assert.equal(r.result,'CONSISTENT_QA_SNAPSHOT');assert.equal(r.safeToCreateOrder,false);assert.equal(r.sendable,false);assert.equal(r.atomicWriteProven,false)});
+test('output does not expose customer vehicle or PII fields',()=>{let s=JSON.stringify(review(ROW,X));for(let x of [CUSTOMER,VEHICLE,'customer_id','vehicle_id','customerName','phone','plate_last4'])assert.ok(!s.includes(x))});
+test('result and blockers are frozen',()=>{const x=review(ROW,X);assert.ok(Object.isFrozen(x));assert.ok(Object.isFrozen(x.checks))});
+test('status 入庫済み can be consistent but never sendable',()=>{const x=review({...ROW,lifecycle_status:'入庫済み'},X);assert.equal(x.snapshotConsistent,true);assert.equal(x.sendable,false)});
+for(const status of ['仮入庫','作業中','点検中','見積作成中','お客様確認待ち','キャンセル','キャンセル済み','削除済み','作業完了','引渡し完了','weird',null])
+ test('non-eligible status denies '+status,()=>assert.ok(no({...ROW,lifecycle_status:status})));
+test('stale UI version is rejected',()=>assert.ok(no(ROW,{...X,expectedVersion:3})));
+test('future forged UI version is rejected',()=>assert.ok(no(ROW,{...X,expectedVersion:5})));
+test('missing DB version is rejected',()=>assert.ok(no({...ROW,lifecycle_version:null})));
+test('DB version not integer rejected',()=>assert.ok(no({...ROW,lifecycle_version:'4'})));
+test('existing CAR02 case rejects new case preview',()=>assert.ok(no({...ROW,work_order_exists:true})));
+test('unproven duplicate check rejects case preview',()=>assert.ok(no({...ROW,work_order_exists:null})));
+test('missing customer UUID rejects preview',()=>assert.ok(no({...ROW,customer_id:null})));
+test('missing vehicle UUID rejects preview',()=>assert.ok(no({...ROW,vehicle_id:null})));
+test('cross tenant row rejects preview',()=>assert.ok(no({...ROW,shop_code:'different_shop'})));
+test('wrong booking ID rejects preview',()=>assert.ok(no({...ROW,reservation_id:'77777777-7777-4777-8777-777777777777'})));
+test('missing booking record denies preview',()=>assert.ok(no(null)));
+test('invalid calendar day denies preview',()=>assert.ok(no({...ROW,reservation_date:'2026-02-30'})));
+test('missing calendar day denies preview',()=>assert.ok(no({...ROW,reservation_date:null})));
+test('non 30-minute slot denies preview',()=>assert.ok(no({...ROW,reservation_time:'10:15'})));
+test('seconds 01 denies preview',()=>assert.ok(no({...ROW,reservation_time:'10:30:01'})));
+test('HH:MM:SS 00 allows QA consistency',()=>assert.ok(yes({...ROW,reservation_time:'10:30:00'})));
+test('HH:MM time accepts 09:00',()=>assert.ok(yes({...ROW,reservation_time:'09:00'})));
+test('missing time denies preview',()=>assert.ok(no({...ROW,reservation_time:null})));
+test('no production constructor',()=>assert.throws(()=>reader(mock(),{environment:'production'}),/DISPOSABLE_ONLY/));
+test('no missing isolation gate',()=>assert.throws(()=>reader(mock(),{allowDisposableQa:false}),/DISPOSABLE_ONLY/));
+test('no unexpected github environment',()=>assert.throws(()=>reader(mock(),{env:{...ENV,GITHUB_ACTIONS:'false'}}),/DISPOSABLE_ONLY/));
+test('no changed PGHOST',()=>assert.throws(()=>reader(mock(),{env:{...ENV,PGHOST:'db.example'}}),/DISPOSABLE_ONLY/));
+test('no changed Pg password',()=>assert.throws(()=>reader(mock(),{pool:mock(),env:{...ENV,PGPASSWORD:'real'}}),/DISPOSABLE_ONLY/));
+test('no unexpected pool hostname',()=>{const p=mock();p.options.host='db.example';assert.throws(()=>reader(p),/DISPOSABLE_ONLY/)});
+test('no unexpected connection database',()=>{const p=mock();p.options.database='production';assert.throws(()=>reader(p),/DISPOSABLE_ONLY/)});
+test('no unexpected branch mapping',()=>assert.throws(()=>reader(mock(),{branchBindings:{ksh:SHOP}}),/DISPOSABLE_ONLY/));
+test('inbox role customer is forbidden',async()=>await rej(()=>reader().inspect({...REQ,actor:{...ACTOR,role:'customer'}}),'ACTOR_REQUIRED'));
+test('forged unverified staff is forbidden',async()=>await rej(()=>reader().inspect({...REQ,actor:{...ACTOR,verified:false}}),'ACTOR_REQUIRED'));
+test('wangan branch cannot read ksh-bound reservation',async()=>await rej(()=>reader().inspect({...REQ,branch:'wangan'}),'BRANCH_BINDING_DENIED'));
+test('fake tenant cannot use ksh branch',async()=>await rej(()=>reader().inspect({...REQ,actor:{...ACTOR,shopCode:'foreign'}}),'BRANCH_BINDING_DENIED'));
+test('unknown branch denied',async()=>await rej(()=>reader().inspect({...REQ,branch:'other'}),'BRANCH_BINDING_DENIED'));
+test('display-only ID denied',async()=>await rej(()=>reader().inspect({...REQ,reservationId:'DEMO-0001'}),'UUID_REQUIRED'));
+test('version missing denied',async()=>await rej(()=>reader().inspect({...REQ,expectedVersion:null}),'VERSION_REQUIRED'));
+test('client cannot add shop role or customer id in selection',async()=>await rej(()=>reader().inspect({...REQ,shopCode:SHOP}),'INPUT_DENIED'));
+test('client cannot attach customer id',async()=>await rej(()=>reader().inspect({...REQ,customerId:CUSTOMER}),'INPUT_DENIED'));
+test('real transaction begins READ ONLY, reads UUID and tenant, commits, releases',async()=>{let events=[];const x=await reader(mock(ROW,events)).inspect(REQ);
+ assert.equal(x.snapshotConsistent,true);assert.match(events[0].sql,/READ ONLY/);assert.equal(events[1].sql,V24_SQL);assert.deepEqual(events[1].params,[ID,SHOP]);assert.equal(events[2].sql,'COMMIT');assert.equal(events[3].sql,'RELEASE')});
+test('PG error rolls back and never emits a descriptor',async()=>{let events=[];await rej(()=>reader(mock(ROW,events,true)).inspect(REQ),'SNAPSHOT_UNAVAILABLE');assert.ok(events.some(x=>x.sql==='ROLLBACK'));assert.ok(!events.some(x=>x.sql==='COMMIT'));assert.equal(events.at(-1).sql,'RELEASE')});
+test('no legacy booking found is HOLD, no creation',async()=>{const x=await reader(mock(null)).inspect(REQ);assert.equal(x.result,'HOLD');assert.equal(x.sendable,false)});
+test('QA reader has no send/deploy/write function',()=>{let x=reader();for(const key of ['send','deploy','write','createOrder','release'])assert.equal(typeof x[key],'undefined')});
