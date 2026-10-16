@@ -19,4 +19,18 @@ test('too early and too late blocked',()=>{assert.throws(()=>v({...input,time:'0
 test('today past time blocked with Tokyo local comparison',()=>assert.throws(()=>validateAtomicBookingInput({...input,day:'2026-10-16',time:'09:00'},{now:new Date('2026-10-16T01:00:00Z')}),/WINDOW_INVALID/));
 test('QA constructor rejects production environment',()=>assert.throws(()=>createAtomicBookingQa({environment:'production',allowDisposableQa:true,pool:{connect(){}}}),/ISOLATION_REQUIRED/));
 test('QA constructor rejects missing explicit consent',()=>assert.throws(()=>createAtomicBookingQa({environment:'disposable_qa',pool:{connect(){}}}),/ISOLATION_REQUIRED/));
-test('QA constructor rejects ordinary local or production env',()=>assert.throws(()=>createAtomicBookingQa({environment:'disposable_qa',allowDisposableQa:true,pool:{connect(){},options:{host:'127.0.0.1',database:'car02_qa',user:'postgres',port:5432}}}),/DISPOSABLE_ONLY/));
+test('QA constructor rejects ordinary local or production env',()=>{
+  const pool={connect(){},options:{host:'127.0.0.1',database:'car02_qa',user:'postgres',port:5432}};
+  // Explicitly inject a NON-CI environment. GitHub Actions itself sets all
+  // synthetic QA variables, so the ambient process.env is not a negative case.
+  assert.throws(()=>createAtomicBookingQa({environment:'disposable_qa',allowDisposableQa:true,pool,env:{}}),/DISPOSABLE_ONLY/);
+  // Forged runner context but incorrect database must also fail closed.
+  assert.throws(()=>createAtomicBookingQa({environment:'disposable_qa',allowDisposableQa:true,pool,
+    env:{GITHUB_ACTIONS:'true',NODE_ENV:'test',CAR02_RELEASE_LOCK:'true',CAR02_BASIC_PG17_QA:'yes',
+      PGHOST:'127.0.0.1',PGPORT:'5432',PGUSER:'postgres',PGPASSWORD:'qa_only_local',PGDATABASE:'production'}}),/DISPOSABLE_ONLY/);
+  // A non-loopback pool must be rejected even if caller claims a disposable QA environment.
+  assert.throws(()=>createAtomicBookingQa({environment:'disposable_qa',allowDisposableQa:true,
+    pool:{...pool,options:{...pool.options,host:'db.production.invalid'}},
+    env:{GITHUB_ACTIONS:'true',NODE_ENV:'test',CAR02_RELEASE_LOCK:'true',CAR02_BASIC_PG17_QA:'yes',
+      PGHOST:'127.0.0.1',PGPORT:'5432',PGUSER:'postgres',PGPASSWORD:'qa_only_local',PGDATABASE:'car02_qa'}}),/DISPOSABLE_ONLY/);
+});
