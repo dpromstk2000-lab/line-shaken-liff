@@ -8,16 +8,21 @@ import {readFileSync} from 'node:fs';
 import pg from 'pg';
 import {createCar02V24QaLifecycleReader,V24_MODE} from './car02-v24-qa-lifecycle-snapshot-isolated.mjs';
 const env=process.env;
-for(const [k,v] of Object.entries({GITHUB_ACTIONS:'true',NODE_ENV:'test',CAR02_RELEASE_LOCK:'true',
+// process.env has a Node-specific prototype. The core reader intentionally
+// accepts only plain objects, so copy ONLY the inspected CI-only variables.
+// This preserves every exact-value isolation gate and never weakens the reader.
+const REQUIRED_QA_ENV=Object.freeze({GITHUB_ACTIONS:'true',NODE_ENV:'test',CAR02_RELEASE_LOCK:'true',
  CAR02_BASIC_PG17_QA:'yes',PGHOST:'127.0.0.1',PGPORT:'5432',PGUSER:'postgres',
- PGPASSWORD:'qa_only_local',PGDATABASE:'car02_qa'}))if(env[k]!==v)throw Error('CAR02_V24_DISPOSABLE_ONLY');
+ PGPASSWORD:'qa_only_local',PGDATABASE:'car02_qa'});
+for(const [k,v] of Object.entries(REQUIRED_QA_ENV))if(env[k]!==v)throw Error('CAR02_V24_DISPOSABLE_ONLY');
+const verifiedQaEnv=Object.fromEntries(Object.keys(REQUIRED_QA_ENV).map(k=>[k,env[k]]));
 const lock=readFileSync(new URL('./car02-edge-entry-r52.ts',import.meta.url),'utf8');
 if(!/const\s+CAR02_RELEASE_LOCK\s*=\s*true;/.test(lock))throw Error('CAR02_V24_RELEASE_LOCK_MISSING');
 const POOL=new pg.Pool({host:'127.0.0.1',port:5432,user:'postgres',password:'qa_only_local',database:'car02_qa',max:3});
 const SHOP='street_house_kitsuki',OTHER='other_shop';
 const ID='66666666-6666-4666-8666-666666666666',FOREIGN='77777777-7777-4777-8777-777777777777';
 const fakeActor=(shop=SHOP)=>({verified:true,role:'staff',subject:'synthetic-v24-actor',shopCode:shop});
-const reader=createCar02V24QaLifecycleReader({pool:POOL,env,environment:'disposable_qa',allowDisposableQa:true,
+const reader=createCar02V24QaLifecycleReader({pool:POOL,env:verifiedQaEnv,environment:'disposable_qa',allowDisposableQa:true,
  branchBindings:{ksh:SHOP,wangan:OTHER}});
 const request=(change={})=>({actor:fakeActor(),branch:'ksh',reservationId:ID,expectedVersion:4,...change});
 let cases=0;const pass=async(label,fn)=>{await fn();console.log(`PASS V24-SNAPSHOT-PG17 ${++cases}: ${label}`)};
