@@ -15,6 +15,9 @@ on:
       - 'car02-basic-booking-http-isolated.mjs'
       - 'test_car02_basic_booking_http_isolated.mjs'
       - 'pg17-car02-basic-booking-http-isolated.mjs'
+      - 'car02-basic-staff-booking-browser-isolated.mjs'
+      - 'test_car02_basic_staff_booking_browser_isolated.mjs'
+      - 'pg17-car02-basic-staff-booking-browser-isolated.mjs'
       - '.github/workflows/car02-basic-reference-pg17-qa.yml'
 permissions:
   contents: read
@@ -152,6 +155,21 @@ jobs:
           set -euo pipefail
           node pg17-car02-basic-booking-http-isolated.mjs | tee car02_basic_pg17_evidence/booking_http_pg17.log
           grep -q 'CAR02_BASIC_BOOKING_HTTP_R44_R57_R45_R13_PG17_PASS 15/15 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/booking_http_pg17.log
+      - name: Verify staff booking browser contract (isolated only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-basic-staff-booking-browser-isolated.mjs
+          node --check pg17-car02-basic-staff-booking-browser-isolated.mjs
+          node --test test_car02_basic_staff_booking_browser_isolated.mjs | tee car02_basic_pg17_evidence/staff_booking_browser_unit.tap
+          grep -q '# pass 27' car02_basic_pg17_evidence/staff_booking_browser_unit.tap
+          grep -q '# fail 0' car02_basic_pg17_evidence/staff_booking_browser_unit.tap
+      - name: Verify browser to R44 booking HTTP and R57 R45 R13 disposable PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-car02-basic-staff-booking-browser-isolated.mjs | tee car02_basic_pg17_evidence/staff_booking_browser_pg17.log
+          grep -q 'CAR02_BASIC_STAFF_BOOKING_BROWSER_R44_R57_R45_R13_PG17_PASS 15/15 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/staff_booking_browser_pg17.log
       - name: Store redacted QA proof
         if: always()
         uses: actions/upload-artifact@v4
