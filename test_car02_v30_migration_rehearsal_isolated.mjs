@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {V30_MODE,V30_QA_TABLE,V30_QA_INDEX,V30_QA_INDEX_DDL,V30_AGGREGATE_KEYS,
+  decideV30MigrationRehearsal,guardV30DisposableIndexExperiment,summarizeV30Aggregate}
+ from './car02-v30-migration-rehearsal-isolated.mjs';
+const catalog={legacy_reservations_table_exists:true,car02_orders_table_exists:true,
+ expected_order_columns_present:true,expected_reservation_columns_present:true,
+ some_reservation_unique_index_exists:false};
+const aggregate={total_orders:'5',orders_without_reservation:'1',duplicate_booking_groups:'1',
+ orders_in_duplicate_groups:'2',largest_group:'2',review_gate:'HOLD_MANUAL_RECONCILIATION_REQUIRED'};
+const clear={total_orders:'3',orders_without_reservation:'1',duplicate_booking_groups:'0',
+ orders_in_duplicate_groups:'0',largest_group:'0',review_gate:'HOLD_OTHER_RELEASE_GATES_STILL_REQUIRED'};
+const idx={index_count:'4',unique_mention_count:'0',effective_index_count:'0'};
+const all=(catalogRow=catalog,aggregateRow=aggregate,indexRow=idx)=>({catalogRow,aggregateRow,indexRow});
+const guard=(extra={})=>guardV30DisposableIndexExperiment({environment:'disposable_qa',dbName:'car02_qa',
+ table:V30_QA_TABLE,duplicateGroups:0,releaseLock:true,allowDisposableQa:true,...extra});
+const cases=[
+ ['release permanently NO_GO',()=>assert.equal(V30_MODE.release,'NO_GO')],
+ ['migration permanently HOLD',()=>assert.equal(V30_MODE.migration,'HOLD')],
+ ['no live DB claim',()=>assert.equal(V30_MODE.liveDbInspected,false)],
+ ['no production mutation permission',()=>assert.equal(V30_MODE.productionMutationAuthorized,false)],
+ ['no customer notification',()=>assert.equal(V30_MODE.sendable,false)],
+ ['DDL only QA table',()=>assert.match(V30_QA_INDEX_DDL,/^CREATE UNIQUE INDEX car02_v30_qa_one_order_per_reservation ON public\.car02_v30_qa_migration_probe/)],
+ ['DDL only expected reservation keys',()=>assert.match(V30_QA_INDEX_DDL,/\(shop_code,reservation_id\) WHERE reservation_id IS NOT NULL$/)],
+ ['DDL identifier fixed',()=>assert.equal(V30_QA_INDEX,'car02_v30_qa_one_order_per_reservation')],
+ ['duplicate inventory means stop',()=>assert.equal(decideV30MigrationRehearsal(all()).lane,'STOP_DUPLICATES_MANUAL_REVIEW')],
+ ['duplicate inventory not rehearsable',()=>assert.equal(decideV30MigrationRehearsal(all()).cloneRehearsalAllowed,false)],
+ ['duplicate inventory requires manual review',()=>assert.equal(decideV30MigrationRehearsal(all()).manualReconciliationRequired,true)],
+ ['duplicate inventory no real data proof',()=>assert.equal(decideV30MigrationRehearsal(all()).realDataProven,false)],
+ ['duplicate inventory remains HOLD',()=>assert.equal(decideV30MigrationRehearsal(all()).migration,'HOLD')],
+ ['clean inventory permits QA clone only',()=>assert.equal(decideV30MigrationRehearsal(all(catalog,clear)).lane,'QA_CLONE_REHEARSAL_ONLY')],
+ ['clean inventory still NO_GO',()=>assert.equal(decideV30MigrationRehearsal(all(catalog,clear)).release,'NO_GO')],
+ ['clean inventory still not production ready',()=>assert.equal(decideV30MigrationRehearsal(all(catalog,clear)).productionReady,false)],
+ ['existing effective index requires human review',()=>assert.equal(decideV30MigrationRehearsal(all(catalog,clear,{index_count:'4',unique_mention_count:'1',effective_index_count:'1'})).lane,'HOLD_EXISTING_UNIQUE_INDEX_NEEDS_REVIEW')],
+ ['effective index never approves migration',()=>assert.equal(decideV30MigrationRehearsal(all(catalog,clear,{index_count:'4',unique_mention_count:'1',effective_index_count:'1'})).migration,'HOLD')],
+ ['missing schema stops',()=>assert.equal(decideV30MigrationRehearsal(all({...catalog,car02_orders_table_exists:false},null,null)).lane,'STOP_SCHEMA_UNVERIFIED')],
+ ['missing schema rejects aggregate execution',()=>assert.throws(()=>decideV30MigrationRehearsal(all({...catalog,car02_orders_table_exists:false})),/SCHEMA_QUERY_GUARD/)],
+ ['missing schema no rehearsal',()=>assert.equal(decideV30MigrationRehearsal(all({...catalog,car02_orders_table_exists:false},null,null)).cloneRehearsalAllowed,false)],
+ ['catalog missing key rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all({car02_orders_table_exists:true})),/CATALOG_INVALID/)],
+ ['catalog extra key rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all({...catalog,secret:'x'})),/CATALOG_INVALID/)],
+ ['catalog wrong field type rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all({...catalog,car02_orders_table_exists:'true'})),/CATALOG_INVALID/)],
+ ['aggregate negative count rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,{...clear,total_orders:'-1'})),/COUNT_INVALID/)],
+ ['aggregate group inconsistency rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,{...clear,duplicate_booking_groups:'1'})),/COUNTS_CONTRADICTORY/)],
+ ['aggregate wrong HOLD flag rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,{...clear,review_gate:'GO'})),/REVIEW_GATE_INVALID/)],
+ ['index table proof count contradiction rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,clear,{index_count:'0',unique_mention_count:'1',effective_index_count:'1'})),/COUNTS_CONTRADICTORY/)],
+ ['index negative count rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,clear,{...idx,index_count:'-1'})),/COUNT_INVALID/)],
+ ['index false unique mention never sufficient',()=>assert.equal(decideV30MigrationRehearsal(all(catalog,clear,{index_count:'4',unique_mention_count:'2',effective_index_count:'0'})).cloneRehearsalAllowed,true)],
+ ['index catalog absent rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,clear,null)),/CATALOG_INVALID/)],
+ ['aggregate absent rejected',()=>assert.throws(()=>decideV30MigrationRehearsal(all(catalog,null)),/COUNTS_INVALID/)],
+ ['inventory output count numeric',()=>assert.equal(decideV30MigrationRehearsal(all()).duplicateGroups,1)],
+ ['inventory output unlinked numeric',()=>assert.equal(decideV30MigrationRehearsal(all()).unlinkedOrders,1)],
+ ['summary only expected six keys',()=>assert.deepEqual(Object.keys(summarizeV30Aggregate({...clear,password:'should not propagate'})),[...V30_AGGREGATE_KEYS])],
+ ['summary input missing field rejected',()=>assert.throws(()=>summarizeV30Aggregate({total_orders:5}),/AGGREGATES_REQUIRED/)],
+ ['summary nonobject rejected',()=>assert.throws(()=>summarizeV30Aggregate(null),/AGGREGATES_REQUIRED/)],
+ ['guard allows empty QA clone',()=>assert.equal(guard().allowed,true)],
+ ['guard returns SQL only QA clone',()=>assert.equal(guard().ddl,V30_QA_INDEX_DDL)],
+ ['guard always keeps release HOLD',()=>assert.equal(guard().migration,'HOLD')],
+ ['guard rejects existing duplicates',()=>assert.equal(guard({duplicateGroups:2}).allowed,false)],
+ ['guard no DDL on duplicates',()=>assert.equal(guard({duplicateGroups:2}).ddl,null)],
+ ['guard rejects production environment',()=>assert.throws(()=>guard({environment:'production'}),/DISPOSABLE_ONLY/)],
+ ['guard rejects real DB',()=>assert.throws(()=>guard({dbName:'live'}),/DISPOSABLE_ONLY/)],
+ ['guard rejects other table',()=>assert.throws(()=>guard({table:'public.ksh_car02_work_orders'}),/DISPOSABLE_ONLY/)],
+ ['guard rejects unlocked release',()=>assert.throws(()=>guard({releaseLock:false}),/DISPOSABLE_ONLY/)],
+ ['guard requires explicit opt in',()=>assert.throws(()=>guard({allowDisposableQa:false}),/DISPOSABLE_ONLY/)],
+ ['guard rejects negative groups',()=>assert.throws(()=>guard({duplicateGroups:-1}),/DUPLICATE_COUNT_INVALID/)],
+ ['guard rejects decimal groups',()=>assert.throws(()=>guard({duplicateGroups:0.1}),/DUPLICATE_COUNT_INVALID/)],
+ ['guard rejects string groups',()=>assert.throws(()=>guard({duplicateGroups:'0'}),/DUPLICATE_COUNT_INVALID/)],
+ ['guard never authorizes production',()=>assert.equal(guard().productionAuthorized,false)],
+];
+for(const [label,fn] of cases)test(label,fn);
