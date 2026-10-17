@@ -34,6 +34,10 @@ on:
       - car02-v32-auth-booking-runner-isolated.mjs
       - test_car02_v32_auth_booking_boundary_isolated.mjs
       - test_car02_v32_auth_runtime_isolated.mjs
+      - car02-v33-staff-jwt-claims-isolated.mjs
+      - car02-v33-staff-jwt-claims-runner-isolated.mjs
+      - test_car02_v33_staff_jwt_claims_isolated.mjs
+      - test_car02_v33_r44_bridge_isolated.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -124,6 +128,24 @@ jobs:
           grep -q '# fail 0' car02_legacy_preflight_evidence/v32_unit.tap
           node car02-v32-auth-booking-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v32_source_audit.txt
           grep -Fq 'CAR02_V32_AUTH_BOOKING_SOURCE_PASS 16/16 UNPROVEN=8 NO_GO HOLD' car02_legacy_preflight_evidence/v32_source_audit.txt
+      - name: V3.3 JWT issuer audience expiry guard and R44 bridge (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v33-staff-jwt-claims-isolated.mjs
+          node --check car02-v33-staff-jwt-claims-runner-isolated.mjs
+          node --check test_car02_v33_staff_jwt_claims_isolated.mjs
+          node --check test_car02_v33_r44_bridge_isolated.mjs
+          node --test test_car02_v33_staff_jwt_claims_isolated.mjs | tee car02_legacy_preflight_evidence/v33_claims_unit.tap
+          grep -q '# tests 79' car02_legacy_preflight_evidence/v33_claims_unit.tap
+          grep -q '# pass 79' car02_legacy_preflight_evidence/v33_claims_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v33_claims_unit.tap
+          node --test test_car02_v33_r44_bridge_isolated.mjs | tee car02_legacy_preflight_evidence/v33_r44_bridge.tap
+          grep -q '# tests 18' car02_legacy_preflight_evidence/v33_r44_bridge.tap
+          grep -q '# pass 18' car02_legacy_preflight_evidence/v33_r44_bridge.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v33_r44_bridge.tap
+          node car02-v33-staff-jwt-claims-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v33_source_audit.txt
+          grep -Fq 'CAR02_V33_STAFF_CLAIMS_SOURCE_PASS 5/5 UNBOUND=4 NO_GO HOLD' car02_legacy_preflight_evidence/v33_source_audit.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
