@@ -36,6 +36,11 @@ on:
       - 'car02-v27-order-uniqueness-audit-isolated.mjs'
       - 'test_car02_v27_order_uniqueness_audit_isolated.mjs'
       - 'pg17-car02-v27-order-uniqueness-isolated.mjs'
+      - '01_CATALOG_ONLY_READONLY.sql'
+      - '02_DUPLICATE_COUNTS_READONLY.sql'
+      - 'car02-v28-premigration-readonly-isolated.mjs'
+      - 'test_car02_v28_premigration_readonly_isolated.mjs'
+      - 'pg17-car02-v28-premigration-readonly-isolated.mjs'
       - '.github/workflows/car02-basic-reference-pg17-qa.yml'
 permissions:
   contents: read
@@ -280,6 +285,22 @@ jobs:
           node pg17-car02-v27-order-uniqueness-isolated.mjs | tee car02_basic_pg17_evidence/v27_one_order_pg17.log
           grep -q 'CAR02_V27_ONE_ORDER_PER_BOOKING_PG17_PASS 20/20 SYNTHETIC_ONLY NO_GO HOLD' car02_basic_pg17_evidence/v27_one_order_pg17.log
           grep -q 'CAR02_V27_DISPOSABLE_FIXTURE_RESTORED' car02_basic_pg17_evidence/v27_one_order_pg17.log
+      - name: V2.8 pinned catalog and aggregate pre-migration source safety (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v28-premigration-readonly-isolated.mjs
+          node --check test_car02_v28_premigration_readonly_isolated.mjs
+          node --check pg17-car02-v28-premigration-readonly-isolated.mjs
+          node --test test_car02_v28_premigration_readonly_isolated.mjs | tee car02_basic_pg17_evidence/v28_premigration_unit.tap
+          grep -q '# pass 80' car02_basic_pg17_evidence/v28_premigration_unit.tap
+          grep -q '# fail 0' car02_basic_pg17_evidence/v28_premigration_unit.tap
+      - name: V2.8 pre-migration READ ONLY inventory on disposable PG17 (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pg17-car02-v28-premigration-readonly-isolated.mjs | tee car02_basic_pg17_evidence/v28_premigration_pg17.log
+          grep -q 'CAR02_V28_PREMIGRATION_READONLY_PG17_PASS 20/20 AGGREGATE_ONLY NON_SENDABLE NO_GO HOLD' car02_basic_pg17_evidence/v28_premigration_pg17.log
       - name: Store redacted QA proof
         if: always()
         uses: actions/upload-artifact@v4
