@@ -30,6 +30,10 @@ on:
       - car02-v31-live-route-boundary-audit-isolated.mjs
       - car02-v31-live-route-boundary-runner-isolated.mjs
       - test_car02_v31_live_route_boundary_isolated.mjs
+      - car02-v32-auth-booking-boundary-isolated.mjs
+      - car02-v32-auth-booking-runner-isolated.mjs
+      - test_car02_v32_auth_booking_boundary_isolated.mjs
+      - test_car02_v32_auth_runtime_isolated.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -106,6 +110,20 @@ jobs:
           node car02-v31-live-route-boundary-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v31_route_audit.txt
           grep -q 'CAR02_V31_LEGACY_ROUTE_SOURCE_PASS 12/12 UNPROVEN=6 NO_GO HOLD' car02_legacy_preflight_evidence/v31_route_audit.txt
           ! grep -Eiq '(https?://|@|token|password|service.role)' car02_legacy_preflight_evidence/v31_route_audit.txt
+      - name: V3.2 synthetic R44 staff auth and booking entry source safety (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v32-auth-booking-boundary-isolated.mjs
+          node --check car02-v32-auth-booking-runner-isolated.mjs
+          node --check test_car02_v32_auth_booking_boundary_isolated.mjs
+          node --check test_car02_v32_auth_runtime_isolated.mjs
+          node --test test_car02_v32_auth_booking_boundary_isolated.mjs test_car02_v32_auth_runtime_isolated.mjs | tee car02_legacy_preflight_evidence/v32_unit.tap
+          grep -q '# tests 83' car02_legacy_preflight_evidence/v32_unit.tap
+          grep -q '# pass 83' car02_legacy_preflight_evidence/v32_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v32_unit.tap
+          node car02-v32-auth-booking-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v32_source_audit.txt
+          grep -Fq 'CAR02_V32_AUTH_BOOKING_SOURCE_PASS 16/16 UNPROVEN=8 NO_GO HOLD' car02_legacy_preflight_evidence/v32_source_audit.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
