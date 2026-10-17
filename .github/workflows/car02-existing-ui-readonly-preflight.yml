@@ -27,6 +27,9 @@ on:
       - car02-v25-concurrent-qa-claim-isolated.mjs
       - BASELINE_QA_ONLY.sql
       - R13_MIGRATION_QA_ONLY.sql
+      - car02-v31-live-route-boundary-audit-isolated.mjs
+      - car02-v31-live-route-boundary-runner-isolated.mjs
+      - test_car02_v31_live_route_boundary_isolated.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -90,6 +93,19 @@ jobs:
           grep -q '# fail 0' car02_legacy_preflight_evidence/v26_unit.tap
           node car02-v26-release-readiness-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v26_release_gaps.txt
           grep -q 'CAR02_V26_STATIC_AUDIT_PASS 10/10 RELEASE_BLOCKERS=8 NO_GO HOLD' car02_legacy_preflight_evidence/v26_release_gaps.txt
+      - name: V3.1 verify legacy route families and release lock (READ ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v31-live-route-boundary-audit-isolated.mjs
+          node --check car02-v31-live-route-boundary-runner-isolated.mjs
+          node --check test_car02_v31_live_route_boundary_isolated.mjs
+          node --test test_car02_v31_live_route_boundary_isolated.mjs | tee car02_legacy_preflight_evidence/v31_unit.tap
+          grep -q '# pass 34' car02_legacy_preflight_evidence/v31_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v31_unit.tap
+          node car02-v31-live-route-boundary-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v31_route_audit.txt
+          grep -q 'CAR02_V31_LEGACY_ROUTE_SOURCE_PASS 12/12 UNPROVEN=6 NO_GO HOLD' car02_legacy_preflight_evidence/v31_route_audit.txt
+          ! grep -Eiq '(https?://|@|token|password|service.role)' car02_legacy_preflight_evidence/v31_route_audit.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
