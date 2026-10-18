@@ -48,6 +48,9 @@ on:
       - car02-v36-session-version-fence-isolated.mjs
       - car02-v36-session-version-runner-isolated.mjs
       - test_car02_v36_session_version_fence_isolated.mjs
+      - car02-v37-authorized-replay-fence-isolated.mjs
+      - car02-v37-authorized-replay-runner-isolated.mjs
+      - test_car02_v37_authorized_replay_fence_isolated.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -200,6 +203,19 @@ jobs:
           grep -q '# fail 0' car02_legacy_preflight_evidence/v36_auth_version.tap
           node car02-v36-session-version-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v36_source_audit.txt
           grep -Fq 'CAR02_V36_SESSION_VERSION_SOURCE_PASS 8/8 BLOCKERS=5 NO_GO HOLD' car02_legacy_preflight_evidence/v36_source_audit.txt
+      - name: V3.7 synthetic authorized idempotency replay fence (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v37-authorized-replay-fence-isolated.mjs
+          node --check car02-v37-authorized-replay-runner-isolated.mjs
+          node --check test_car02_v37_authorized_replay_fence_isolated.mjs
+          node --test test_car02_v37_authorized_replay_fence_isolated.mjs | tee car02_legacy_preflight_evidence/v37_replay_unit.tap
+          grep -q '# tests 90' car02_legacy_preflight_evidence/v37_replay_unit.tap
+          grep -q '# pass 90' car02_legacy_preflight_evidence/v37_replay_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v37_replay_unit.tap
+          node car02-v37-authorized-replay-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v37_source_audit.txt
+          grep -Fq 'CAR02_V37_REPLAY_FENCE_SOURCE_PASS 8/8 BLOCKERS=5 NO_GO HOLD' car02_legacy_preflight_evidence/v37_source_audit.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
