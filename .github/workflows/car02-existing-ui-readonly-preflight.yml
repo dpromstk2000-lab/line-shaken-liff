@@ -60,6 +60,10 @@ on:
       - car02-v40-r46-locked-membership-contract-isolated.mjs
       - car02-v40-r46-schema-audit-runner-isolated.mjs
       - test_car02_v40_r46_locked_membership_isolated.mjs
+      - car02-v41-staff-auth-version-policy-isolated.mjs
+      - car02-v41-source-audit-runner-isolated.mjs
+      - test_car02_v41_staff_auth_version_isolated.mjs
+      - CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
       - R46_STAFF_GRANTS_QA_ONLY.sql
       - car02-auth-providers-r46.mjs
       - car02-pg-adapter.mjs
@@ -268,6 +272,20 @@ jobs:
           node car02-v40-r46-schema-audit-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v40_r46_version_audit.txt
           grep -Fq 'CAR02_V40_R46_SCHEMA_GAP_PASS 15/15 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v40_r46_version_audit.txt
           grep -Fq 'V40_RELEASE_BLOCKER R46_STAFF_ACCESS_AUTH_VERSION_COLUMN_MISSING' car02_legacy_preflight_evidence/v40_r46_version_audit.txt
+      - name: V4.1 R46 auth-version schema evolution and session revocation review (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v41-staff-auth-version-policy-isolated.mjs
+          node --check car02-v41-source-audit-runner-isolated.mjs
+          node --check test_car02_v41_staff_auth_version_isolated.mjs
+          node --test test_car02_v41_staff_auth_version_isolated.mjs | tee car02_legacy_preflight_evidence/v41_auth_version_tests.tap
+          grep -q '# tests 47' car02_legacy_preflight_evidence/v41_auth_version_tests.tap
+          grep -q '# pass 47' car02_legacy_preflight_evidence/v41_auth_version_tests.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v41_auth_version_tests.tap
+          node car02-v41-source-audit-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v41_source_audit.txt
+          grep -Fq 'CAR02_V41_SCHEMA_EVOLUTION_REVIEW_PASS 18/18 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v41_source_audit.txt
+          grep -Fq 'V41_REVIEW_ONLY: NO_DB_SQL_EXECUTED; NO_SIGNED_SESSION; NO_REAL_LOCK; RELEASE_HOLD' car02_legacy_preflight_evidence/v41_source_audit.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
