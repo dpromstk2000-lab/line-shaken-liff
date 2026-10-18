@@ -57,6 +57,12 @@ on:
       - car02-v39-transaction-authorization-contract-isolated.mjs
       - car02-v39-contract-source-runner-isolated.mjs
       - test_car02_v39_transaction_authorization_contract_isolated.mjs
+      - car02-v40-r46-locked-membership-contract-isolated.mjs
+      - car02-v40-r46-schema-audit-runner-isolated.mjs
+      - test_car02_v40_r46_locked_membership_isolated.mjs
+      - R46_STAFF_GRANTS_QA_ONLY.sql
+      - car02-auth-providers-r46.mjs
+      - car02-pg-adapter.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -248,6 +254,20 @@ jobs:
           grep -q '# fail 0' car02_legacy_preflight_evidence/v39_contract_tests.tap
           node car02-v39-contract-source-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v39_contract_source.txt
           grep -Fq 'CAR02_V39_CONTRACT_SOURCE_PASS 10/10 BLOCKERS=5 NO_GO HOLD' car02_legacy_preflight_evidence/v39_contract_source.txt
+      - name: V4.0 actual R46 staff schema vs transaction auth-version contract (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v40-r46-locked-membership-contract-isolated.mjs
+          node --check car02-v40-r46-schema-audit-runner-isolated.mjs
+          node --check test_car02_v40_r46_locked_membership_isolated.mjs
+          node --test test_car02_v40_r46_locked_membership_isolated.mjs | tee car02_legacy_preflight_evidence/v40_r46_version_unit.tap
+          grep -q '# tests 63' car02_legacy_preflight_evidence/v40_r46_version_unit.tap
+          grep -q '# pass 63' car02_legacy_preflight_evidence/v40_r46_version_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v40_r46_version_unit.tap
+          node car02-v40-r46-schema-audit-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v40_r46_version_audit.txt
+          grep -Fq 'CAR02_V40_R46_SCHEMA_GAP_PASS 15/15 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v40_r46_version_audit.txt
+          grep -Fq 'V40_RELEASE_BLOCKER R46_STAFF_ACCESS_AUTH_VERSION_COLUMN_MISSING' car02_legacy_preflight_evidence/v40_r46_version_audit.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
