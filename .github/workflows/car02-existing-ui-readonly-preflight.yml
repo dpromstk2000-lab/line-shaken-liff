@@ -54,6 +54,9 @@ on:
       - car02-v38-r43-transaction-audit-isolated.mjs
       - car02-v38-r43-transaction-runner-isolated.mjs
       - test_car02_v38_r43_transaction_audit_isolated.mjs
+      - car02-v39-transaction-authorization-contract-isolated.mjs
+      - car02-v39-contract-source-runner-isolated.mjs
+      - test_car02_v39_transaction_authorization_contract_isolated.mjs
       - .github/workflows/car02-existing-ui-readonly-preflight.yml
       - SUPAbasepass.txt
       - '.env*'
@@ -232,6 +235,19 @@ jobs:
           grep -q '# fail 0' car02_legacy_preflight_evidence/v38_r43_unit.tap
           node car02-v38-r43-transaction-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v38_r43_source_audit.txt
           grep -Fq 'CAR02_V38_R43_REPLAY_AUDIT_PASS 11/11 BLOCKERS=5 NO_GO HOLD' car02_legacy_preflight_evidence/v38_r43_source_audit.txt
+      - name: V3.9 R43 authorization transaction design proposal (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v39-transaction-authorization-contract-isolated.mjs
+          node --check car02-v39-contract-source-runner-isolated.mjs
+          node --check test_car02_v39_transaction_authorization_contract_isolated.mjs
+          node --test test_car02_v39_transaction_authorization_contract_isolated.mjs | tee car02_legacy_preflight_evidence/v39_contract_tests.tap
+          grep -q '# tests 75' car02_legacy_preflight_evidence/v39_contract_tests.tap
+          grep -q '# pass 75' car02_legacy_preflight_evidence/v39_contract_tests.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v39_contract_tests.tap
+          node car02-v39-contract-source-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v39_contract_source.txt
+          grep -Fq 'CAR02_V39_CONTRACT_SOURCE_PASS 10/10 BLOCKERS=5 NO_GO HOLD' car02_legacy_preflight_evidence/v39_contract_source.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
