@@ -69,6 +69,9 @@ on:
       - car02-v43-signed-transaction-replay-isolated.mjs
       - car02-v43-source-audit-runner-isolated.mjs
       - test_car02_v43_signed_transaction_replay_isolated.mjs
+      - car02-v46-postcommit-outbox-isolated.mjs
+      - car02-v46-source-audit-runner-isolated.mjs
+      - test_car02_v46_postcommit_outbox_isolated.mjs
       - car02-v45-rollback-unit-of-work-isolated.mjs
       - car02-v45-source-audit-runner-isolated.mjs
       - test_car02_v45_rollback_unit_of_work_isolated.mjs
@@ -354,6 +357,20 @@ jobs:
           node car02-v45-source-audit-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v45_uow_source_audit.txt
           grep -Fq 'CAR02_V45_ROLLBACK_UOW_REVIEW_PASS 22/22 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v45_uow_source_audit.txt
           grep -Fq 'V45_QA_ONLY: IN_MEMORY_ROLLBACK_MODEL; NO_POSTGRESQL_ROLLBACK_PROOF; NO_DB; NO_EXTERNAL_SIDE_EFFECT_GUARANTEE; NO_RELEASE' car02_legacy_preflight_evidence/v45_uow_source_audit.txt
+      - name: V4.6 synthetic transactional outbox and uncertain delivery (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v46-postcommit-outbox-isolated.mjs
+          node --check car02-v46-source-audit-runner-isolated.mjs
+          node --check test_car02_v46_postcommit_outbox_isolated.mjs
+          node --test test_car02_v46_postcommit_outbox_isolated.mjs | tee car02_legacy_preflight_evidence/v46_outbox_unit.tap
+          grep -q '# tests 46' car02_legacy_preflight_evidence/v46_outbox_unit.tap
+          grep -q '# pass 46' car02_legacy_preflight_evidence/v46_outbox_unit.tap
+          grep -q '# fail 0' car02_legacy_preflight_evidence/v46_outbox_unit.tap
+          node car02-v46-source-audit-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v46_outbox_source.txt
+          grep -Fq 'CAR02_V46_POSTCOMMIT_OUTBOX_REVIEW_PASS 23/23 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v46_outbox_source.txt
+          grep -Fq 'V46_QA_ONLY: IN_MEMORY_ATOMIC_OUTBOX; NO_PG; NO_LINE; NO_REAL_DISPATCH; UNCERTAIN_SEND_MANUAL_REVIEW; RELEASE_HOLD' car02_legacy_preflight_evidence/v46_outbox_source.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
