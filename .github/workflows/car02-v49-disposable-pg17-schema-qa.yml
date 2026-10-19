@@ -488,7 +488,7 @@ jobs:
             IF NOT v_found THEN RAISE EXCEPTION 'V411_REPLAY_AFTER_REVOKE'; END IF;
             UPDATE public.ksh_car02_staff_access SET active=true
               WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049';
-            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a')<>7 THEN
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049'::uuid)<>7 THEN
               RAISE EXCEPTION 'V411_REACTIVATION_ROTATION_FAILED';
             END IF;
             v_found:=false;
