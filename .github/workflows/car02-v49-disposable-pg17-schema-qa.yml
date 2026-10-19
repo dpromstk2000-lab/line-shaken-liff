@@ -392,6 +392,13 @@ jobs:
             RETURN v_fingerprint;
           END
           $fn$;
+          -- V4.11 CI FIX: the V4.9 baseline deliberately promoted subject 0049
+          -- to owner. Use a separate genuine staff subject for the owner-only
+          -- negative authorization case so the test checks the correct role.
+          INSERT INTO public.ksh_car02_staff_access
+            (shop_code,user_sub,staff_role,active,grant_source)
+          VALUES ('qa-shop-a','00000000-0000-0000-0000-000000000052',
+                  'staff',true,'v411-disposable-staff-qa');
           DO $qa$
           DECLARE v_before integer; v_result text; v_message text; v_found boolean;
           BEGIN
@@ -427,11 +434,19 @@ jobs:
               IF v_message='V411_IDEMPOTENCY_KEY_REUSED' THEN v_found:=true; ELSE RAISE; END IF;
             END;
             IF NOT v_found THEN RAISE EXCEPTION 'V411_KEY_REUSE_ACCEPTED'; END IF;
+            -- A separate real staff fixture must be active, version 1;
+            -- the V4.9 subject 0049 is intentionally an owner at this stage.
+            IF NOT EXISTS (
+              SELECT 1 FROM public.ksh_car02_staff_access
+              WHERE shop_code='qa-shop-a'
+                AND user_sub='00000000-0000-0000-0000-000000000052'
+                AND active=true AND staff_role='staff' AND auth_version=1
+            ) THEN RAISE EXCEPTION 'V411_STAFF_NEGATIVE_FIXTURE_INVALID'; END IF;
             -- Staff must not perform an owner-only transaction.
             v_found:=false;
             BEGIN
               PERFORM public.car02_v411_authorized_replay_qa_only(
-                'qa-shop-a','00000000-0000-0000-0000-000000000049',5,'admin','owner-only','owner');
+                'qa-shop-a','00000000-0000-0000-0000-000000000052',1,'admin','owner-only','owner');
             EXCEPTION WHEN OTHERS THEN
               GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
               IF v_message='V411_ROLE_FORBIDDEN' THEN v_found:=true; ELSE RAISE; END IF;
