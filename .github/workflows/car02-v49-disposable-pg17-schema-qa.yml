@@ -1,5 +1,5 @@
-name: CAR02 V4.9 Disposable PG17 Schema Integration QA (NO_GO HOLD)
-# All database interactions target a NEW throwaway postgres:17 GitHub service only.
+name: CAR02 V4.9-V4.10 Disposable PG17 Authorization QA (NO_GO HOLD)
+# V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
   push:
@@ -194,3 +194,117 @@ jobs:
           test "$result" = 'true:5'
           echo 'V49_PG17_ROW_LOCK_PASS: concurrent revoke UPDATE blocked by SELECT FOR UPDATE; timeout rolls back without data change'
           echo 'V49_RELEASE_HOLD: no R43 production transaction integration or signer proof'
+
+      - name: V4.10 disposable PG17 issuance guard and column permission tests (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          cat > "$RUNNER_TEMP/car02-v410-issuance.sql" <<'PGSQL'
+          \set ON_ERROR_STOP on
+          -- Disposable Postgres 17 only; REVIEW/QA. Not a production migration.
+          DO $$ BEGIN
+            IF current_setting('server_version_num')::int < 170000 OR current_setting('server_version_num')::int >= 180000 THEN
+              RAISE EXCEPTION 'V410_PG17_REQUIRED';
+            END IF;
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049') <> 5 THEN
+              RAISE EXCEPTION 'V410_V49_BASELINE_MISSING';
+            END IF;
+          END $$;
+          BEGIN;
+          SET LOCAL lock_timeout='2s';
+          SET LOCAL statement_timeout='45s';
+          CREATE FUNCTION public.ksh_car02_staff_initial_version_guard_v410()
+          RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN
+            IF NEW.auth_version IS DISTINCT FROM 1 THEN
+              RAISE EXCEPTION 'CAR02_STAFF_INITIAL_AUTH_VERSION_INVALID';
+            END IF;
+            NEW.auth_version := 1;
+            RETURN NEW;
+          END;
+          $$;
+          CREATE TRIGGER ksh_car02_staff_initial_version_guard_v410
+          BEFORE INSERT ON public.ksh_car02_staff_access
+          FOR EACH ROW EXECUTE FUNCTION public.ksh_car02_staff_initial_version_guard_v410();
+          -- R46's table-wide INSERT granted control over auth_version. Narrow to approved columns.
+          REVOKE INSERT ON public.ksh_car02_staff_access FROM service_role;
+          GRANT INSERT(shop_code,user_sub,staff_role,active,grant_source)
+            ON public.ksh_car02_staff_access TO service_role;
+          COMMIT;
+          DO $$ DECLARE blocked boolean := false; msg text; BEGIN
+            IF has_column_privilege('service_role','public.ksh_car02_staff_access','auth_version','INSERT') THEN
+              RAISE EXCEPTION 'V410_VERSION_COLUMN_INSERT_STILL_GRANTED';
+            END IF;
+            IF NOT has_column_privilege('service_role','public.ksh_car02_staff_access','shop_code','INSERT') THEN
+              RAISE EXCEPTION 'V410_APPROVED_COLUMNS_NOT_GRANTED';
+            END IF;
+            IF NOT has_table_privilege('service_role','public.ksh_car02_staff_access','SELECT') OR
+               NOT has_table_privilege('service_role','public.ksh_car02_staff_access','UPDATE') THEN
+              RAISE EXCEPTION 'V410_REQUIRED_READ_UPDATE_PRIVILEGES_LOST';
+            END IF;
+            BEGIN
+              INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,auth_version)
+              VALUES ('qa-shop-b','00000000-0000-0000-0000-000000000410','staff',false,2147483647);
+              RAISE EXCEPTION 'V410_SUPERUSER_SHOULD_HAVE_BEEN_REJECTED';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS msg=MESSAGE_TEXT;
+              IF msg <> 'CAR02_STAFF_INITIAL_AUTH_VERSION_INVALID' THEN
+                RAISE EXCEPTION 'V410_WRONG_OVERRIDE_REJECTION: %',msg;
+              END IF;
+              blocked := true;
+            END;
+            IF NOT blocked THEN RAISE EXCEPTION 'V410_OVERRIDE_NOT_REJECTED'; END IF;
+          END $$;
+          -- Only in throwaway CI: emulate Supabase's service_role BYPASSRLS characteristic.
+          ALTER ROLE service_role BYPASSRLS;
+          SET ROLE service_role;
+          DO $$ DECLARE blocked boolean := false; BEGIN
+            BEGIN
+              INSERT INTO public.ksh_car02_staff_access
+                (shop_code,user_sub,staff_role,active,grant_source,auth_version)
+              VALUES ('qa-shop-b','00000000-0000-0000-0000-000000000411','staff',false,'ci-test',1);
+            EXCEPTION WHEN insufficient_privilege THEN blocked:=true;
+            END;
+            IF NOT blocked THEN RAISE EXCEPTION 'V410_SERVICE_ROLE_COULD_SET_VERSION'; END IF;
+          END $$;
+          INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+          VALUES ('qa-shop-b','00000000-0000-0000-0000-000000000412','staff',false,'ci-isolated');
+          RESET ROLE;
+          DO $$ BEGIN
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                WHERE user_sub='00000000-0000-0000-0000-000000000412') <> 1 THEN
+              RAISE EXCEPTION 'V410_INITIAL_DEFAULT_FAILED';
+            END IF;
+            IF EXISTS (SELECT 1 FROM public.ksh_car02_staff_access
+                WHERE user_sub IN ('00000000-0000-0000-0000-000000000410',
+                                   '00000000-0000-0000-0000-000000000411')) THEN
+              RAISE EXCEPTION 'V410_FAILED_INSERT_STILL_VISIBLE';
+            END IF;
+          END $$;
+          UPDATE public.ksh_car02_staff_access SET active=true,auth_version=999
+            WHERE shop_code='qa-shop-b' AND user_sub='00000000-0000-0000-0000-000000000412';
+          DO $$ BEGIN
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                WHERE user_sub='00000000-0000-0000-0000-000000000412') <> 2 THEN
+              RAISE EXCEPTION 'V410_UPDATE_TRIGGER_MUST_ROTATE_NOT_ACCEPT_CLIENT_VERSION';
+            END IF;
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049') <> 5 THEN
+              RAISE EXCEPTION 'V410_CROSS_TENANT_VERSION_DRIFT';
+            END IF;
+          END $$;
+          \echo 'V410_PG17_ISSUANCE_GUARD_PASS: invalid initial version rejected; role cannot provide version; default starts at 1; update rotates; tenant isolation preserved'
+          \echo 'V410_RELEASE_HOLD: disposable DB only; not deployed; R43 integration, live signer and full R13 migration unproven'
+          PGSQL
+          docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" \
+            -v "$RUNNER_TEMP:/scratch:ro" \
+            postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55432 \
+            -U postgres -d postgres -f /scratch/car02-v410-issuance.sql \
+            | tee "$RUNNER_TEMP/car02-v410-issuance.log"
+          grep -Fq 'V410_PG17_ISSUANCE_GUARD_PASS' "$RUNNER_TEMP/car02-v410-issuance.log"
+          grep -Fq 'V410_RELEASE_HOLD' "$RUNNER_TEMP/car02-v410-issuance.log"
