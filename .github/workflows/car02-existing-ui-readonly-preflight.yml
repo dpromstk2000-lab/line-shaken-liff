@@ -90,6 +90,10 @@ on:
       - SUPAbasepass.txt
       - '.env*'
 
+      - car02-v48-six-blocker-release-gate-isolated.mjs
+      - car02-v48-source-gate-runner-isolated.mjs
+      - test_car02_v48_six_blocker_release_gate_isolated.mjs
+      - CAR02_V48_RELEASE_EVIDENCE_MATRIX_REVIEW_ONLY.md
 permissions:
   contents: read
 
@@ -389,6 +393,21 @@ jobs:
           node car02-v47-source-audit-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v47_source_audit.txt
           grep -Fq 'CAR02_V47_DURABLE_OUTBOX_LEASE_REVIEW_PASS 28/28 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v47_source_audit.txt
           grep -Fq 'V47_QA_ONLY: IN_MEMORY_LEASE_FENCING; SQL_COMMENT_ONLY; NO_REAL_PG; NO_LINE; NO_EXECUTION; RELEASE_HOLD' car02_legacy_preflight_evidence/v47_source_audit.txt
+      - name: V4.8 read-only six-blocker release evidence gate (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-v48-six-blocker-release-gate-isolated.mjs
+          node --check car02-v48-source-gate-runner-isolated.mjs
+          node --check test_car02_v48_six_blocker_release_gate_isolated.mjs
+          node --test test_car02_v48_six_blocker_release_gate_isolated.mjs | tee car02_legacy_preflight_evidence/v48_release_gate_unit.tap
+          grep -Fq '# tests 77' car02_legacy_preflight_evidence/v48_release_gate_unit.tap
+          grep -Fq '# pass 77' car02_legacy_preflight_evidence/v48_release_gate_unit.tap
+          grep -Fq '# fail 0' car02_legacy_preflight_evidence/v48_release_gate_unit.tap
+          node car02-v48-source-gate-runner-isolated.mjs | tee car02_legacy_preflight_evidence/v48_release_source_gate.txt
+          grep -Fq 'CAR02_V48_SIX_BLOCKER_GATE_PASS 20/20 BLOCKERS=6 NO_GO HOLD' car02_legacy_preflight_evidence/v48_release_source_gate.txt
+          grep -Fq 'V48_RELEASE_DECISION NO_GO BLOCKERS=6 NEVER_AUTO_GO' car02_legacy_preflight_evidence/v48_release_source_gate.txt
+          grep -Fq 'V48_QA_ONLY: STATIC_SOURCE_CHECKS; NO_LIVE_DB; NO_REAL_JWT; NO_SQL_EXECUTION; NO_RELEASE' car02_legacy_preflight_evidence/v48_release_source_gate.txt
       - name: Store non-sensitive verification status
         if: always()
         uses: actions/upload-artifact@v4
