@@ -29,7 +29,7 @@ const checks={
  r46SqlStillReviewOnly:snapshot.r46Sql.includes('QA/REVIEW ONLY'),
  v47SqlNotExecuted:a.anchors.v47CommentOnly===true,
  r43ReplayStillUnfenced:a.blockers[2].expectedGapVisible,
- noProductionWrites:!/(?:\bALTER\s+TABLE|\bCREATE\s+TRIGGER|\bDROP\s+TABLE)/i.test(readFileSync('car02-v48-six-blocker-release-gate-isolated.mjs','utf8')),
+ noProductionWrites:!/(?:\b(?:pool|client|db|c)\.query\s*\(|\b(?:fetch|createClient|writeFileSync|appendFileSync|execFileSync|spawnSync)\s*\(|\.rpc\s*\(|\bimport\s*\(|\brequire\s*\()/i.test(readFileSync('car02-v48-six-blocker-release-gate-isolated.mjs','utf8')),
  modelNotCalledFromWorker:!snapshot.r52Edge.includes('car02-v48-six-blocker-release-gate-isolated'),
  knownGitHubCIIsNotLivePg:!d.authorized&&d.requiresIndependentLiveDbAndSignerEvidence,
  sourceDriftIsFailure:a.unexpected.length===0,
