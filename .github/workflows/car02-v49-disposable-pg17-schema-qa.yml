@@ -1,0 +1,196 @@
+name: CAR02 V4.9 Disposable PG17 Schema Integration QA (NO_GO HOLD)
+# All database interactions target a NEW throwaway postgres:17 GitHub service only.
+# NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v49-disposable-pg17-schema-qa.yml'
+      - 'R46_STAFF_GRANTS_QA_ONLY.sql'
+      - 'CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-pg17-only:
+    name: Disposable PostgreSQL 17 R46/V41 checks (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: car02_v49_disposable_ci_only
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: car02_v49_disposable_ci_only
+    steps:
+      - name: Checkout QA SQL (read only)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail closed on missing QA sources or prohibited production environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s R46_STAFF_GRANTS_QA_ONLY.sql
+          test -s CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          grep -Fq 'QA/REVIEW ONLY' R46_STAFF_GRANTS_QA_ONLY.sql
+          grep -Fq 'NOT AN APPROVED MIGRATION' CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          echo 'V49_ISOLATION_PASS: no production secrets and review-only source contracts'
+      - name: PostgreSQL 17 disposable schema, revocation and rollback assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/car02-v49-pg17.sql" <<'PGSQL'
+          \set ON_ERROR_STOP on
+          -- This database is an ephemeral GH Actions postgres:17 service.
+          -- Minimal R13 dependency STUB only; NOT full R13 migration integration.
+          DO $$ BEGIN
+            IF current_setting('server_version_num')::int < 170000 OR current_setting('server_version_num')::int >= 180000 THEN
+              RAISE EXCEPTION 'V49_POSTGRESQL_17_REQUIRED';
+            END IF;
+          END $$;
+          CREATE ROLE service_role NOLOGIN;
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE TABLE public.ksh_demo_shop_settings(shop_code text PRIMARY KEY);
+          INSERT INTO public.ksh_demo_shop_settings(shop_code) VALUES ('qa-shop-a'),('qa-shop-b');
+          \i /workspace/R46_STAFF_GRANTS_QA_ONLY.sql
+          \i /workspace/CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+          VALUES ('qa-shop-a','00000000-0000-0000-0000-000000000049','staff',true,'ci-isolated'),
+                 ('qa-shop-b','00000000-0000-0000-0000-000000000050','owner',false,'ci-isolated');
+          DO $$ BEGIN
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a') <> 1 THEN
+              RAISE EXCEPTION 'V49_DEFAULT_VERSION_FAILED';
+            END IF;
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-b') <> 1 THEN
+              RAISE EXCEPTION 'V49_TENANT_SCOPE_FAILED';
+            END IF;
+            IF has_table_privilege('service_role','public.ksh_car02_staff_access','DELETE') THEN
+              RAISE EXCEPTION 'V49_SERVICE_ROLE_DELETE_STILL_GRANTED';
+            END IF;
+            IF NOT has_table_privilege('service_role','public.ksh_car02_staff_access','UPDATE') THEN
+              RAISE EXCEPTION 'V49_SERVICE_ROLE_UPDATE_NOT_GRANTED';
+            END IF;
+            IF has_table_privilege('anon','public.ksh_car02_staff_access','SELECT') OR
+               has_table_privilege('authenticated','public.ksh_car02_staff_access','SELECT') THEN
+              RAISE EXCEPTION 'V49_UNTRUSTED_SELECT_GRANTED';
+            END IF;
+            IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.ksh_car02_staff_access'::regclass) THEN
+              RAISE EXCEPTION 'V49_RLS_DISABLED';
+            END IF;
+          END $$;
+          UPDATE public.ksh_car02_staff_access SET staff_role='owner' WHERE shop_code='qa-shop-a';
+          UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code='qa-shop-a';
+          UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code='qa-shop-a';
+          UPDATE public.ksh_car02_staff_access SET auth_version=1 WHERE shop_code='qa-shop-a';
+          DO $$ BEGIN
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a') <> 5 THEN
+              RAISE EXCEPTION 'V49_REVOKE_REACTIVATE_OR_MANUAL_VERSION_BUMP_FAILED';
+            END IF;
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-b') <> 1 THEN
+              RAISE EXCEPTION 'V49_CROSS_TENANT_UPDATE_DETECTED';
+            END IF;
+          END $$;
+          DO $$ DECLARE msg text; BEGIN
+            BEGIN
+              UPDATE public.ksh_car02_staff_access SET shop_code='qa-shop-b' WHERE shop_code='qa-shop-a';
+              RAISE EXCEPTION 'V49_SHOULD_HAVE_REJECTED_PRINCIPAL_CHANGE';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+              IF msg NOT LIKE '%CAR02_STAFF_MEMBERSHIP_IDENTITY_IMMUTABLE%' THEN
+                RAISE EXCEPTION 'V49_IDENTITY_IMMUTABILITY_NOT_PROVEN: %',msg;
+              END IF;
+            END;
+            BEGIN
+              DELETE FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a';
+              RAISE EXCEPTION 'V49_SHOULD_HAVE_REJECTED_DELETE';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+              IF msg NOT LIKE '%CAR02_STAFF_ACCESS_DELETE_DENIED%' THEN
+                RAISE EXCEPTION 'V49_DELETE_BLOCK_NOT_PROVEN: %',msg;
+              END IF;
+            END;
+            BEGIN
+              UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code='qa-shop-a';
+              RAISE EXCEPTION 'V49_TEST_ROLLBACK_MARKER';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+              IF msg <> 'V49_TEST_ROLLBACK_MARKER' THEN RAISE; END IF;
+            END;
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a') <> 5 OR
+               NOT (SELECT active FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a') THEN
+              RAISE EXCEPTION 'V49_SUBTRANSACTION_ROLLBACK_FAILED';
+            END IF;
+          END $$;
+          -- Explicit provided auth_version on INSERT remains a hardening concern;
+          -- document this but DO NOT claim that the proposal is production-ready.
+          INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source,auth_version)
+          VALUES ('qa-shop-b','00000000-0000-0000-0000-000000000051','staff',false,'ci-isolated',2147483647);
+          DO $$ DECLARE msg text; BEGIN
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                WHERE user_sub='00000000-0000-0000-0000-000000000051') <> 2147483647 THEN
+              RAISE EXCEPTION 'V49_TEST_SETUP_FAILED';
+            END IF;
+            BEGIN
+              UPDATE public.ksh_car02_staff_access SET active=true
+              WHERE user_sub='00000000-0000-0000-0000-000000000051';
+              RAISE EXCEPTION 'V49_SHOULD_HAVE_REJECTED_EXHAUSTION';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+              IF msg NOT LIKE '%CAR02_STAFF_AUTH_VERSION_EXHAUSTED%' THEN
+                RAISE EXCEPTION 'V49_OVERFLOW_NOT_BLOCKED: %',msg;
+              END IF;
+            END;
+          END $$;
+          \echo 'V49_PG17_SCHEMA_PASS: R46+V41 SQL, version-bump, revocation, immutable principal, delete-denial, RLS privileges, transactional rollback'
+          \echo 'V49_REVIEW_FINDING: auth_version may be set explicitly at INSERT; a future INSERT guard is required before release'
+          \echo 'V49_RELEASE_DECISION: NO_GO / HOLD (QA-only disposable database; no R43 tx integration, no live signing)'
+          PGSQL
+          docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$RUNNER_TEMP:/scratch:ro" \
+            postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55432 \
+            -U postgres -d postgres -f /scratch/car02-v49-pg17.sql \
+            | tee "$RUNNER_TEMP/car02-v49-pg17.log"
+          grep -Fq 'V49_PG17_SCHEMA_PASS' "$RUNNER_TEMP/car02-v49-pg17.log"
+          grep -Fq 'V49_REVIEW_FINDING' "$RUNNER_TEMP/car02-v49-pg17.log"
+          grep -Fq 'V49_RELEASE_DECISION: NO_GO / HOLD' "$RUNNER_TEMP/car02-v49-pg17.log"
+      - name: PostgreSQL 17 concurrent SELECT FOR UPDATE lock blocks revoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Two independent disposable database connections; no DPRO runtime import.
+          run_pg() {
+            docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" \
+              postgres:17 psql -X -v ON_ERROR_STOP=1 -qAt \
+              -h 127.0.0.1 -p 55432 -U postgres -d postgres "$@"
+          }
+          run_pg -c "BEGIN; SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049' FOR UPDATE; SELECT pg_sleep(8); COMMIT;" > "$RUNNER_TEMP/v49_lock_holder.log" 2>&1 &
+          lock_pid=$!
+          sleep 2
+          set +e
+          run_pg -c "SET statement_timeout='900ms'; UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049';" > "$RUNNER_TEMP/v49_lock_contender.log" 2>&1
+          contender_rc=$?
+          set -e
+          wait "$lock_pid"
+          if [ "$contender_rc" -eq 0 ]; then
+            echo 'V49_LOCK_FAIL: concurrent UPDATE did not wait on FOR UPDATE' >&2
+            exit 1
+          fi
+          grep -Fq 'canceling statement due to statement timeout' "$RUNNER_TEMP/v49_lock_contender.log"
+          # Following rollback due to timeout, target row remains active and version 5.
+          result="$(run_pg -c "SELECT active::text||':'||auth_version::text FROM public.ksh_car02_staff_access WHERE shop_code='qa-shop-a' AND user_sub='00000000-0000-0000-0000-000000000049';")"
+          test "$result" = 'true:5'
+          echo 'V49_PG17_ROW_LOCK_PASS: concurrent revoke UPDATE blocked by SELECT FOR UPDATE; timeout rolls back without data change'
+          echo 'V49_RELEASE_HOLD: no R43 production transaction integration or signer proof'
