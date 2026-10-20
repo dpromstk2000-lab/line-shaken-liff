@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.12 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.13 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -7,6 +7,8 @@ on:
       - '.github/workflows/car02-v49-disposable-pg17-schema-qa.yml'
       - 'R46_STAFF_GRANTS_QA_ONLY.sql'
       - 'CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql'
+      - 'car02-pg-adapter.mjs'
+      - 'car02-core.mjs'
       - 'R13_MIGRATION_QA_ONLY.sql'
   workflow_dispatch:
 permissions:
@@ -702,3 +704,103 @@ jobs:
           test "$result" = '0'
           echo 'V412_R13_NEGATIVE_BASELINE_PASS: migration refused missing dependencies; zero CAR02 tables remained'
           echo 'V412_FINAL_NO_GO_HOLD: synthetic R13 fixture, source R43 unchanged, DB auth and signer blockers remain'
+      - name: V4.13 actual R43 adapter transaction and replay gap in full R13 PG17 (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ONLY the disposable V4.12 full-R13 QA database is used; no production URL.
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s car02-pg-adapter.mjs
+          test -s car02-core.mjs
+          grep -Fq "return obj(existing.response_snapshot);" car02-pg-adapter.mjs
+          grep -Fq "await c.query('COMMIT')" car02-pg-adapter.mjs
+          # Install ONLY a pinned local PostgreSQL client in runner temporary storage.
+          # Never install dependencies or write any file into repository or Worker.
+          mkdir -p "$RUNNER_TEMP/v413-deps"
+          npm --prefix "$RUNNER_TEMP/v413-deps" install --no-save --ignore-scripts --no-audit --no-fund --silent pg@8.16.3
+          cat > "$RUNNER_TEMP/v413-r43-source-check.mjs" <<'NODEJS'
+          import assert from 'node:assert/strict';
+          import {createRequire} from 'node:module';
+          import {resolve,join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const req=createRequire(join(process.env.RUNNER_TEMP,'v413-deps','package.json'));
+          const {Pool}=req('pg');
+          const mod=await import(pathToFileURL(resolve(process.env.GITHUB_WORKSPACE,'car02-pg-adapter.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',
+            user:'postgres',password:process.env.PGPASSWORD,max:3,connectionTimeoutMillis:5000});
+          const adapter=mod.createCar02PgAdapter(pool);
+          const shop='street_house_kitsuki';
+          const subject='00000000-0000-0000-0000-000000000413';
+          const customerId='00000000-0000-0000-0000-000000000121';
+          const vehicleId='00000000-0000-0000-0000-000000000122';
+          // Synthetic server-trusted identity only. No live signer, client or auth proof.
+          const actor={role:'staff',subject,shopCode:shop,verified:true,authVersion:1};
+          const intent={op:'v413-create-order',customerId,vehicleId,reservationId:null};
+          const setup=()=>({actor,shop,key:'v413-create-first',intent});
+          const count=async()=>Number((await pool.query('SELECT count(*)::integer AS n FROM public.ksh_car02_work_orders WHERE shop_code=$1',[shop])).rows[0].n);
+          try {
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access
+              (shop_code,user_sub,staff_role,active,grant_source)
+              VALUES ($1,$2,'staff',true,'v413-disposable')`,[shop,subject]);
+            const before=await count();
+            const result=await adapter.transaction(setup(),async t=>{
+              await t.assertLinks({customerId,vehicleId,reservationId:null});
+              return await t.create({customerId,vehicleId,reservationId:null});
+            });
+            assert.equal(result.shop,shop);
+            assert.equal(result.status,'draft');
+            assert.equal(result.events[0].type,'created');
+            assert.equal(await count(),before+1);
+            let replayCalled=false;
+            const replay=await adapter.transaction(setup(),async()=>{replayCalled=true;throw Error('V413_UNEXPECTED_CALLBACK');});
+            assert.equal(replayCalled,false);
+            assert.equal(replay.id,result.id);
+            assert.equal(await count(),before+1);
+            console.log('V413_R43_REAL_ADAPTER_ATOMIC_REPLAY_PASS: same digest replay returns first receipt without a second work order');
+            // Simulate staff revocation in disposable PG17. R43 is not production-authorized.
+            await pool.query(`UPDATE public.ksh_car02_staff_access SET active=false
+              WHERE shop_code=$1 AND user_sub=$2`,[shop,subject]);
+            const membership=(await pool.query(`SELECT active,auth_version FROM public.ksh_car02_staff_access
+              WHERE shop_code=$1 AND user_sub=$2`,[shop,subject])).rows[0];
+            assert.equal(membership.active,false);
+            assert.equal(membership.auth_version,2);
+            let staleCallback=false;
+            const staleReplay=await adapter.transaction(setup(),async()=>{staleCallback=true;throw Error('V413_UNEXPECTED_STALE_CALLBACK');});
+            assert.equal(staleCallback,false);
+            assert.equal(staleReplay.id,result.id);
+            assert.equal(await count(),before+1);
+            console.log('V413_R43_REVOKED_REPLAY_GAP_CONFIRMED: raw R43 adapter returns old receipt after membership revocation; NO_GO');
+            const revokedNewKey={actor,shop,key:'v413-after-revoke',intent:{...intent,op:'v413-new-after-revoke'}};
+            const unsafeNew=await adapter.transaction(revokedNewKey,async t=>{
+              await t.assertLinks({customerId,vehicleId,reservationId:null});
+              return await t.create({customerId,vehicleId,reservationId:null});
+            });
+            assert.notEqual(unsafeNew.id,result.id);
+            assert.equal(await count(),before+2);
+            console.log('V413_R43_REVOKED_NEW_MUTATION_GAP_CONFIRMED: raw adapter lacks in-transaction staff membership fence; NO_GO');
+            let rolledBack=false;
+            try {
+              await adapter.transaction({actor,shop,key:'v413-failing-rollback',intent:{op:'v413-rollback'}},async t=>{
+                await t.create({customerId,vehicleId,reservationId:null});
+                throw Error('V413_INJECTED_ROLLBACK');
+              });
+            } catch(e) { if(e.message==='V413_INJECTED_ROLLBACK')rolledBack=true;else throw e; }
+            assert.equal(rolledBack,true);
+            assert.equal(await count(),before+2);
+            console.log('V413_R43_REAL_ADAPTER_ROLLBACK_PASS: failed transaction persisted no extra work order');
+            const ops=Number((await pool.query(`SELECT count(*)::int AS n FROM public.ksh_car02_operations
+              WHERE shop_code=$1 AND actor_scope=$2`,[shop,`staff:${subject}`])).rows[0].n);
+            assert.equal(ops,2);
+            console.log('V413_FINAL_NO_GO_HOLD: real R43 connected to full synthetic R13, raw adapter permits revoked replay/write; actual HTTP boundary and signed JWT not tested');
+          } finally {await pool.end();}
+          NODEJS
+          node --check "$RUNNER_TEMP/v413-r43-source-check.mjs"
+          node "$RUNNER_TEMP/v413-r43-source-check.mjs" | tee "$RUNNER_TEMP/car02-v413-r43.log"
+          grep -Fq 'V413_R43_REAL_ADAPTER_ATOMIC_REPLAY_PASS' "$RUNNER_TEMP/car02-v413-r43.log"
+          grep -Fq 'V413_R43_REVOKED_REPLAY_GAP_CONFIRMED' "$RUNNER_TEMP/car02-v413-r43.log"
+          grep -Fq 'V413_R43_REVOKED_NEW_MUTATION_GAP_CONFIRMED' "$RUNNER_TEMP/car02-v413-r43.log"
+          grep -Fq 'V413_R43_REAL_ADAPTER_ROLLBACK_PASS' "$RUNNER_TEMP/car02-v413-r43.log"
+          grep -Fq 'V413_FINAL_NO_GO_HOLD' "$RUNNER_TEMP/car02-v413-r43.log"
