@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.24 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.25 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -2367,4 +2367,190 @@ jobs:
             V424_NO_GO_RELEASE_CONTRACT_PASS \
             V424_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/car02-v424-nested-gate.log"
+          done
+      - name: V4.25 actual R48 photo read signed session and revocation fence (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s car02-private-photo-view-r48.mjs
+          test -s car02-pg-photo-view-r48.mjs
+          test -s car02-edge-entry-r52.ts
+          test -s "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          node --check car02-private-photo-view-r48.mjs
+          cat > "$RUNNER_TEMP/car02-v425-photo-boundary-qa.mjs" <<'NODEJS'
+          // DPRO CAR02 V4.25: PRIVATE PHOTO READ AUTH-REVOCATION QA, disposable PG17 + fake storage.
+          // Uses real R48 HTTP/viewer modules but IS NOT a production patch, integration or deployment.
+          import assert from 'node:assert/strict';
+          import {createHash,generateKeyPairSync,randomUUID,sign,verify} from 'node:crypto';
+          import {join,resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          import {createRequire} from 'node:module';
+          const temp=process.env.RUNNER_TEMP;
+          if(!temp||!process.env.PGPASSWORD)throw Error('V425_DISPOSABLE_CONTEXT_REQUIRED');
+          const require=createRequire(join(temp,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const {createCar02PrivatePhotoViewR48,createCar02PhotoHttpR48}=
+            await import(pathToFileURL(resolve('car02-private-photo-view-r48.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',
+            password:process.env.PGPASSWORD,max:5,connectionTimeoutMillis:5000});
+          const uuid=/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
+          const shop='street_house_kitsuki',sub='00000000-0000-0000-0000-000000000425';
+          const photoId='00000000-0000-0000-0000-000000000625',
+            orderId='00000000-0000-0000-0000-000000000725',reportId='00000000-0000-0000-0000-000000000825';
+          const photoPath=[shop,orderId,reportId,photoId+'.png'].join('/');
+          const bytes=Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,0]);
+          const digest=createHash('sha256').update(bytes).digest('hex');
+          const meta={id:photoId,shop,orderId,reportId,bucket:'ksh-car02-private-photos',path:photoPath,
+            mime:'image/png',bytes:bytes.length,sha256:digest};
+          const {publicKey,privateKey}=generateKeyPairSync('ed25519');
+          const now=()=>Math.floor(Date.now()/1000),b64=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
+          const decode=s=>JSON.parse(Buffer.from(s,'base64url').toString('utf8'));
+          const fault=code=>{const e=Error(code);e.code=code;throw e;};
+          const base='https://car02-qa.example.invalid',url=base+'/api/car02/photos/'+photoId;
+          let reads=0,storageGets=0,holdDownload=false,signalEntered=()=>{},unlockDownload=()=>{};
+          let reached=new Promise(r=>{signalEntered=r}),released=new Promise(r=>{unlockDownload=r});
+          const repository={findReady:async({actor,shop:requestedShop,photoId:requestedId})=>{
+            reads++;
+            assert.equal(actor.verified,true);
+            assert.equal(actor.shopCode,shop);
+            assert.equal(requestedShop,shop);
+            assert.equal(requestedId,photoId);
+            return {...meta};
+          }};
+          const fetchImpl=async (input,init)=>{
+            storageGets++;
+            assert.equal(init.method,'GET');
+            assert.equal(init.redirect,'error');
+            assert.equal(input,'https://qa-only.supabase.co/storage/v1/object/authenticated/ksh-car02-private-photos/'+photoPath);
+            if(holdDownload){signalEntered();await released;}
+            return new Response(bytes,{status:200,headers:{'content-type':'image/png'}});
+          };
+          const viewer=createCar02PrivatePhotoViewR48({repository,releaseEnabled:async()=>true,
+            baseUrl:'https://qa-only.supabase.co',serviceRoleKey:'qa_fake_storage_private_key_v425_nonsecret',fetchImpl});
+          function issue({jti=randomUUID(),subId=sub,tenant=shop,role='staff',version=1,iat=now(),exp=now()+90,
+            issuer='car02-v425-qa',aud='photo-disposable-qa'}={}){
+            const h=b64({alg:'EdDSA',typ:'JWT'}),p=b64({iss:issuer,aud,sub:subId,shop:tenant,
+              role,authVersion:version,jti,iat,exp});const msg=h+'.'+p;
+            return msg+'.'+sign(null,Buffer.from(msg),privateKey).toString('base64url');
+          }
+          function verifiedToken(token){
+            if(typeof token!=='string'||!/^[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+$/.test(token))fault('V425_TOKEN_INVALID');
+            const parts=token.split('.');let h,p;
+            try{h=decode(parts[0]);p=decode(parts[1])}catch{fault('V425_TOKEN_INVALID')}
+            if(h?.alg!=='EdDSA'||h?.typ!=='JWT'||p?.iss!=='car02-v425-qa'||p?.aud!=='photo-disposable-qa'||
+               p?.sub!==sub||!uuid.test(p?.sub||'')||p?.shop!==shop||p?.role!=='staff'||
+               !Number.isSafeInteger(p?.authVersion)||p.authVersion<1||!uuid.test(p?.jti||'')||
+               !Number.isSafeInteger(p?.iat)||!Number.isSafeInteger(p?.exp)||p.iat>now()||p.exp<=now()||p.exp-p.iat>90)
+               fault('V425_TOKEN_INVALID');
+            if(!verify(null,Buffer.from(parts[0]+'.'+parts[1]),publicKey,Buffer.from(parts[2],'base64url')))
+              fault('V425_TOKEN_INVALID');
+            return p;
+          }
+          const actor=p=>({verified:true,role:p.role,subject:'staff:'+p.sub,shopCode:p.shop});
+          const rawPhotoHttp=createCar02PhotoHttpR48({viewer,
+            releaseEnabled:async()=>true,
+            authenticate:async req=>actor(verifiedToken(req.headers.get('authorization')?.replace(/^Bearer /,''))),
+            allowedOrigins:[base]});
+          const request=(token,u=url)=>new Request(u,{headers:{authorization:'Bearer '+token,origin:base}});
+          const deniedBody=async (r,status)=>{assert.equal(r.status,status);assert.equal(r.headers.get('cache-control'),'no-store');return r.json()};
+          const guard=async request=>{
+            // QA-only transactional photo-read fence; R48 source is NOT modified.
+            let p;
+            try{p=verifiedToken(request.headers.get('authorization')?.replace(/^Bearer /,''))}
+            catch{return new Response('{"ok":false,"code":"CAR02_UNAUTHORIZED"}',{status:401,headers:{'cache-control':'no-store'}})}
+            const c=await pool.connect();let inTx=false;
+            try{
+              await c.query('BEGIN');inTx=true;
+              const m=await c.query(`SELECT staff_role,active,auth_version FROM public.ksh_car02_staff_access
+                WHERE shop_code=$1 AND user_sub=$2 FOR SHARE`,[p.shop,p.sub]);
+              if(m.rows?.length!==1||m.rows[0].active!==true||m.rows[0].staff_role!==p.role||m.rows[0].auth_version!==p.authVersion)
+                fault('V425_MEMBERSHIP_REVOKED');
+              const session=await c.query(`SELECT active FROM public.car02_v418_staff_sessions_qa_only
+                WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3 FOR SHARE`,[p.shop,p.sub,p.jti]);
+              if(session.rows?.length!==1||session.rows[0].active!==true)fault('V425_JTI_REVOKED');
+              const result=await rawPhotoHttp(request);
+              await c.query('COMMIT');inTx=false;
+              return result;
+            }catch(e){
+              if(inTx)await c.query('ROLLBACK').catch(()=>{});
+              return new Response(JSON.stringify({ok:false,code:'CAR02_PHOTO_ACCESS_DENIED'}),
+                {status:e.code?.startsWith('V425_')?403:503,headers:{'cache-control':'no-store'}});
+            }finally{c.release()}
+          };
+          const newLedger=async jti=>pool.query(`INSERT INTO public.car02_v418_staff_sessions_qa_only(shop_code,user_sub,session_id,active)
+           VALUES($1,$2,$3,true)`,[shop,sub,jti]);
+          const revoke=async jti=>pool.query(`UPDATE public.car02_v418_staff_sessions_qa_only SET active=false,revoked_at=now()
+           WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3`,[shop,sub,jti]);
+          try{
+            // Fail if earlier disposable schema or isolated jti ledger is missing; never create live schema.
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+              VALUES($1,$2,'staff',true,'v425-photo-auth-isolated-qa')`,[shop,sub]);
+            let version=(await pool.query('SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub])).rows[0].auth_version;
+            assert.equal(version,1);
+            const jti=randomUUID();await newLedger(jti);const token=issue({jti,version});
+            const good=await guard(request(token));assert.equal(good.status,200);
+            assert.equal(good.headers.get('cache-control'),'private, no-store, max-age=0');
+            assert.deepEqual(new Uint8Array(await good.arrayBuffer()),bytes);
+            const visits={reads,storageGets};
+            const parts=token.split('.'),forged={...decode(parts[1]),jti:randomUUID()};
+            const bad=parts[0]+'.'+b64(forged)+'.'+parts[2];
+            await deniedBody(await guard(request(bad)),401);
+            await deniedBody(await guard(request(issue({role:'owner',jti,version}))),401);
+            await deniedBody(await guard(request(issue({tenant:'another-tenant',jti,version}))),401);
+            await deniedBody(await guard(request(issue({jti,version,exp:now()-1}))),401);
+            await deniedBody(await guard(request(issue({jti,version,issuer:'evil-issuer'}))),401);
+            await deniedBody(await guard(request(issue({jti:randomUUID(),version}))),403);
+            assert.deepEqual({reads,storageGets},visits,'denied identity may not reach storage');
+            console.log('V425_R48_SIGNED_STAFF_PHOTO_PASS: actual R48 photo HTTP/viewer, content hash, no cache, signed JTI and DB guard');
+            console.log('V425_BAD_CLAIMS_AND_TENANT_DENIED_PASS: tamper, role, tenant, expiry, issuer and unknown jti blocked before storage');
+            await revoke(jti);
+            const locked=await guard(request(token));await deniedBody(locked,403);
+            assert.deepEqual({reads,storageGets},visits);
+            // Demonstrate the unpatched R48 wrapper alone does not perform persistent revocation:
+            // it relies on external authenticate() and releaseEnabled() supplied by its caller.
+            const raw=await rawPhotoHttp(request(token));assert.equal(raw.status,200);
+            console.log('V425_RAW_R48_STALE_ACTOR_GAP_CONFIRMED: standalone R48 with cached verified actor allows photo after DB session revocation; needs trusted guard');
+            const nextJti=randomUUID();await newLedger(nextJti);const nextToken=issue({jti:nextJti,version});
+            assert.equal((await guard(request(nextToken))).status,200);
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await deniedBody(await guard(request(nextToken)),403);
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            version=(await pool.query('SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub])).rows[0].auth_version;
+            assert.ok(version>1);
+            await deniedBody(await guard(request(nextToken)),403);
+            const rotatedJti=randomUUID();await newLedger(rotatedJti);const rotated=issue({jti:rotatedJti,version});
+            assert.equal((await guard(request(rotated))).status,200);
+            console.log('V425_PHOTO_LOGOUT_ROLE_VERSION_FENCE_PASS: logout, revoke, reactivation and stale version blocked; refreshed JTI allowed');
+            // Transaction keeps membership and JTI shared locks until R48 finishes reading bytes.
+            reached=new Promise(r=>{signalEntered=r});released=new Promise(r=>{unlockDownload=r});holdDownload=true;
+            let endWait=false;
+            const pending=guard(request(rotated));
+            await Promise.race([reached,new Promise((_,reject)=>setTimeout(()=>reject(Error('V425_FETCH_NOT_STARTED')),3000))]);
+            const c=await pool.connect();
+            try{
+              await c.query('BEGIN');await c.query("SET LOCAL lock_timeout='350ms'");
+              await assert.rejects(()=>c.query('UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2',[shop,sub]),e=>e.code==='55P03');
+              await c.query('ROLLBACK');
+            }finally{c.release();holdDownload=false;unlockDownload()}
+            const finished=await pending;assert.equal(finished.status,200);await finished.arrayBuffer();
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await deniedBody(await guard(request(rotated)),403);
+            console.log('V425_CONCURRENT_PHOTO_READ_REVOKE_LOCK_PASS: photo read holds membership lock; concurrent revoke waits and next read is rejected');
+            console.log('V425_FINAL_NO_GO_HOLD: fake R48 repository/storage, ephemeral key, QA-only guard and PG; existing R48 and live HTTP/Worker unchanged');
+          }finally{await pool.end();}
+          NODEJS
+          node --check "$RUNNER_TEMP/car02-v425-photo-boundary-qa.mjs"
+          node "$RUNNER_TEMP/car02-v425-photo-boundary-qa.mjs" | tee "$RUNNER_TEMP/car02-v425-photo-boundary-qa.log"
+          for marker in \
+            V425_R48_SIGNED_STAFF_PHOTO_PASS \
+            V425_BAD_CLAIMS_AND_TENANT_DENIED_PASS \
+            V425_RAW_R48_STALE_ACTOR_GAP_CONFIRMED \
+            V425_PHOTO_LOGOUT_ROLE_VERSION_FENCE_PASS \
+            V425_CONCURRENT_PHOTO_READ_REVOKE_LOCK_PASS \
+            V425_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v425-photo-boundary-qa.log"
           done
