@@ -1,0 +1,276 @@
+name: CAR02 V4.32 Post-Commit Snapshot Repair Isolation (NO_GO HOLD)
+# QA ONLY: immutable reviewed R13/R46/V41; disposable PG17; synthetic provider freshness.
+# Successful CI means MODEL tests passed, NOT production auth freshness or release approval.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v432-post-commit-snapshot-fix-qa.yml'
+      - 'R13_MIGRATION_QA_ONLY.sql'
+      - 'R46_STAFF_GRANTS_QA_ONLY.sql'
+      - 'CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolate-generation:
+    name: Real PG17 sealed generation MODEL and Ed25519 checks (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v432_disposable_only
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v432_disposable_only
+    steps:
+      - name: Checkout source read-only, no persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Isolated exact-schema PG17 signed-session generation QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          for v in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN GITHUB_TOKEN; do
+            test -z "${!v:-}" || { echo "Unexpected production-like secret env: $v" >&2; exit 1; }
+          done
+          for f in R13_MIGRATION_QA_ONLY.sql R46_STAFF_GRANTS_QA_ONLY.sql CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          test "$(git hash-object R13_MIGRATION_QA_ONLY.sql)" = '5136872276b3403f036bae768410c937119398b2'
+          test "$(git hash-object R46_STAFF_GRANTS_QA_ONLY.sql)" = '2a63ac0788cb6b0deb6bb3f9ca30db4da752b9fc'
+          test "$(git hash-object CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql)" = '07211b0f20673a48cf0b185acd0c33f937611470'
+          grep -Eq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          pg_isready -h 127.0.0.1 -p 55432 -U postgres -d postgres
+          pg() { docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$RUNNER_TEMP:/scratch:ro" \
+            postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55432 -U postgres "$@"; }
+          for r in service_role anon authenticated; do pg -d postgres -c "CREATE ROLE $r NOLOGIN" >/dev/null; done
+          pg -d postgres -c 'CREATE DATABASE car02_v432_disposable' >/dev/null
+          cat > "$RUNNER_TEMP/v432.sql" <<'PGSQL'
+          \set ON_ERROR_STOP on
+          DO $$BEGIN IF current_setting('server_version_num')::integer NOT BETWEEN 170000 AND 179999 THEN
+           RAISE EXCEPTION 'V432_PG17_REQUIRED'; END IF; END$$;
+          CREATE TABLE public.ksh_demo_shop_settings(shop_code text PRIMARY KEY);
+          CREATE TABLE public.ksh_demo_customers(id uuid PRIMARY KEY,shop_code text NOT NULL);
+          CREATE TABLE public.ksh_demo_vehicles(id uuid PRIMARY KEY,shop_code text NOT NULL,customer_id uuid NOT NULL);
+          CREATE TABLE public.ksh_demo_reservations(id uuid PRIMARY KEY,shop_code text NOT NULL,customer_id uuid NOT NULL,vehicle_id uuid NOT NULL);
+          INSERT INTO public.ksh_demo_shop_settings VALUES ('street_house_kitsuki'),('qa-other-shop');
+          INSERT INTO public.ksh_demo_customers VALUES ('00000000-0000-0000-0000-000000000121','street_house_kitsuki');
+          INSERT INTO public.ksh_demo_vehicles VALUES ('00000000-0000-0000-0000-000000000122','street_house_kitsuki','00000000-0000-0000-0000-000000000121');
+          \i /workspace/R13_MIGRATION_QA_ONLY.sql
+          \i /workspace/R46_STAFF_GRANTS_QA_ONLY.sql
+          \i /workspace/CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          -- QA MODEL: a trusted, independently fresh provider credential MUST already have been
+          -- established out of band. Live Supabase Auth DOES NOT provide this proof here.
+          -- These synthetic rows simulate that absent provider-side attestation, and do not solve it.
+          CREATE TABLE public.v432_qa_provider_proofs (
+           id uuid PRIMARY KEY, shop_code text NOT NULL, user_sub uuid NOT NULL,
+           attested_version integer NOT NULL, attested_fresh boolean NOT NULL,
+           created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+          );
+          CREATE TABLE public.v432_qa_sessions (
+           jti uuid PRIMARY KEY, proof_id uuid NOT NULL REFERENCES public.v432_qa_provider_proofs(id),
+           shop_code text NOT NULL, user_sub uuid NOT NULL, staff_role text NOT NULL,
+           auth_version integer NOT NULL, revoked boolean NOT NULL DEFAULT false,
+           created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+          );
+          -- No grants to PUBLIC/anon/authenticated; not a deployable schema or function.
+          REVOKE ALL ON public.v432_qa_provider_proofs, public.v432_qa_sessions FROM PUBLIC,anon,authenticated;
+          CREATE FUNCTION public.v432_qa_mint(p_jti uuid,p_proof uuid,p_shop text,p_sub uuid,
+           p_role text,p_version integer,p_hold_seconds numeric DEFAULT 0)
+          RETURNS boolean LANGUAGE plpgsql AS $f$
+          DECLARE m record; a record; v uuid;
+          BEGIN
+           IF p_hold_seconds<0 OR p_hold_seconds>2 THEN RETURN false; END IF;
+           -- Row lock makes session generation and revocation linearizable for THIS model.
+           SELECT active,staff_role,auth_version INTO m FROM public.ksh_car02_staff_access
+           WHERE shop_code=p_shop AND user_sub=p_sub FOR UPDATE;
+           IF NOT FOUND OR m.active IS DISTINCT FROM TRUE OR m.staff_role IS DISTINCT FROM p_role
+              OR m.auth_version IS DISTINCT FROM p_version THEN RETURN false; END IF;
+           SELECT * INTO a FROM public.v432_qa_provider_proofs WHERE id=p_proof FOR SHARE;
+           IF NOT FOUND OR a.attested_fresh IS DISTINCT FROM TRUE
+              OR a.shop_code IS DISTINCT FROM p_shop OR a.user_sub IS DISTINCT FROM p_sub
+              OR a.attested_version IS DISTINCT FROM m.auth_version THEN RETURN false; END IF;
+           IF p_hold_seconds>0 THEN PERFORM pg_sleep(p_hold_seconds::double precision); END IF;
+           INSERT INTO public.v432_qa_sessions(jti,proof_id,shop_code,user_sub,staff_role,auth_version)
+           VALUES (p_jti,p_proof,p_shop,p_sub,p_role,p_version) ON CONFLICT DO NOTHING RETURNING jti INTO v;
+           RETURN v IS NOT NULL;
+          END$f$;
+          -- V4.32: authorization state is mutable within a statement; do not use STABLE snapshots.
+          -- This is MODEL-only and is NOT a substitute for row-lock recheck in real R43 writes.
+          CREATE FUNCTION public.v432_qa_authorize(p_jti uuid,p_shop text,p_sub uuid,p_role text)
+          RETURNS boolean LANGUAGE sql VOLATILE AS $f$
+           SELECT EXISTS (
+            SELECT 1 FROM public.v432_qa_sessions s
+             JOIN public.ksh_car02_staff_access m ON (m.shop_code=s.shop_code AND m.user_sub=s.user_sub)
+             JOIN public.v432_qa_provider_proofs p ON p.id=s.proof_id
+            WHERE s.jti=p_jti AND s.shop_code=p_shop AND s.user_sub=p_sub AND s.staff_role=p_role
+             AND NOT s.revoked AND m.active AND m.staff_role=s.staff_role
+             AND m.auth_version=s.auth_version AND p.attested_fresh
+             AND p.attested_version=s.auth_version AND p.user_sub=s.user_sub AND p.shop_code=s.shop_code
+           );
+          $f$;
+          INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+           VALUES('street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',true,'v432-synthetic'),
+           ('qa-other-shop','00000000-0000-0000-0000-000000004431','owner',true,'v432-synthetic');
+          -- Proof A was minted for version 1 and may NEVER be re-bound to another version.
+          INSERT INTO public.v432_qa_provider_proofs(id,shop_code,user_sub,attested_version,attested_fresh)
+          VALUES('00000000-0000-0000-0000-000000001101','street_house_kitsuki','00000000-0000-0000-0000-000000004431',1,true),
+           ('00000000-0000-0000-0000-000000001102','street_house_kitsuki','00000000-0000-0000-0000-000000004431',1,false),
+           ('00000000-0000-0000-0000-000000001103','qa-other-shop','00000000-0000-0000-0000-000000004431',1,true);
+          DO $t$BEGIN
+           IF NOT public.v432_qa_mint('00000000-0000-0000-0000-000000002101',
+           '00000000-0000-0000-0000-000000001101','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',1) THEN
+           RAISE EXCEPTION 'V432_INITIAL_ISSUE_FAILED'; END IF;
+           IF NOT public.v432_qa_authorize('00000000-0000-0000-0000-000000002101',
+           'street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff') THEN
+           RAISE EXCEPTION 'V432_INITIAL_AUTH_FAILED'; END IF;
+           IF public.v432_qa_mint('00000000-0000-0000-0000-000000002102',
+           '00000000-0000-0000-0000-000000001102','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',1)
+           OR public.v432_qa_mint('00000000-0000-0000-0000-000000002103',
+           '00000000-0000-0000-0000-000000001101','street_house_kitsuki','00000000-0000-0000-0000-000000004431','owner',1)
+           OR public.v432_qa_mint('00000000-0000-0000-0000-000000002104',
+           '00000000-0000-0000-0000-000000001101','qa-other-shop','00000000-0000-0000-0000-000000004431','owner',1)
+           OR public.v432_qa_authorize('00000000-0000-0000-0000-000000002101',
+           'qa-other-shop','00000000-0000-0000-0000-000000004431','staff')
+           THEN RAISE EXCEPTION 'V432_NEGATIVE_BOUNDARY_FAILED'; END IF;
+          END$t$;
+          \echo V432_REAL_PG17_INITIAL_PROOF_TENANT_ROLE_BOUND_PASS
+          UPDATE public.ksh_car02_staff_access SET active=false
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004431';
+          DO $t$ BEGIN
+           IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='street_house_kitsuki'
+           AND user_sub='00000000-0000-0000-0000-000000004431')<>2
+           OR public.v432_qa_authorize('00000000-0000-0000-0000-000000002101','street_house_kitsuki',
+           '00000000-0000-0000-0000-000000004431','staff')
+           THEN RAISE EXCEPTION 'V432_REVOKE_STALE_JTI_FAILED'; END IF;
+          END$t$;
+          UPDATE public.ksh_car02_staff_access SET active=true
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004431';
+          DO $t$BEGIN
+           IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='street_house_kitsuki'
+           AND user_sub='00000000-0000-0000-0000-000000004431')<>3
+           OR public.v432_qa_mint('00000000-0000-0000-0000-000000002105',
+           '00000000-0000-0000-0000-000000001101','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',3)
+           OR public.v432_qa_authorize('00000000-0000-0000-0000-000000002101','street_house_kitsuki',
+           '00000000-0000-0000-0000-000000004431','staff')
+           THEN RAISE EXCEPTION 'V432_OLD_PROVIDER_REBIND_FAILED'; END IF;
+          END$t$;
+          \echo V432_REVOKE_REACTIVATE_OLD_PROVIDER_REBIND_DENIED_PASS
+          -- A fresh, version-three attestation is a synthetic prereq, NOT currently proved by R44/R46.
+          INSERT INTO public.v432_qa_provider_proofs VALUES
+           ('00000000-0000-0000-0000-000000001301','street_house_kitsuki',
+            '00000000-0000-0000-0000-000000004431',3,true,clock_timestamp());
+          -- PostgreSQL can reorder boolean expressions; do not mix mint + authorize in a single IF.
+          DO $t$ BEGIN
+           IF NOT public.v432_qa_mint('00000000-0000-0000-0000-000000002301',
+           '00000000-0000-0000-0000-000000001301','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',3)
+           THEN RAISE EXCEPTION 'V432_FRESH_PROOF_ISSUANCE_FAILED'; END IF;
+          END$t$;
+          DO $t$ BEGIN
+           IF NOT public.v432_qa_authorize('00000000-0000-0000-0000-000000002301','street_house_kitsuki',
+           '00000000-0000-0000-0000-000000004431','staff')
+           THEN RAISE EXCEPTION 'V432_FRESH_PROOF_AUTHORIZATION_FAILED'; END IF;
+          END$t$;
+          -- Reject an accidental return to statement-start snapshot semantics.
+          DO $t$ BEGIN
+           IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_proc
+              WHERE oid='public.v432_qa_authorize(uuid,text,uuid,text)'::regprocedure AND provolatile='v')
+           THEN RAISE EXCEPTION 'V432_FRESH_AUTHORIZATION_SNAPSHOT_CONTRACT_FAILED'; END IF;
+          END$t$;
+          \echo V432_FRESH_PROOF_MINT_AUTHORIZATION_AND_SNAPSHOT_PASS
+          -- Rolling back an attempted revoke must not advance version or persist new sessions.
+          BEGIN;
+          UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code='street_house_kitsuki'
+           AND user_sub='00000000-0000-0000-0000-000000004431';
+          DO $t$BEGIN
+           IF public.v432_qa_authorize('00000000-0000-0000-0000-000000002301','street_house_kitsuki',
+           '00000000-0000-0000-0000-000000004431','staff') THEN
+           RAISE EXCEPTION 'V432_PRE_ROLLBACK_STALE_ALLOWED'; END IF;
+          END$t$;
+          ROLLBACK;
+          DO $t$BEGIN
+           IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='street_house_kitsuki'
+           AND user_sub='00000000-0000-0000-0000-000000004431')<>3
+           OR NOT public.v432_qa_authorize('00000000-0000-0000-0000-000000002301','street_house_kitsuki',
+           '00000000-0000-0000-0000-000000004431','staff') THEN
+           RAISE EXCEPTION 'V432_ROLLBACK_RESTORE_FAILED'; END IF;
+          END$t$;
+          UPDATE public.v432_qa_sessions SET revoked=true WHERE jti='00000000-0000-0000-0000-000000002301';
+          DO $t$BEGIN
+           IF public.v432_qa_authorize('00000000-0000-0000-0000-000000002301','street_house_kitsuki',
+           '00000000-0000-0000-0000-000000004431','staff') THEN RAISE EXCEPTION 'V432_JTI_REVOKED_ALLOWED'; END IF;
+          END$t$;
+          \echo V432_REAL_PG17_ROLLBACK_JTI_REVOCATION_PASS
+          PGSQL
+          pg -d car02_v432_disposable -f /scratch/v432.sql | tee "$RUNNER_TEMP/v432-output.log"
+          for marker in V432_REAL_PG17_INITIAL_PROOF_TENANT_ROLE_BOUND_PASS \
+           V432_REVOKE_REACTIVATE_OLD_PROVIDER_REBIND_DENIED_PASS \
+           V432_REAL_PG17_ROLLBACK_JTI_REVOCATION_PASS; do
+           grep -Fq "$marker" "$RUNNER_TEMP/v432-output.log"
+          done
+          # Concurrent same-JTI issuance: exactly one insert across eight independent transactions.
+          for i in $(seq 1 8); do
+            (pg -Atq -d car02_v432_disposable -c "SELECT public.v432_qa_mint('00000000-0000-0000-0000-000000002399','00000000-0000-0000-0000-000000001301','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',3)" > "$RUNNER_TEMP/writer-$i.out") &
+          done
+          wait
+          test "$(grep -l '^t$' "$RUNNER_TEMP"/writer-*.out | wc -l)" -eq 1
+          test "$(grep -l '^f$' "$RUNNER_TEMP"/writer-*.out | wc -l)" -eq 7
+          echo V432_REAL_PG17_EIGHT_WRITER_JTI_UNIQUENESS_PASS
+          # Mint holds membership row lock. Revoke waits; after revoke commits even a just-minted JTI is stale.
+          (pg -Atq -d car02_v432_disposable -c "SELECT public.v432_qa_mint('00000000-0000-0000-0000-000000002398','00000000-0000-0000-0000-000000001301','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',3,0.8)" > "$RUNNER_TEMP/mint-race.out") &
+          MINT_PID=$!
+          sleep 0.25
+          pg -d car02_v432_disposable -c "UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004431'" >/dev/null
+          wait "$MINT_PID"
+          # The issuer might start after revocation due to scheduling; both outcomes MUST deny post-commit authorization.
+          pg -Atq -d car02_v432_disposable -c "SELECT CASE WHEN public.v432_qa_authorize('00000000-0000-0000-0000-000000002398','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff') THEN 'V432_RACE_AUTH_BROKEN' ELSE 'V432_REAL_PG17_POST_COMMIT_RACE_FAIL_CLOSED_PASS' END" | tee "$RUNNER_TEMP/race.out"
+          grep -Fq V432_REAL_PG17_POST_COMMIT_RACE_FAIL_CLOSED_PASS "$RUNNER_TEMP/race.out"
+          # Re-enabling rotates to v5; previously attested v3 must NOT be reminted.
+          pg -d car02_v432_disposable -c "UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004431'" >/dev/null
+          pg -Atq -d car02_v432_disposable -c "SELECT CASE WHEN public.v432_qa_mint('00000000-0000-0000-0000-000000002397','00000000-0000-0000-0000-000000001301','street_house_kitsuki','00000000-0000-0000-0000-000000004431','staff',5) THEN 'V432_OLD_TOKEN_REBOUND' ELSE 'V432_POST_REACTIVATION_STALE_ATTESTATION_DENIED_PASS' END" | tee "$RUNNER_TEMP/stale.out"
+          grep -Fq V432_POST_REACTIVATION_STALE_ATTESTATION_DENIED_PASS "$RUNNER_TEMP/stale.out"
+          cat > "$RUNNER_TEMP/v432-crypto.cjs" <<'NODEJS'
+          const {generateKeyPairSync,sign,verify}=require('node:crypto');
+          const assert=require('node:assert/strict');
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519'); // ephemeral CI-only key, NOT deployed
+          const enc=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
+          const now=Math.floor(Date.now()/1000);
+          const base={iss:'car02-qa-only',aud:'car02-qa-only',sub:'staff:00000000-0000-0000-0000-000000004431',
+           shop:'street_house_kitsuki',role:'staff',auth_version:3,
+           proof_id:'00000000-0000-0000-0000-000000001301',jti:'00000000-0000-0000-0000-000000002301',iat:now,exp:now+90};
+          function mint(c){const data=enc({alg:'EdDSA',typ:'JWT'})+'.'+enc(c);return data+'.'+sign(null,Buffer.from(data),privateKey).toString('base64url');}
+          function accept(t,at=now,expected=base){try{
+           const p=t.split('.');if(p.length!==3)return false;
+           const h=JSON.parse(Buffer.from(p[0],'base64url'));const c=JSON.parse(Buffer.from(p[1],'base64url'));
+           if(h.alg!=='EdDSA'||h.typ!=='JWT')return false;
+           if(!verify(null,Buffer.from(p[0]+'.'+p[1]),publicKey,Buffer.from(p[2],'base64url')))return false;
+           if(!Number.isSafeInteger(c.iat)||!Number.isSafeInteger(c.exp)||c.iat>at+30||c.exp<=at||c.exp-c.iat>120)return false;
+           return ['iss','aud','sub','shop','role','auth_version','proof_id','jti'].every(k=>c[k]===expected[k]);
+           }catch{return false;}}
+          const original=mint(base);assert(accept(original));
+          assert(!accept(original.split('.').slice(0,2).join('.')+'.invalid'));
+          for(const key of ['shop','role','auth_version','proof_id','jti']){
+           const bad={...base,[key]:key==='auth_version'?4:'forged'};
+           assert(!accept(mint(bad)));assert(!accept(mint(bad),now,base));
+          }
+          const parts=original.split('.');parts[1]=enc({...base,auth_version:4});assert(!accept(parts.join('.')));
+          assert(!accept(mint({...base,exp:now-1})));assert(!accept(mint({...base,iat:now+31})));
+          assert(!accept(mint({...base,iat:now-1000,exp:now+200})));
+          assert(!accept(mint({...base,iss:'other'})));
+          assert(!accept(mint({...base,aud:'other'})));
+          console.log('V432_EPHEMERAL_ED25519_CLAIM_TAMPER_JTI_TIME_NEGATIVE_PASS');
+          NODEJS
+          node "$RUNNER_TEMP/v432-crypto.cjs"
+          # Unsolved production prerequisite deliberately retained: Supabase /user does not prove
+          # an origin credential minted for a specific CAR02 authorization generation.
+          echo V432_PROVIDER_FRESHNESS_NOT_IN_LIVE_R44_R46_NO_GO
+           echo V432_FINAL_NO_GO_HOLD_RELEASE_LOCK_TRUE
