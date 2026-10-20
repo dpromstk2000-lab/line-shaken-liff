@@ -1,0 +1,81 @@
+name: CAR02 V4.34 Generation-Bound Staff Candidate QA (NO_GO HOLD)
+# Isolated review branch only; no live Supabase, LINE, Worker, or production migrations.
+# SUCCESS validates only a candidate with trusted-interface mocks, NOT production readiness.
+on:
+  push:
+    branches:
+      - car02-v434-review-only
+    paths:
+      - 'car02-staff-generation-r434.mjs'
+      - 'car02-staff-generation-r434.test.mjs'
+      - '.github/workflows/car02-v434-auth-generation-candidate-qa.yml'
+      - 'car02-auth-providers-r46.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate-guard-tests:
+    name: Source-linked auth candidate and offline negative checks (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout read-only review code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate isolated guard and real R46 provider interface
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-staff-generation-r434.mjs
+          node --check car02-staff-generation-r434.test.mjs
+          node --test car02-staff-generation-r434.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {createSupabaseStaffTokenVerifierR46} from './car02-auth-providers-r46.mjs';
+          import {createCar02GenerationBoundStaffAuthR434,CAR02_V434_RELEASE_LOCK} from './car02-staff-generation-r434.mjs';
+          assert.equal(CAR02_V434_RELEASE_LOCK,true);
+          const edge=readFileSync('./car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          const nowSeconds=2000000000,nowMs=nowSeconds*1000;
+          const userSub='00000000-0000-0000-0000-000000004434';
+          const shopCode='street_house_kitsuki';
+          const issuer='https://v434-fixture.supabase.co/auth/v1';
+          const authR46=createSupabaseStaffTokenVerifierR46({
+            supabaseUrl:'https://v434-fixture.supabase.co',anonKey:'V434_PUBLIC_FIXTURE_ONLY',
+            nowSeconds:()=>nowSeconds,
+            fetchImpl:async()=>({ok:true,json:async()=>({id:userSub,aud:'authenticated',is_anonymous:false})})
+          });
+          const jwt=(session)=>'fixture.'+Buffer.from(JSON.stringify({
+            sub:userSub,iss:issuer,aud:'authenticated',role:'authenticated',exp:nowSeconds+600,session_id:session
+          })).toString('base64url')+'.fixture';
+          const oldJwt=jwt('00000000-0000-0000-0000-000000000101');
+          const newJwt=jwt('00000000-0000-0000-0000-000000000102');
+          let member={userSub,shopCode,active:true,role:'staff',authVersion:3,authGenerationCommittedAtMs:nowMs-50000};
+          const records=new Map([
+            [oldJwt,{verified:true,active:true,userSub,sessionId:'00000000-0000-0000-0000-000000000101',createdAtMs:nowMs-90000}],
+            [newJwt,{verified:true,active:true,userSub,sessionId:'00000000-0000-0000-0000-000000000102',createdAtMs:nowMs-1000}]
+          ]);
+          const guard=createCar02GenerationBoundStaffAuthR434({shopCode,
+            verifyStaffJwt:authR46,
+            readStaffMembership:async()=>({...member}),
+            attestProviderSession:async({accessToken})=>{
+              const row=records.get(accessToken);
+              return row?{...row,credentialSha256:createHash('sha256').update(accessToken).digest('hex')}:null;
+            },nowMs:()=>nowMs});
+          const req=(token)=>new Request('https://car02.test/no-go',{headers:{authorization:'Bearer '+token}});
+          // Real R46 does validate OLD bearer by design; it alone cannot enforce CAR02 generation.
+          assert.equal((await authR46({accessToken:oldJwt})).verified,true);
+          await assert.rejects(guard(req(oldJwt)),e=>e.code==='CAR02_UNAUTHORIZED');
+          const candidate=await guard(req(newJwt));
+          assert.equal(candidate.authVersion,3);
+          assert.equal(candidate.role,'staff');
+          member={...member,active:false,authVersion:4,authGenerationCommittedAtMs:nowMs-500};
+          await assert.rejects(guard(req(newJwt)),e=>e.code==='CAR02_UNAUTHORIZED');
+          console.log('V434_REAL_R46_INTERFACE_AND_STALE_SESSION_DENIED_PASS');
+          console.log('V434_TX_BARRIER_CANDIDATE_MOCKS_PASS');
+          console.log('V434_RELEASE_NO_GO_AUTHORITY_ADAPTERS_NOT_DEPLOYED');
+          NODE
