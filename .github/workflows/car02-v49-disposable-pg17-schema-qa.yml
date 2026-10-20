@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.19 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.20 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1668,4 +1668,151 @@ jobs:
             V419_CONCURRENT_READ_REVOKE_LOCK_PASS \
             V419_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/v419-read-boundary-qa.log"
+          done
+      - name: V4.20 R13 outbox durable-lease worker claim/retry in disposable PG17 (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          test -s "$RUNNER_TEMP/v419-read-boundary-qa.mjs"
+          cat > "$RUNNER_TEMP/v420-outbox-lease-qa.mjs" <<'NODEJS'
+          // DPRO CAR02 V4.20 - isolated outbox queue/lease QA; zero external sends.
+          // Review-only candidate. Actual R13 table + throwaway lease table on disposable PostgreSQL 17.
+          import assert from 'node:assert/strict';
+          import { randomUUID } from 'node:crypto';
+          import { createRequire } from 'node:module';
+          import { join } from 'node:path';
+          const require=createRequire(join(process.env.RUNNER_TEMP,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:16,connectionTimeoutMillis:5000});
+          const shop='street_house_kitsuki',other='qa-other-shop',kind='v420-outbox-qa';
+          const prefix='v420:'+randomUUID()+':';
+          function rejected() { const e=Error('V420_CLAIM_REJECTED');e.code='V420_CLAIM_REJECTED';throw e; }
+          async function withTx(fn){const c=await pool.connect();let started=false;try{
+           await c.query('BEGIN'); started=true;
+           const value=await fn(c);
+           await c.query('COMMIT');started=false;return value;
+          } catch(e) {if(started)await c.query('ROLLBACK');throw e;}finally{c.release()}}
+          async function claim(target,worker,leaseMs=30000){
+           if(![shop,other].includes(target)||typeof worker!=='string'||worker.length<1||worker.length>60)rejected();
+           return withTx(async c=>{
+            const r=await c.query(`SELECT o.id FROM public.ksh_car02_notification_outbox o
+              JOIN public.ksh_car02_work_orders w ON w.id=o.work_order_id
+              WHERE w.shop_code=$1 AND o.event_type=$2 AND o.dedupe_key LIKE $3
+              AND ((o.delivery_status IN ('pending','retry') AND (o.next_attempt_at IS NULL OR o.next_attempt_at<=clock_timestamp()))
+                OR (o.delivery_status='sending' AND EXISTS
+                  (SELECT 1 FROM public.car02_v420_leases_qa_only l
+                   WHERE l.outbox_id=o.id AND l.lease_until<clock_timestamp())))
+              ORDER BY o.created_at,o.id FOR UPDATE OF o SKIP LOCKED LIMIT 1`,[target,kind,prefix+'%']);
+            if(!r.rows.length)return null;
+            const id=r.rows[0].id,token=randomUUID();
+            const up=await c.query(`UPDATE public.ksh_car02_notification_outbox
+              SET delivery_status='sending',attempts=attempts+1,next_attempt_at=NULL
+              WHERE id=$1 RETURNING attempts`,[id]);
+            await c.query(`INSERT INTO public.car02_v420_leases_qa_only(outbox_id,claim_token,worker_id,lease_until)
+              VALUES($1,$2,$3,clock_timestamp()+($4::integer*interval '1 millisecond'))
+              ON CONFLICT(outbox_id) DO UPDATE SET claim_token=EXCLUDED.claim_token,
+                worker_id=EXCLUDED.worker_id,lease_until=EXCLUDED.lease_until`,[id,token,worker,leaseMs]);
+            return {id,token,attempts:up.rows[0].attempts};
+           });
+          }
+          async function settle(target,job,token,success){
+           if(![shop,other].includes(target)||typeof token!=='string')rejected();
+           return withTx(async c=>{
+            const r=await c.query(`SELECT o.delivery_status,l.claim_token,l.lease_until
+              FROM public.ksh_car02_notification_outbox o
+              JOIN public.ksh_car02_work_orders w ON w.id=o.work_order_id
+              JOIN public.car02_v420_leases_qa_only l ON l.outbox_id=o.id
+              WHERE o.id=$1 AND w.shop_code=$2 AND o.event_type=$3
+              AND o.dedupe_key LIKE $4 FOR UPDATE OF o`,[job,target,kind,prefix+'%']);
+            if(r.rows.length!==1||r.rows[0].delivery_status!=='sending'||
+               r.rows[0].claim_token!==token||new Date(r.rows[0].lease_until).getTime()<=Date.now())rejected();
+            if(success){
+              await c.query(`UPDATE public.ksh_car02_notification_outbox
+                SET delivery_status='sent',sent_at=clock_timestamp(),next_attempt_at=NULL WHERE id=$1`,[job]);
+            }else{
+              await c.query(`UPDATE public.ksh_car02_notification_outbox
+                SET delivery_status='retry',next_attempt_at=clock_timestamp()+interval '60 seconds' WHERE id=$1`,[job]);
+            }
+            await c.query('DELETE FROM public.car02_v420_leases_qa_only WHERE outbox_id=$1',[job]);
+            return success?'sent':'retry';
+           });
+          }
+          async function deny(fn){await assert.rejects(Promise.resolve().then(fn),e=>e?.code==='V420_CLAIM_REJECTED');}
+          async function seed(order,tag){const key=prefix+tag;return (await pool.query(`INSERT INTO public.ksh_car02_notification_outbox
+            (work_order_id,event_type,channel,dedupe_key) VALUES($1,$2,'LINE',$3) RETURNING id`,[order,kind,key])).rows[0].id}
+          try {
+           const v=await pool.query('SHOW server_version_num');assert.ok(Number(v.rows[0].server_version_num)>=170000 && Number(v.rows[0].server_version_num)<180000);
+           await pool.query(`CREATE TABLE public.car02_v420_leases_qa_only (
+              outbox_id uuid PRIMARY KEY REFERENCES public.ksh_car02_notification_outbox(id),
+              claim_token uuid NOT NULL,worker_id text NOT NULL,lease_until timestamptz NOT NULL)`);
+           const actual=await pool.query(`SELECT id FROM public.ksh_car02_work_orders WHERE shop_code=$1 ORDER BY created_at LIMIT 1`,[shop]);
+           assert.ok(actual.rows.length>0,'R13/R43 work order must exist');const mainOrder=actual.rows[0].id;
+           const secondary=(await pool.query(`INSERT INTO public.ksh_car02_work_orders(shop_code,status,state_version)
+           VALUES($1,'draft',1) RETURNING id`,[other])).rows[0].id;
+           for(const k of ['a','b','c'])await seed(mainOrder,k);
+           await seed(secondary,'other');
+           // R13 unique dedupe must remain effective even for multiple workers.
+           await assert.rejects(seed(mainOrder,'a'),e=>e?.code==='23505');
+           const first=await Promise.all([claim(shop,'worker-a'),claim(shop,'worker-b')]);
+           assert.ok(first.every(Boolean));assert.notEqual(first[0].id,first[1].id);
+           await deny(()=>settle(other,first[0].id,first[0].token,true));
+           assert.equal(await settle(shop,first[0].id,first[0].token,true),'sent');
+           await deny(()=>settle(shop,first[0].id,first[0].token,true));
+           console.log('V420_R13_OUTBOX_UNIQUE_AND_ATOMIC_CLAIM_PASS: independent workers lease distinct rows; R13 dedupe remains unique');
+           await deny(()=>settle(shop,first[1].id,randomUUID(),true));
+           assert.equal(await settle(shop,first[1].id,first[1].token,false),'retry');
+           const third=await claim(shop,'worker-c');assert.ok(third&&![first[0].id,first[1].id].includes(third.id));
+           await settle(shop,third.id,third.token,true);
+           assert.equal(await claim(shop,'unready-retry'),null,'future retry must not be sent early');
+           await pool.query(`UPDATE public.ksh_car02_notification_outbox SET next_attempt_at=clock_timestamp()-interval '1 second'
+           WHERE id=$1`,[first[1].id]);
+           const retry=await claim(shop,'retry-worker');assert.equal(retry.id,first[1].id);assert.equal(retry.attempts,2);
+           await deny(()=>settle(shop,retry.id,first[1].token,true));
+           assert.equal(await settle(shop,retry.id,retry.token,true),'sent');
+           console.log('V420_RETRY_TOKEN_FENCE_AND_BACKOFF_PASS: future retries withheld; stale acknowledgments rejected; latest attempt succeeds');
+           assert.equal(await claim(shop,'empty-shop'),null);
+           const outside=await claim(other,'other-shop-worker');assert.ok(outside);
+           await deny(()=>settle(shop,outside.id,outside.token,true));
+           await settle(other,outside.id,outside.token,true);
+           console.log('V420_TENANT_QUEUE_ISOLATION_PASS: shop claim and acknowledgment cannot cross tenant');
+           const leaseId=await seed(mainOrder,'lease-expiry');const aged=await claim(shop,'expired-worker',30000);
+           assert.equal(aged.id,leaseId);
+           await pool.query(`UPDATE public.car02_v420_leases_qa_only SET lease_until=clock_timestamp()-interval '1 second' WHERE outbox_id=$1`,[leaseId]);
+           const recovered=await claim(shop,'recovery-worker');assert.equal(recovered.id,leaseId);assert.notEqual(recovered.token,aged.token);assert.equal(recovered.attempts,2);
+           await deny(()=>settle(shop,aged.id,aged.token,true));
+           await settle(shop,recovered.id,recovered.token,true);
+           console.log('V420_EXPIRED_LEASE_RECOVERY_PASS: stale worker cannot acknowledge a reclaimed notification');
+           const flood=12;for(let i=0;i<flood;i++)await seed(mainOrder,'parallel-'+i);
+           const claimed=await Promise.all(Array.from({length:flood},(_,i)=>claim(shop,'parallel-worker-'+i)));
+           assert.ok(claimed.every(Boolean));assert.equal(new Set(claimed.map(c=>c.id)).size,flood);
+           await Promise.all(claimed.map(c=>settle(shop,c.id,c.token,true)));
+           const check=await pool.query(`SELECT delivery_status,count(*)::int AS n,max(attempts)::int AS max_attempt
+           FROM public.ksh_car02_notification_outbox WHERE event_type=$1 AND dedupe_key LIKE $2
+           GROUP BY delivery_status`,[kind,prefix+'%']);
+           assert.deepEqual(check.rows.map(x=>x.delivery_status),['sent']);assert.equal(check.rows[0].n,flood+5);
+           assert.equal(await claim(shop,'final-empty'),null);
+           console.log('V420_PARALLEL_WORKER_NO_DOUBLE_CLAIM_PASS: 12 competing PG connections claim distinct notifications; no duplicate rows');
+           const privilege=await pool.query(`SELECT has_table_privilege('anon','public.ksh_car02_notification_outbox','SELECT') AS anon_read,
+           has_table_privilege('authenticated','public.ksh_car02_notification_outbox','SELECT') AS authenticated_read`);
+           assert.equal(privilege.rows[0].anon_read,false);assert.equal(privilege.rows[0].authenticated_read,false);
+           console.log('V420_OUTBOX_PRIVATE_RLS_PASS: R13 outbox denied direct anonymous/authenticated reads');
+           console.log('V420_FINAL_NO_GO_HOLD: no LINE delivery performed; DB-only simulated claim/ack; leases QA table not production; external delivery exactly-once unproven');
+          }finally{await pool.end()}
+          NODEJS
+          node --check "$RUNNER_TEMP/v420-outbox-lease-qa.mjs"
+          node "$RUNNER_TEMP/v420-outbox-lease-qa.mjs" | tee "$RUNNER_TEMP/v420-outbox-lease-qa.log"
+          for marker in \
+            V420_R13_OUTBOX_UNIQUE_AND_ATOMIC_CLAIM_PASS \
+            V420_RETRY_TOKEN_FENCE_AND_BACKOFF_PASS \
+            V420_TENANT_QUEUE_ISOLATION_PASS \
+            V420_EXPIRED_LEASE_RECOVERY_PASS \
+            V420_PARALLEL_WORKER_NO_DOUBLE_CLAIM_PASS \
+            V420_OUTBOX_PRIVATE_RLS_PASS \
+            V420_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v420-outbox-lease-qa.log"
           done
