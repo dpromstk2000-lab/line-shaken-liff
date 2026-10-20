@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.11 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.12 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -7,6 +7,7 @@ on:
       - '.github/workflows/car02-v49-disposable-pg17-schema-qa.yml'
       - 'R46_STAFF_GRANTS_QA_ONLY.sql'
       - 'CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql'
+      - 'R13_MIGRATION_QA_ONLY.sql'
   workflow_dispatch:
 permissions:
   contents: read
@@ -541,3 +542,163 @@ jobs:
           test "$result" = 'true:7'
           echo 'V411_PG17_CONCURRENT_REVOKE_BLOCKED_PASS: SELECT FOR UPDATE in authorized replay holds membership lock until transaction commit'
           echo 'V411_FINAL_NO_GO_HOLD: disposable QA only; production R43 remains unmodified'
+
+      - name: V4.12 disposable PG17 full R13 migration compatibility and tenant guard (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Full unchanged R13 migration against a fresh isolated database, NEVER production.
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          for s in R13_MIGRATION_QA_ONLY.sql R46_STAFF_GRANTS_QA_ONLY.sql CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql; do
+            test -s "$s"
+          done
+          grep -Fq 'R13_BASELINE_SCHEMA_NOT_FOUND' R13_MIGRATION_QA_ONLY.sql
+          grep -Fq 'R13_EXPECTED_STORE_MISSING' R13_MIGRATION_QA_ONLY.sql
+          grep -Fq 'R13_CAR02_ALREADY_EXISTS_STOP_NO_OVERWRITE' R13_MIGRATION_QA_ONLY.sql
+          grep -Fq 'NOT AN APPROVED MIGRATION' CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          run_pg_v412() {
+            docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" \
+              -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$RUNNER_TEMP:/scratch:ro" \
+              postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55432 -U postgres "$@"
+          }
+          # Separate fresh databases avoid modifying V4.9-V4.11 QA state.
+          run_pg_v412 -d postgres -c 'CREATE DATABASE car02_v412_full'
+          run_pg_v412 -d postgres -c 'CREATE DATABASE car02_v412_negative'
+          cat > "$RUNNER_TEMP/car02-v412-full.sql" <<'PGSQL'
+          \set ON_ERROR_STOP on
+          -- Disposable PostgreSQL 17 ONLY. Minimal synthetic ksh_demo tables below,
+          -- not a copy of production schema. The full R13 file is not edited.
+          DO $$ BEGIN
+            IF current_setting('server_version_num')::integer < 170000 OR
+               current_setting('server_version_num')::integer >= 180000 THEN
+              RAISE EXCEPTION 'V412_PG17_REQUIRED';
+            END IF;
+          END $$;
+          -- These roles were provisioned in the V4.9 disposable postgres:17 service
+          -- and are cluster-level roles (shared across throwaway QA databases).
+          DO $$ BEGIN
+            IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') OR
+               NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') OR
+               NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
+              RAISE EXCEPTION 'V412_V49_DISPOSABLE_ROLES_MISSING';
+            END IF;
+          END $$;
+          CREATE TABLE public.ksh_demo_shop_settings(shop_code text PRIMARY KEY);
+          CREATE TABLE public.ksh_demo_customers(id uuid PRIMARY KEY, shop_code text NOT NULL);
+          CREATE TABLE public.ksh_demo_vehicles(id uuid PRIMARY KEY, shop_code text NOT NULL, customer_id uuid NOT NULL);
+          CREATE TABLE public.ksh_demo_reservations(id uuid PRIMARY KEY, shop_code text NOT NULL, customer_id uuid NOT NULL, vehicle_id uuid NOT NULL);
+          INSERT INTO public.ksh_demo_shop_settings(shop_code) VALUES ('street_house_kitsuki'),('qa-other-shop');
+          INSERT INTO public.ksh_demo_customers(id,shop_code) VALUES
+            ('00000000-0000-0000-0000-000000000121','street_house_kitsuki'),
+            ('00000000-0000-0000-0000-000000000123','qa-other-shop');
+          INSERT INTO public.ksh_demo_vehicles(id,shop_code,customer_id) VALUES
+            ('00000000-0000-0000-0000-000000000122','street_house_kitsuki','00000000-0000-0000-0000-000000000121');
+          -- Apply the unchanged full R13, followed by unchanged R46 and V41 review-only sources.
+          \i /workspace/R13_MIGRATION_QA_ONLY.sql
+          \i /workspace/R46_STAFF_GRANTS_QA_ONLY.sql
+          \i /workspace/CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          DO $v412$
+          DECLARE v_n integer; v_work uuid; v_msg text;
+          BEGIN
+            SELECT count(*) INTO v_n FROM pg_catalog.pg_tables
+            WHERE schemaname='public' AND tablename IN (
+              'ksh_car02_work_orders','ksh_car02_reports','ksh_car02_photos',
+              'ksh_car02_quotes','ksh_car02_decisions','ksh_car02_events',
+              'ksh_car02_operations','ksh_car02_notification_outbox');
+            IF v_n<>8 THEN RAISE EXCEPTION 'V412_R13_EXPECTED_TABLES_MISSING: %',v_n; END IF;
+            IF (SELECT count(*) FROM pg_catalog.pg_trigger
+                WHERE tgrelid='public.ksh_car02_work_orders'::regclass AND NOT tgisinternal) < 2 THEN
+              RAISE EXCEPTION 'V412_R13_WORK_ORDER_TRIGGERS_MISSING';
+            END IF;
+            IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.ksh_car02_work_orders'::regclass) OR
+               NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.ksh_car02_notification_outbox'::regclass) THEN
+              RAISE EXCEPTION 'V412_R13_RLS_REQUIRED';
+            END IF;
+            IF has_table_privilege('anon','public.ksh_car02_work_orders','SELECT') OR
+               has_table_privilege('authenticated','public.ksh_car02_work_orders','SELECT') OR
+               has_table_privilege('anon','public.ksh_car02_notification_outbox','INSERT') OR
+               has_table_privilege('authenticated','public.ksh_car02_notification_outbox','UPDATE') THEN
+              RAISE EXCEPTION 'V412_R13_FRONTEND_PRIVILEGE_LEAK';
+            END IF;
+            IF NOT has_table_privilege('service_role','public.ksh_car02_operations','INSERT') THEN
+              RAISE EXCEPTION 'V412_R13_SERVER_ROLE_MISSING';
+            END IF;
+            -- Valid draft on tenant-matching synthetic entities.
+            INSERT INTO public.ksh_car02_work_orders(shop_code,customer_id,vehicle_id)
+            VALUES ('street_house_kitsuki','00000000-0000-0000-0000-000000000121',
+                    '00000000-0000-0000-0000-000000000122') RETURNING id INTO v_work;
+            IF NOT EXISTS (SELECT 1 FROM public.ksh_car02_work_orders
+                   WHERE id=v_work AND status='draft' AND state_version=1) THEN
+              RAISE EXCEPTION 'V412_VALID_DRAFT_NOT_CREATED';
+            END IF;
+            -- Cross-tenant customer scope must reject insert, without persisting the row.
+            BEGIN
+              INSERT INTO public.ksh_car02_work_orders(shop_code,customer_id)
+              VALUES ('street_house_kitsuki','00000000-0000-0000-0000-000000000123');
+              RAISE EXCEPTION 'V412_EXPECTED_SCOPE_REJECTED';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS v_msg=MESSAGE_TEXT;
+              IF v_msg <> 'CAR02_CUSTOMER_SCOPE_MISMATCH' THEN
+                RAISE EXCEPTION 'V412_SCOPE_GUARD_FAILED: %',v_msg;
+              END IF;
+            END;
+            -- Start-state violations must fail closed.
+            BEGIN
+              INSERT INTO public.ksh_car02_work_orders(shop_code,customer_id,vehicle_id,status)
+              VALUES ('street_house_kitsuki','00000000-0000-0000-0000-000000000121',
+                      '00000000-0000-0000-0000-000000000122','pending');
+              RAISE EXCEPTION 'V412_EXPECTED_DRAFT_STATE_REJECTED';
+            EXCEPTION WHEN OTHERS THEN
+              GET STACKED DIAGNOSTICS v_msg=MESSAGE_TEXT;
+              IF v_msg <> 'CAR02_ORDER_MUST_START_DRAFT_V1' THEN
+                RAISE EXCEPTION 'V412_DRAFT_GUARD_FAILED: %',v_msg;
+              END IF;
+            END;
+            -- The outbox dedupe uniqueness check is part of the full R13 schema.
+            INSERT INTO public.ksh_car02_notification_outbox(work_order_id,event_type,dedupe_key)
+            VALUES (v_work,'quote_presented','v412-only-once');
+            BEGIN
+              INSERT INTO public.ksh_car02_notification_outbox(work_order_id,event_type,dedupe_key)
+              VALUES (v_work,'quote_presented','v412-only-once');
+              RAISE EXCEPTION 'V412_EXPECTED_DEDUPE_REJECTED';
+            EXCEPTION WHEN unique_violation THEN NULL;
+            END;
+            IF (SELECT count(*) FROM public.ksh_car02_notification_outbox
+                  WHERE dedupe_key='v412-only-once')<>1 THEN
+              RAISE EXCEPTION 'V412_DUPLICATE_OUTBOX_PERSISTED';
+            END IF;
+            -- V41 backfill and guarded changes work against the complete R13 schema.
+            INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+            VALUES ('street_house_kitsuki','00000000-0000-0000-0000-000000000124',
+                    'staff',true,'v412-disposable');
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                   WHERE user_sub='00000000-0000-0000-0000-000000000124')<>1 THEN
+              RAISE EXCEPTION 'V412_R46_V41_DEFAULT_VERSION_NOT_ONE';
+            END IF;
+            UPDATE public.ksh_car02_staff_access SET active=false
+              WHERE user_sub='00000000-0000-0000-0000-000000000124';
+            IF (SELECT auth_version FROM public.ksh_car02_staff_access
+                   WHERE user_sub='00000000-0000-0000-0000-000000000124')<>2 THEN
+              RAISE EXCEPTION 'V412_R46_V41_REVOCATION_NO_ROTATION';
+            END IF;
+          END $v412$;
+          \echo 'V412_FULL_R13_PG17_PASS: unchanged R13+R46+V41, 8 tables, triggers, tenant scope, draft state, RLS, outbox dedupe, auth version bump'
+          \echo 'V412_RELEASE_HOLD: synthetic ksh_demo dependency stubs; no actual R43 runtime; no signed JWT; no production DB; NO_GO'
+          PGSQL
+          run_pg_v412 -d car02_v412_full -f /scratch/car02-v412-full.sql | tee "$RUNNER_TEMP/car02-v412-full.log"
+          grep -Fq 'V412_FULL_R13_PG17_PASS' "$RUNNER_TEMP/car02-v412-full.log"
+          grep -Fq 'V412_RELEASE_HOLD' "$RUNNER_TEMP/car02-v412-full.log"
+          # R13 must fail closed and roll back if real baseline tables are missing.
+          set +e
+          run_pg_v412 -d car02_v412_negative -f /workspace/R13_MIGRATION_QA_ONLY.sql > "$RUNNER_TEMP/car02-v412-negative.log" 2>&1
+          negative_rc=$?
+          set -e
+          test "$negative_rc" -ne 0
+          grep -Fq 'R13_BASELINE_SCHEMA_NOT_FOUND' "$RUNNER_TEMP/car02-v412-negative.log"
+          result="$(run_pg_v412 -qAt -d car02_v412_negative -c "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename LIKE 'ksh_car02_%';")"
+          test "$result" = '0'
+          echo 'V412_R13_NEGATIVE_BASELINE_PASS: migration refused missing dependencies; zero CAR02 tables remained'
+          echo 'V412_FINAL_NO_GO_HOLD: synthetic R13 fixture, source R43 unchanged, DB auth and signer blockers remain'
