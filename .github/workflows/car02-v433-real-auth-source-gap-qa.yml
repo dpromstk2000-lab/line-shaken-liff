@@ -1,0 +1,114 @@
+name: CAR02 V4.33 Original R44-R46 Generation Gap Audit (NO_GO HOLD)
+# Source-aware negative audit. Expected gap reproduction => CI SUCCESS but release remains NO_GO.
+# Synthetic in-memory identity and signing; no Supabase/Worker/LINE live network calls.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v433-real-auth-source-gap-qa.yml'
+      - 'car02-identity-r44.mjs'
+      - 'car02-auth-providers-r46.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-bound-negative-auth-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout source read only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify original R44 R46 auth generation gap without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {createHash, generateKeyPairSync, sign, verify} from 'node:crypto';
+          import {createCar02Authenticator, createCar02ReleaseGate} from './car02-identity-r44.mjs';
+          import {createStaffAccessResolverR46,createSupabaseStaffTokenVerifierR46} from './car02-auth-providers-r46.mjs';
+          const note=(name)=>console.log('V433_'+name+'_PASS');
+          const r44=readFileSync('./car02-identity-r44.mjs','utf8');
+          const r46=readFileSync('./car02-auth-providers-r46.mjs','utf8');
+          const edge=readFileSync('./car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.match(r44,/resolveStaffAccess\(\{userSub:jwt\.sub,shopCode\}\)/);
+          assert.match(r46,/SELECT shop_code,user_sub,staff_role,active\s+FROM public\.ksh_car02_staff_access/);
+          // This review is intentionally a NEGATIVE finding: original R44/R46 do not bind auth_version.
+          // If those sources change, the strict patterns above force a fresh manual assessment.
+          const userSub='00000000-0000-0000-0000-000000004433';
+          const shopCode='street_house_kitsuki';
+          const issuer='https://v433-tests.supabase.co/auth/v1';
+          const now=2000000000;
+          const claims={sub:userSub,iss:issuer,aud:'authenticated',role:'authenticated',exp:now+1000,iat:now-1000};
+          const jwt='fixture.'+Buffer.from(JSON.stringify(claims)).toString('base64url')+'.fixture';
+          let providerCalls=0;
+          const verifier=createSupabaseStaffTokenVerifierR46({supabaseUrl:'https://v433-tests.supabase.co',anonKey:'V433_TEST_PUBLIC_KEY',nowSeconds:()=>now,fetchImpl:async (url,opts)=>{
+            providerCalls++;
+            assert.equal(url,issuer+'/user');
+            assert.equal(opts.headers.Authorization,'Bearer '+jwt);
+            return {ok:true,json:async()=>({id:userSub,aud:'authenticated',is_anonymous:false})};
+          }});
+          const state={active:true,role:'staff',version:1};
+          const resolver=createStaffAccessResolverR46({lookupMembership:async({userSub:subject,shopCode:shop})=>{
+            assert.equal(subject,userSub);assert.equal(shop,shopCode);
+            return {userSub,shopCode,role:state.role,active:state.active,authVersion:state.version};
+          }});
+          const auth=createCar02Authenticator({shopCode,lineClientId:'V433_TEST_LINE_CHANNEL',
+            verifyLineIdToken:async()=>{throw Error('test intentionally has no LINE credential');},
+            verifyStaffJwt:verifier,resolveLineCustomer:async()=>{throw Error('no LINE customer');},
+            resolveStaffAccess:resolver,nowSeconds:()=>now});
+          const req=()=>new Request('https://car02.test/locked-review',{headers:{authorization:'Bearer '+jwt}});
+          const first=await auth(req());
+          assert.equal(first.role,'staff');
+          assert.equal(first.verified,true);
+          assert.equal(Object.hasOwn(first,'authVersion'),false);
+          note('REAL_R44_R46_ORIGINAL_STAFF_AUTH_CONTRACT_OBSERVED');
+          state.active=false;state.version=2;
+          await assert.rejects(auth(req()),e=>e.code==='CAR02_UNAUTHORIZED'&&e.status===401);
+          note('REVOKED_STAFF_DENIED');
+          state.active=true;state.version=3;
+          const rebound=await auth(req());
+          assert.equal(rebound.role,'staff');
+          assert.equal(Object.hasOwn(rebound,'authVersion'),false);
+          assert.equal(providerCalls,3);
+          // Expected defect, NOT a passing authorization policy: old accessToken is accepted again.
+          note('OLD_CREDENTIAL_REBOUND_GAP_REPRODUCED_NO_GO');
+          assert.equal(await createCar02ReleaseGate({systemCode:'CAR02',contracted:false,goLiveApproved:false,migrationVerified:false,verifiedIdentityBound:false,workerBackendReady:false,externalNotificationsReviewed:false})(),false);
+          note('R52_RELEASE_REMAINS_HARD_LOCKED');
+          
+          // Review-only signed generation ticket model. No actual R44/R46 runtime uses this.
+          // Issuance MUST later be authorized by independently fresh trusted provider session
+          // rather than the old access token above. The private key only exists inside CI memory.
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+          const fingerprint=t=>createHash('sha256').update(t).digest('hex');
+          const makeTicket=(token,version,signedAt=now)=>{
+           const payload=JSON.stringify({aud:'CAR02_V433_GENERATION_TICKET',shopCode,userSub,role:'staff',authVersion:version,credentialFingerprint:fingerprint(token),iat:signedAt,exp:signedAt+120});
+           return {payload,sig:sign(null,Buffer.from(payload),privateKey).toString('base64url')};
+          };
+          const ticketValid=(t,credential,tenant,version,role='staff',clock=now)=>{
+           try{
+            if(typeof t?.payload!=='string'||typeof t?.sig!=='string'||!(/^[A-Za-z0-9_-]+$/).test(t.sig))return false;
+            if(!verify(null,Buffer.from(t.payload),publicKey,Buffer.from(t.sig,'base64url')))return false;
+            const p=JSON.parse(t.payload);
+            return p.aud==='CAR02_V433_GENERATION_TICKET'&&p.shopCode===tenant&&p.userSub===userSub&&p.role===role&&
+             Number.isSafeInteger(p.authVersion)&&p.authVersion===version&&p.credentialFingerprint===fingerprint(credential)&&
+             Number.isSafeInteger(p.iat)&&Number.isSafeInteger(p.exp)&&p.iat<=clock&&clock<p.exp&&p.exp-p.iat<=120;
+           }catch{return false}
+          };
+          const old=makeTicket(jwt,1);
+          assert.equal(ticketValid(old,jwt,shopCode,1),true);
+          assert.equal(ticketValid(old,jwt,shopCode,3),false);
+          assert.equal(ticketValid(old,jwt,'other_shop',1),false);
+          assert.equal(ticketValid(old,jwt+'changed',shopCode,1),false);
+          assert.equal(ticketValid(old,jwt,shopCode,1,'owner'),false);
+          assert.equal(ticketValid(old,jwt,shopCode,1,'staff',now+121),false);
+          const modified={...old,payload:old.payload.replace('"staff"','"owner"')};
+          assert.equal(ticketValid(modified,jwt,shopCode,1,'owner'),false);
+          note('SEALED_GENERATION_TICKET_MODEL_NEGATIVES');
+          console.log('V433_RELEASE_DECISION_NO_GO_ORIGINAL_AUTH_GENERATION_BINDING_MISSING');
+          NODE
