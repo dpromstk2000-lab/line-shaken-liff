@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.17 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.18 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1377,4 +1377,144 @@ jobs:
             V417_FRESH_PROVIDER_SESSION_REISSUE_PASS \
             V417_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/car02-v417-iat-fence.log"
+          done
+      - name: V4.18 disposable signed JTI logout ledger and concurrent replay fence (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s "$RUNNER_TEMP/v414-disposable-copy/car02-pg-adapter.mjs"
+          test -s "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          test -s "$RUNNER_TEMP/v417-iat-fence-qa.mjs"
+          cat > "$RUNNER_TEMP/v418-session-jti-qa.mjs" <<'NODEJS'
+          // CAR02 V4.18: disposable signed-session jti/logout revocation ledger experiment.
+          // NOT a production adapter, signing service, user-Auth integration, or migration.
+          import assert from 'node:assert/strict';
+          import {generateKeyPairSync,randomUUID,sign,verify} from 'node:crypto';
+          import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+          import {join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          import {createRequire} from 'node:module';
+          const temp=process.env.RUNNER_TEMP;
+          const require=createRequire(join(temp,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const source=readFileSync(join(temp,'v414-disposable-copy','car02-pg-adapter.mjs'),'utf8');
+          const anchor=`        if(membership.auth_version!==actor.trustedAuthVersion)
+                    throw E('CAR02_TX_SESSION_STALE',403);
+          `;
+          assert.equal(source.split(anchor).length,2,'QA-only V414 guard anchor must match once');
+          const jtiGuard=`        // V4.18 disposable extension: session jti must remain active INSIDE same DB tx.
+                  // Lock order: staff membership first, session jti second, operation record last.
+                  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.trustedSessionId||''))
+                    throw E('CAR02_TX_SESSION_ID_REQUIRED',403);
+                  const ticket=await one(c, 'SELECT active FROM public.car02_v418_staff_sessions_qa_only WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3 FOR UPDATE',
+                    [shop,actor.subject,actor.trustedSessionId]);
+                  if(!ticket || ticket.active!==true)throw E('CAR02_TX_SESSION_REVOKED',403);
+          `;
+          const guarded=source.replace(anchor,anchor+jtiGuard);
+          const dst=join(temp,'v418-disposable-copy');mkdirSync(dst,{recursive:true});
+          writeFileSync(join(dst,'car02-pg-adapter.mjs'),guarded);
+          writeFileSync(join(dst,'car02-core.mjs'),readFileSync(join(temp,'v414-disposable-copy','car02-core.mjs')));
+          const {createCar02PgAdapter}=await import(pathToFileURL(join(dst,'car02-pg-adapter.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:4,connectionTimeoutMillis:5000});
+          const adapter=createCar02PgAdapter(pool);
+          const shop='street_house_kitsuki',sub='00000000-0000-0000-0000-000000000418';
+          const customerId='00000000-0000-0000-0000-000000000121',vehicleId='00000000-0000-0000-0000-000000000122';
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+          const now=()=>Math.floor(Date.now()/1000),b64=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
+          const unpack=s=>JSON.parse(Buffer.from(s,'base64url').toString('utf8'));
+          const err=code=>{const e=Error(code);e.code=code;throw e};
+          function issue(jti){
+            const hdr=b64({alg:'EdDSA',typ:'JWT'}),payload=b64({iss:'car02-v418-qa-only',aud:'car02-v418-disposable',sub,shop,role:'staff',authVersion:1,jti,iat:now(),exp:now()+120});
+            const signed=hdr+'.'+payload;return signed+'.'+sign(null,Buffer.from(signed),privateKey).toString('base64url');
+          }
+          function verifyToken(token){
+            if(typeof token!=='string'||!/^[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+$/.test(token))err('V418_BAD_SIGNATURE');
+            const parts=token.split('.');let h,p;try{h=unpack(parts[0]);p=unpack(parts[1])}catch{err('V418_BAD_SIGNATURE')}
+            if(h?.alg!=='EdDSA'||h?.typ!=='JWT'||p?.iss!=='car02-v418-qa-only'||p?.aud!=='car02-v418-disposable'||
+               p?.sub!==sub||p?.shop!==shop||p?.role!=='staff'||p?.authVersion!==1||
+               !Number.isSafeInteger(p?.iat)||!Number.isSafeInteger(p?.exp)||p.iat>now()||p.exp<=now()||p.exp-p.iat>120||
+               typeof p?.jti!=='string'||!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(p.jti))err('V418_BAD_SIGNATURE');
+            if(!verify(null,Buffer.from(parts[0]+'.'+parts[1]),publicKey,Buffer.from(parts[2],'base64url')))err('V418_BAD_SIGNATURE');
+            return p;
+          }
+          const intent={op:'v418-jti-logout-qa-only',customerId,vehicleId,reservationId:null};
+          async function tx(token,key,fn=async t=>{await t.assertLinks({customerId,vehicleId,reservationId:null});return t.create({customerId,vehicleId,reservationId:null});}){
+            const p=verifyToken(token);
+            const actor=Object.freeze({verified:true,role:p.role,subject:p.sub,shopCode:p.shop,trustedAuthVersion:p.authVersion,trustedSessionId:p.jti});
+            return adapter.transaction({actor,shop,key,intent},fn);
+          }
+          async function denied(p,code){await assert.rejects(Promise.resolve().then(p),e=>e?.code===code||e?.message===code,code)}
+          const count=async()=>Number((await pool.query('SELECT count(*)::int AS n FROM public.ksh_car02_work_orders WHERE shop_code=$1',[shop])).rows[0].n);
+          async function grant(jti){await pool.query('INSERT INTO public.car02_v418_staff_sessions_qa_only(shop_code,user_sub,session_id,active) VALUES ($1,$2,$3,true)',[shop,sub,jti]);}
+          async function revoke(jti){await pool.query('UPDATE public.car02_v418_staff_sessions_qa_only SET active=false,revoked_at=now() WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3',[shop,sub,jti]);}
+          try{
+            await pool.query(`CREATE TABLE public.car02_v418_staff_sessions_qa_only(
+              shop_code text NOT NULL,user_sub uuid NOT NULL,session_id uuid NOT NULL,
+              active boolean NOT NULL DEFAULT true,issued_at timestamptz NOT NULL DEFAULT now(),revoked_at timestamptz,
+              PRIMARY KEY(shop_code,user_sub,session_id)
+            )`);
+            await pool.query('ALTER TABLE public.car02_v418_staff_sessions_qa_only ENABLE ROW LEVEL SECURITY');
+            await pool.query('REVOKE ALL ON public.car02_v418_staff_sessions_qa_only FROM PUBLIC,anon,authenticated');
+            await pool.query('GRANT SELECT,INSERT,UPDATE ON public.car02_v418_staff_sessions_qa_only TO service_role');
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+              VALUES($1,$2,'staff',true,'v418-disposable-session-ledger')`,[shop,sub]);
+            const before=await count(),oldJti=randomUUID();await grant(oldJti);
+            const token=issue(oldJti),key='v418-jti-logout-idempotency';
+            const first=await tx(token,key);assert.equal(first.status,'draft');
+            let callback=false;
+            const replay=await tx(token,key,async()=>{callback=true;throw Error('V418_DUPLICATE_OPERATION')});
+            assert.equal(replay.id,first.id);assert.equal(callback,false);assert.equal(await count(),before+1);
+            const parts=token.split('.');const forged={...unpack(parts[1]),jti:randomUUID()};
+            await denied(()=>tx(parts[0]+'.'+b64(forged)+'.'+parts[2],'v418-forged-jti'),'V418_BAD_SIGNATURE');
+            assert.equal(await count(),before+1);
+            console.log('V418_SIGNED_JTI_TENANT_SCOPE_PASS: authentic jti accepted; tampered jti rejected; duplicate not written');
+            await revoke(oldJti);
+            const membership=(await pool.query('SELECT active,auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub])).rows[0];
+            assert.equal(membership.active,true);assert.equal(membership.auth_version,1);
+            await denied(()=>tx(token,key),'CAR02_TX_SESSION_REVOKED');
+            await denied(()=>tx(token,'v418-old-token-new-operation'),'CAR02_TX_SESSION_REVOKED');
+            assert.equal(await count(),before+1);
+            console.log('V418_LOGOUT_REPLAY_AND_WRITE_DENIED_PASS: signed token still valid but session ledger revoked; membership version unchanged');
+            const freshJti=randomUUID();await grant(freshJti);const refreshed=issue(freshJti);
+            assert.equal((await tx(refreshed,key,()=>{throw Error('V418_NEW_JTI_DUPLICATE')})).id,first.id);
+            assert.equal(await count(),before+1);
+            console.log('V418_NEW_JTI_IDEMPOTENT_REPLAY_PASS: new session can replay original receipt without creating new work');
+            // Concurrency: a transaction holding the JTI row lock is allowed to commit first.
+            // A second connection's logout must not bypass that row lock.
+            let entered,release;const didEnter=new Promise(r=>{entered=r}),mayFinish=new Promise(r=>{release=r});
+            const held=tx(refreshed,'v418-concurrent-transaction',async t=>{
+              entered();await mayFinish;await t.assertLinks({customerId,vehicleId,reservationId:null});
+              return t.create({customerId,vehicleId,reservationId:null});
+            });
+            await didEnter;
+            const competing=await pool.connect();let caught;
+            try{
+              await competing.query('SET statement_timeout=500');
+              const pending=competing.query(`UPDATE public.car02_v418_staff_sessions_qa_only
+                SET active=false,revoked_at=now() WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3`,[shop,sub,freshJti]).then(()=>null,e=>e);
+              await new Promise(r=>setTimeout(r,850));release();
+              assert.equal((await held).status,'draft');caught=await pending;
+            }finally{release();competing.release()}
+            assert.equal(caught?.code,'57014');
+            assert.equal((await pool.query('SELECT active FROM public.car02_v418_staff_sessions_qa_only WHERE session_id=$1',[freshJti])).rows[0].active,true);
+            assert.equal(await count(),before+2);
+            await revoke(freshJti);
+            await denied(()=>tx(refreshed,'v418-concurrent-transaction'),'CAR02_TX_SESSION_REVOKED');
+            console.log('V418_CONCURRENT_LOGOUT_ROW_LOCK_PASS: logout cannot overtake an already authorized transaction; subsequent calls blocked');
+            console.log('V418_FINAL_NO_GO_HOLD: isolated CI-only session ledger; no provider logout webhook, no deployed jti storage or real signer, HTTP/Worker unchanged');
+          } finally {await pool.end()}
+          NODEJS
+          node --check "$RUNNER_TEMP/v418-session-jti-qa.mjs"
+          node "$RUNNER_TEMP/v418-session-jti-qa.mjs" | tee "$RUNNER_TEMP/v418-session-jti-qa.log"
+          for marker in \
+            V418_SIGNED_JTI_TENANT_SCOPE_PASS \
+            V418_LOGOUT_REPLAY_AND_WRITE_DENIED_PASS \
+            V418_NEW_JTI_IDEMPOTENT_REPLAY_PASS \
+            V418_CONCURRENT_LOGOUT_ROW_LOCK_PASS \
+            V418_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v418-session-jti-qa.log"
           done
