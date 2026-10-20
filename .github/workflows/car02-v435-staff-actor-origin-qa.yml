@@ -1,0 +1,51 @@
+name: CAR02 V4.35 Staff Actor Origin Boundary (NO_GO HOLD)
+# Isolated review branch only; original V4.34 module unchanged.
+# NO production DB, Worker, LINE, Supabase or external Auth calls.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-staff-authority-r435.mjs'
+      - 'car02-staff-authority-r435.test.mjs'
+      - 'car02-staff-generation-r434.mjs'
+      - 'car02-staff-generation-r434.test.mjs'
+      - '.github/workflows/car02-v435-staff-actor-origin-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-actor-origin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout review branch without stored credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate actor-origin adapter and prevent release drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node --check car02-staff-authority-r435.mjs
+          node --check car02-staff-authority-r435.test.mjs
+          node --check car02-staff-generation-r434.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V435_RELEASE_LOCK} from './car02-staff-authority-r435.mjs';
+          import {CAR02_V434_RELEASE_LOCK} from './car02-staff-generation-r434.mjs';
+          assert.equal(CAR02_V434_RELEASE_LOCK,true);
+          assert.equal(CAR02_V435_RELEASE_LOCK,true);
+          assert.match(readFileSync('./car02-edge-entry-r52.ts','utf8'),/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          const src=readFileSync('./car02-staff-authority-r435.mjs','utf8');
+          assert.match(src,/new WeakSet\(\)/);
+          assert.match(src,/issuedActors\.has\(actor\)/);
+          assert.match(src,/assertCar02StaffMutationGenerationR434/);
+          // Production entry remains permanently locked. This candidate is not wired.
+          assert.doesNotMatch(readFileSync('./car02-edge-entry-r52.ts','utf8'),/staff-authority-r435/);
+          console.log('V435_SOURCE_BOUND_ACTOR_CAPABILITY_AND_RELEASE_LOCK_PASS');
+          console.log('V435_REAL_PROVIDER_ATTESTATION_AND_POST_COMMIT_FENCE_MISSING_NO_GO');
+          NODE
