@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.21 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.22 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1940,4 +1940,175 @@ jobs:
             V421_PARALLEL_CLAIM_SINGLE_WINNER_PASS \
             V421_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/v421-remote-ambiguity-qa.log"
+          done
+      - name: V4.22 dual-owner manual notification reconciliation and immutable audit (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          test -s "$RUNNER_TEMP/v421-remote-ambiguity-qa.log"
+          cat > "$RUNNER_TEMP/v422-manual-reconciliation-qa.mjs" <<'NODEJS'
+          // DPRO CAR02 V4.22: post-ambiguity manual review gate, DISPOSABLE QA ONLY.
+          // Never calls LINE or Supabase. No remote delivery proof is claimed.
+          import assert from 'node:assert/strict';
+          import {randomUUID, createHash} from 'node:crypto';
+          import {createRequire} from 'node:module';
+          import {join} from 'node:path';
+          const require=createRequire(join(process.env.RUNNER_TEMP,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:20,connectionTimeoutMillis:6000});
+          const shop='street_house_kitsuki', other='qa-other-shop', kind='v422-review-qa';
+          const marker='v422:'+randomUUID()+':';
+          const owner1='00000000-0000-0000-0000-000000004221';
+          const owner2='00000000-0000-0000-0000-000000004222';
+          const staff='00000000-0000-0000-0000-000000004223';
+          const fp=s=>createHash('sha256').update(s).digest('hex');
+          function refused(){const e=Error('V422_MANUAL_REVIEW_DENIED');e.code='V422_MANUAL_REVIEW_DENIED';throw e;}
+          async function denied(fn){await assert.rejects(Promise.resolve().then(fn),e=>e?.code==='V422_MANUAL_REVIEW_DENIED');}
+          async function tx(fn){const c=await pool.connect();let open=false;try{await c.query('BEGIN');open=true;const value=await fn(c);await c.query('COMMIT');open=false;return value;}catch(e){if(open)await c.query('ROLLBACK');throw e;}finally{c.release();}}
+          async function ownerCheck(c,target,sub,expected){
+           const p=await c.query(`SELECT staff_role,active,auth_version FROM public.ksh_car02_staff_access
+           WHERE shop_code=$1 AND user_sub=$2 FOR UPDATE`,[target,sub]);
+           if(p.rows.length!==1||p.rows[0].staff_role!=='owner'||p.rows[0].active!==true||
+             !Number.isSafeInteger(expected)||Number(p.rows[0].auth_version)!==expected)refused();
+          }
+          async function seed(tag,target=shop){
+           const w=await pool.query(`SELECT id FROM public.ksh_car02_work_orders WHERE shop_code=$1 LIMIT 1`,[target]);
+           assert.equal(w.rows.length,1);
+           return tx(async c=>{
+            const o=await c.query(`INSERT INTO public.ksh_car02_notification_outbox(work_order_id,event_type,channel,dedupe_key,delivery_status,attempts,next_attempt_at)
+            VALUES($1,$2,'LINE',$3,'failed',1,NULL) RETURNING id`,[w.rows[0].id,kind,marker+tag]);
+            await c.query(`INSERT INTO public.car02_v421_attempts_qa_only(outbox_id,claim_token,phase)
+            VALUES($1,$2,'ambiguous')`,[o.rows[0].id,randomUUID()]);
+            return o.rows[0].id;
+           });
+          }
+          async function assertAmbiguous(c,id,target){
+           const o=await c.query(`SELECT o.id,o.delivery_status,o.next_attempt_at,o.sent_at
+           FROM public.ksh_car02_notification_outbox o JOIN public.ksh_car02_work_orders w ON w.id=o.work_order_id
+           WHERE o.id=$1 AND w.shop_code=$2 AND o.event_type=$3 AND o.dedupe_key LIKE $4
+           FOR UPDATE OF o`,[id,target,kind,marker+'%']);
+           if(o.rows.length!==1||o.rows[0].delivery_status!=='failed'||o.rows[0].next_attempt_at!==null||o.rows[0].sent_at!==null)refused();
+           const a=await c.query(`SELECT phase FROM public.car02_v421_attempts_qa_only WHERE outbox_id=$1 ORDER BY seq DESC LIMIT 1`,[id]);
+           if(a.rows.length!==1||a.rows[0].phase!=='ambiguous')refused();
+          }
+          async function openReview({id,target=shop,sub,version,evidence}){return tx(async c=>{
+           await assertAmbiguous(c,id,target);
+           await ownerCheck(c,target,sub,version);
+           if(typeof evidence!=='string'||evidence.length<16||evidence.length>200)refused();
+           const r=await c.query(`INSERT INTO public.car02_v422_review_qa_only(outbox_id,shop_code,state,opened_by,opened_version,evidence_digest)
+           VALUES($1,$2,'pending',$3,$4,$5) ON CONFLICT DO NOTHING RETURNING outbox_id`,[id,target,sub,version,fp(evidence)]);
+           if(r.rows.length!==1)refused();
+           await c.query(`INSERT INTO public.car02_v422_review_audit_qa_only(outbox_id,shop_code,actor_sub,event_type,evidence_digest)
+           VALUES($1,$2,$3,'opened',$4)`,[id,target,sub,fp(evidence)]);
+           return id;
+          });}
+          async function resolveReview({id,target=shop,sub,version,outcome,evidence}){return tx(async c=>{
+           await assertAmbiguous(c,id,target);
+           const q=await c.query(`SELECT state,opened_by,evidence_digest FROM public.car02_v422_review_qa_only WHERE outbox_id=$1 AND shop_code=$2 FOR UPDATE`,[id,target]);
+           if(q.rows.length!==1||q.rows[0].state!=='pending'||sub===q.rows[0].opened_by)refused();
+           await ownerCheck(c,target,sub,version);
+           if(!['confirmed_delivered','confirmed_not_delivered'].includes(outcome)||typeof evidence!=='string'||evidence.length<16||evidence.length>200||fp(evidence)===q.rows[0].evidence_digest)refused();
+           const u=await c.query(`UPDATE public.car02_v422_review_qa_only SET state=$3,closed_by=$4,closed_version=$5,resolution_evidence_digest=$6,resolved_at=clock_timestamp()
+           WHERE outbox_id=$1 AND shop_code=$2 AND state='pending' RETURNING state`,[id,target,outcome,sub,version,fp(evidence)]);
+           if(u.rows.length!==1)refused();
+           if(outcome==='confirmed_delivered'){
+            await c.query(`UPDATE public.ksh_car02_notification_outbox SET delivery_status='sent',sent_at=clock_timestamp(),next_attempt_at=NULL WHERE id=$1`,[id]);
+           }
+           // Verified non-delivery remains failed: intentional operator handoff, NEVER automatic requeue.
+           await c.query(`INSERT INTO public.car02_v422_review_audit_qa_only(outbox_id,shop_code,actor_sub,event_type,evidence_digest)
+           VALUES($1,$2,$3,$4,$5)`,[id,target,sub,outcome,fp(evidence)]);
+           return outcome;
+          });}
+          async function assertNoAutoRetry(id){
+           const r=await pool.query(`SELECT delivery_status,next_attempt_at FROM public.ksh_car02_notification_outbox WHERE id=$1`,[id]);
+           assert.equal(r.rows.length,1);assert.equal(r.rows[0].next_attempt_at,null);
+           assert.ok(['sent','failed'].includes(r.rows[0].delivery_status));
+           const allowed=await pool.query(`SELECT id FROM public.ksh_car02_notification_outbox WHERE id=$1 AND (delivery_status='pending' OR (delivery_status='retry' AND (next_attempt_at IS NULL OR next_attempt_at<=now())))`,[id]);
+           assert.equal(allowed.rows.length,0);
+          }
+          try{
+           const version=await pool.query('SHOW server_version_num');assert.ok(+version.rows[0].server_version_num>=170000&&+version.rows[0].server_version_num<180000);
+           await pool.query(`CREATE TABLE public.car02_v422_review_qa_only(
+            outbox_id uuid PRIMARY KEY REFERENCES public.ksh_car02_notification_outbox(id),
+            shop_code text NOT NULL, state text NOT NULL CHECK(state IN('pending','confirmed_delivered','confirmed_not_delivered')),
+            opened_by uuid NOT NULL,opened_version integer NOT NULL CHECK(opened_version>0),
+            evidence_digest text NOT NULL CHECK(length(evidence_digest)=64),
+            closed_by uuid,closed_version integer,resolution_evidence_digest text,resolved_at timestamptz,
+            opened_at timestamptz NOT NULL DEFAULT clock_timestamp()
+           )`);
+           await pool.query(`CREATE TABLE public.car02_v422_review_audit_qa_only(
+            seq bigserial PRIMARY KEY,outbox_id uuid NOT NULL REFERENCES public.ksh_car02_notification_outbox(id),
+            shop_code text NOT NULL, actor_sub uuid NOT NULL, event_type text NOT NULL,
+            evidence_digest text NOT NULL CHECK(length(evidence_digest)=64),created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+           )`);
+           await pool.query(`CREATE FUNCTION public.car02_v422_audit_immutable_qa_only() RETURNS trigger LANGUAGE plpgsql AS $$
+           BEGIN RAISE EXCEPTION 'V422_AUDIT_APPEND_ONLY' USING ERRCODE='23514';END $$`);
+           await pool.query(`CREATE TRIGGER car02_v422_audit_immutable_t BEFORE UPDATE OR DELETE ON public.car02_v422_review_audit_qa_only
+           FOR EACH ROW EXECUTE FUNCTION public.car02_v422_audit_immutable_qa_only()`);
+           for(const table of ['car02_v422_review_qa_only','car02_v422_review_audit_qa_only']){
+            await pool.query(`REVOKE ALL ON public.${table} FROM PUBLIC,anon,authenticated`);
+            const perms=await pool.query(`SELECT has_table_privilege('anon',$1,'SELECT') AS anon,has_table_privilege('authenticated',$1,'SELECT') AS auth`,['public.'+table]);
+            assert.equal(perms.rows[0].anon,false);assert.equal(perms.rows[0].auth,false);
+           }
+           const membership=await pool.query(`INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+           VALUES ($1,$2,'owner',true,'v422-qa'),($1,$3,'owner',true,'v422-qa'),($1,$4,'staff',true,'v422-qa') RETURNING user_sub,auth_version`,[shop,owner1,owner2,staff]);
+           const authVersion=Object.fromEntries(membership.rows.map(x=>[x.user_sub,Number(x.auth_version)]));
+           const id=await seed('confirmed-delivered');
+           await denied(()=>openReview({id,target:other,sub:owner1,version:authVersion[owner1],evidence:'simulated-ledger-001'}));
+           await denied(()=>openReview({id,sub:staff,version:authVersion[staff],evidence:'simulated-ledger-001'}));
+           await denied(()=>openReview({id,sub:owner1,version:authVersion[owner1]+1,evidence:'simulated-ledger-001'}));
+           let c=await pool.query(`SELECT count(*)::int n FROM public.car02_v422_review_qa_only WHERE outbox_id=$1`,[id]);assert.equal(c.rows[0].n,0);
+           await openReview({id,sub:owner1,version:authVersion[owner1],evidence:'simulated-ledger-001'});
+           await denied(()=>openReview({id,sub:owner1,version:authVersion[owner1],evidence:'simulated-ledger-001'}));
+           await denied(()=>resolveReview({id,sub:owner1,version:authVersion[owner1],outcome:'confirmed_delivered',evidence:'independent-proof-002'}));
+           await denied(()=>resolveReview({id,target:other,sub:owner2,version:authVersion[owner2],outcome:'confirmed_delivered',evidence:'independent-proof-002'}));
+           await denied(()=>resolveReview({id,sub:staff,version:authVersion[staff],outcome:'confirmed_delivered',evidence:'independent-proof-002'}));
+           console.log('V422_REVIEW_OWNER_TENANT_DUAL_CONTROL_PASS: owner scope/version checked; staff, cross-shop and self-approval rejected');
+           // Revoke the second reviewer: stale credentials fail even with an open review.
+           await pool.query(`UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2`,[shop,owner2]);
+           await denied(()=>resolveReview({id,sub:owner2,version:authVersion[owner2],outcome:'confirmed_delivered',evidence:'independent-proof-002'}));
+           await pool.query(`UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2`,[shop,owner2]);
+           await denied(()=>resolveReview({id,sub:owner2,version:authVersion[owner2],outcome:'confirmed_delivered',evidence:'independent-proof-002'}));
+           const latest=await pool.query(`SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2`,[shop,owner2]);
+           const rotated=Number(latest.rows[0].auth_version);assert.ok(rotated>authVersion[owner2]);
+           const attempts=await Promise.allSettled(Array.from({length:8},()=>resolveReview({id,sub:owner2,version:rotated,outcome:'confirmed_delivered',evidence:'independent-proof-002'})));
+           assert.equal(attempts.filter(x=>x.status==='fulfilled').length,1);
+           assert.equal(attempts.filter(x=>x.status==='rejected'&&x.reason.code==='V422_MANUAL_REVIEW_DENIED').length,7);
+           await assertNoAutoRetry(id);
+           c=await pool.query(`SELECT state,opened_by,closed_by FROM public.car02_v422_review_qa_only WHERE outbox_id=$1`,[id]);
+           assert.equal(c.rows[0].state,'confirmed_delivered');assert.notEqual(c.rows[0].opened_by,c.rows[0].closed_by);
+           console.log('V422_REVOKED_REVIEWER_AND_CONCURRENT_FINALIZE_PASS: revoked/stale credentials denied; 8 finalizers cause one irreversible decision');
+           const id2=await seed('confirmed-not-delivered');
+           await openReview({id:id2,sub:owner1,version:authVersion[owner1],evidence:'simulated-ledger-003'});
+           await resolveReview({id:id2,sub:owner2,version:rotated,outcome:'confirmed_not_delivered',evidence:'independent-proof-004'});
+           await assertNoAutoRetry(id2);
+           const s=await pool.query(`SELECT delivery_status,next_attempt_at FROM public.ksh_car02_notification_outbox WHERE id=$1`,[id2]);
+           assert.equal(s.rows[0].delivery_status,'failed');
+           await denied(()=>resolveReview({id:id2,sub:owner2,version:rotated,outcome:'confirmed_delivered',evidence:'independent-proof-005'}));
+           console.log('V422_NO_DELIVERY_REVIEW_NO_AUTO_REQUEUE_PASS: finding of non-delivery remains quarantined, no implicit resend');
+           c=await pool.query(`SELECT outbox_id,count(*)::int n FROM public.car02_v422_review_audit_qa_only GROUP BY outbox_id ORDER BY outbox_id`);
+           assert.equal(c.rows.length,2);assert.ok(c.rows.every(x=>x.n===2));
+           await assert.rejects(()=>pool.query(`DELETE FROM public.car02_v422_review_audit_qa_only WHERE outbox_id=$1`,[id]),e=>e.message.includes('V422_AUDIT_APPEND_ONLY'));
+           await assert.rejects(()=>pool.query(`UPDATE public.car02_v422_review_audit_qa_only SET event_type='changed' WHERE outbox_id=$1`,[id]),e=>e.message.includes('V422_AUDIT_APPEND_ONLY'));
+           c=await pool.query(`SELECT count(*)::int n FROM public.car02_v422_review_audit_qa_only WHERE outbox_id=$1`,[id]);assert.equal(c.rows[0].n,2);
+           console.log('V422_AUDIT_APPEND_ONLY_PRIVATE_PASS: two non-deletable hashed-evidence events per reviewed notification; no public table access');
+           const remote=await pool.query(`SELECT count(*)::int n FROM public.car02_v421_attempts_qa_only WHERE outbox_id IN($1,$2)`,[id,id2]);
+           assert.equal(remote.rows[0].n,2);
+           console.log('V422_FINAL_NO_GO_HOLD: manual evidence SIMULATED, no proof of LINE delivery, QA-only tables/owners, no live Worker/HTTP/R43 mutation; production release remains blocked');
+          }finally{await pool.end();}
+          NODEJS
+          node --check "$RUNNER_TEMP/v422-manual-reconciliation-qa.mjs"
+          node "$RUNNER_TEMP/v422-manual-reconciliation-qa.mjs" | tee "$RUNNER_TEMP/v422-manual-reconciliation-qa.log"
+          for marker in \
+            V422_REVIEW_OWNER_TENANT_DUAL_CONTROL_PASS \
+            V422_REVOKED_REVIEWER_AND_CONCURRENT_FINALIZE_PASS \
+            V422_NO_DELIVERY_REVIEW_NO_AUTO_REQUEUE_PASS \
+            V422_AUDIT_APPEND_ONLY_PRIVATE_PASS \
+            V422_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v422-manual-reconciliation-qa.log"
           done
