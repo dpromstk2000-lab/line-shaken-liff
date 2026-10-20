@@ -1,0 +1,95 @@
+name: CAR02 V4.38 Durable Idempotency Receipt and Ambiguous COMMIT PG17 QA (NO_GO HOLD)
+# ONLY car02-v434-review-only. Synthetic offline DB and mocked provider; NO production connections.
+# SUCCESS validates a review candidate, NOT real Supabase auth, R13 migration or deployment readiness.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-idempotency-r438.mjs'
+      - 'car02-idempotency-r438.test.mjs'
+      - 'car02-v438-disposable-pg17.sql'
+      - 'car02-staff-generation-r434.mjs'
+      - 'car02-staff-authority-r435.mjs'
+      - 'car02-transaction-gate-r436.mjs'
+      - 'car02-tenant-cas-gate-r437.mjs'
+      - '.github/workflows/car02-v438-idempotent-receipt-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-commit-receipt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v438_disposable_only
+        ports:
+          - 55438:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v438_disposable_only
+    steps:
+      - name: Checkout isolated review branch, no persistent credential
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Source safety and 64 offline negative/positive tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CAR02_DATABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!name:-}" || { echo "Unexpected live env: $name" >&2; exit 1; }
+          done
+          for file in car02-staff-generation-r434.mjs car02-staff-authority-r435.mjs car02-transaction-gate-r436.mjs car02-tenant-cas-gate-r437.mjs car02-idempotency-r438.mjs car02-idempotency-r438.test.mjs car02-v438-disposable-pg17.sql; do
+            test -s "$file"
+          done
+          node --check car02-idempotency-r438.mjs
+          node --check car02-idempotency-r438.test.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs car02-idempotency-r438.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V438_RELEASE_LOCK,CAR02_V438_MUTATE_SQL,CAR02_V438_RECEIPT_SQL} from './car02-idempotency-r438.mjs';
+          assert.equal(CAR02_V438_RELEASE_LOCK,true);
+          assert.equal(CAR02_V438_MUTATE_SQL,'SELECT public.v438_qa_apply_touch($1::text,$2::uuid,$3::uuid,$4::uuid,$5::integer) AS receipt');
+          assert.equal(CAR02_V438_RECEIPT_SQL,'SELECT shop_code,actor_sub,request_key,order_id,expected_version,new_version FROM public.v438_qa_receipts WHERE shop_code=$1 AND actor_sub=$2 AND request_key=$3');
+          const liveEntry=readFileSync('./car02-edge-entry-r52.ts','utf8');
+          assert.match(liveEntry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(liveEntry,/car02-idempotency-r438|car02-v438-disposable-pg17/);
+          for(const file of ['car02-staff-generation-r434.mjs','car02-staff-authority-r435.mjs','car02-transaction-gate-r436.mjs','car02-tenant-cas-gate-r437.mjs']){
+            assert.match(readFileSync(file,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V438_ORIGINAL_RELEASE_LOCKS_AND_LITERAL_SQL_PASS');
+          console.log('V438_PROVIDER_SESSION_ATTESTATION_NOT_IN_LIVE_R46_NO_GO');
+          NODE
+      - name: Real disposable PostgreSQL 17 receipt commit, replay, rollback and eight-writer collision
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55438 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v438_disposable' >/dev/null
+          pg -d car02_v438_disposable -f /workspace/car02-v438-disposable-pg17.sql | tee "$RUNNER_TEMP/v438-pg17.log"
+          for marker in V438_PG17_UNPRIVILEGED_ROLES_DENIED_PASS V438_PG17_DURABLE_RECEIPT_REPLAY_PASS V438_PG17_DIFFERENT_INTENT_REJECTED_PASS V438_PG17_TENANT_STALE_NO_RECEIPT_PASS V438_PG17_RECEIPT_AND_MUTATION_ROLLBACK_PASS; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v438-pg17.log"
+          done
+          # Eight separately committed sessions race with IDENTICAL key + intent.
+          # Advisory transaction lock + durable receipt must yield ONE version increment.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v438_disposable -c "SELECT public.v438_qa_apply_touch('qa_shop_a','00000000-0000-0000-0000-000000004391','00000000-0000-0000-0000-000000004386','00000000-0000-0000-0000-000000004383',1)" > "$RUNNER_TEMP/v438-race-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          for i in 1 2 3 4 5 6 7 8; do
+            grep -Fq '"newVersion": 2' "$RUNNER_TEMP/v438-race-$i.out" || grep -Fq '"newVersion":2' "$RUNNER_TEMP/v438-race-$i.out"
+          done
+          result=$(pg -Atq -d car02_v438_disposable -c "SELECT (SELECT state_version FROM public.v438_qa_orders WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004383')::text||':'||(SELECT count(*) FROM public.v438_qa_receipts WHERE request_key='00000000-0000-0000-0000-000000004386')::text")
+          test "$result" = '2:1' || { echo "V438_PARALLEL_RECEIPT_BROKEN: $result" >&2; exit 1; }
+          echo V438_PG17_EIGHT_WRITERS_ONE_DURABLE_RECEIPT_PASS
+          echo V438_REAL_PG17_IDEMPOTENCY_RELEASE_NO_GO_HOLD
