@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.15 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.16 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1083,4 +1083,142 @@ jobs:
             V415_REFRESHED_TOKEN_REPLAY_PASS \
             V415_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/car02-v415-signed-gateway.log"
+          done
+      - name: V4.16 actual R44/R46 auth-boundary to guarded R43 with disposable PG17 (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s car02-identity-r44.mjs
+          test -s car02-auth-providers-r46.mjs
+          test -f "$RUNNER_TEMP/v414-disposable-copy/car02-pg-adapter.mjs"
+          test -f "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          cat > "$RUNNER_TEMP/v416-real-r44-r46-qa.mjs" <<'NODEJS'
+          // V4.16: REAL R44/R46 source boundary -> QA-only R43 guarded adapter -> disposable PG17.
+          // Mock Supabase Auth /user explicitly replaces the external HTTP service. No live identity proof.
+          // Never import in Worker / browser or call as a production authenticator.
+          import assert from 'node:assert/strict';
+          import {createRequire} from 'node:module';
+          import {join,resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const temp=process.env.RUNNER_TEMP;
+          const root=process.env.GITHUB_WORKSPACE;
+          const req=createRequire(join(temp,'v413-deps','package.json'));
+          const {Pool}=req('pg');
+          const {createCar02PgAdapter}=await import(pathToFileURL(join(temp,'v414-disposable-copy','car02-pg-adapter.mjs')).href);
+          const {createCar02Authenticator}=await import(pathToFileURL(resolve(root,'car02-identity-r44.mjs')).href);
+          const {createSupabaseStaffTokenVerifierR46,createDbStaffMembershipLookupR46,createStaffAccessResolverR46}=
+            await import(pathToFileURL(resolve(root,'car02-auth-providers-r46.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:4,connectionTimeoutMillis:5000});
+          const adapter=createCar02PgAdapter(pool);
+          const shop='street_house_kitsuki';
+          const sub='00000000-0000-0000-0000-000000000416';
+          const customerId='00000000-0000-0000-0000-000000000121';
+          const vehicleId='00000000-0000-0000-0000-000000000122';
+          const authOrigin='https://supabase-stub.invalid';
+          const issuer=authOrigin+'/auth/v1';
+          const lineClientId='qa-line-channel-not-used';
+          const now=()=>Math.floor(Date.now()/1000);
+          const enc=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
+          // R46 never trusts jwtClaims() alone: production uses HTTPS Supabase Auth user validation.
+          // This fake token is deliberately UNTRUSTED and never used outside the QA stub.
+          const fakeAccessToken=(claims={})=>`${enc({alg:'ES256',typ:'JWT'})}.${enc({sub,iss:issuer,aud:'authenticated',role:'authenticated',exp:now()+180,...claims})}.fictional-signature`;
+          let providerCalls=0;
+          let fakeProviderResponse={id:sub,aud:'authenticated',is_anonymous:false};
+          const fetchStub=async(url,opts)=>{
+            assert.equal(url,issuer+'/user');
+            assert.equal(opts?.method,'GET');
+            assert.equal(opts?.headers?.apikey,'qa-only-anon-placeholder');
+            assert.equal(opts?.redirect,'error');
+            providerCalls++;
+            return {ok:true,json:async()=>({...fakeProviderResponse})};
+          };
+          const verifyStaffJwt=createSupabaseStaffTokenVerifierR46({supabaseUrl:authOrigin,anonKey:'qa-only-anon-placeholder',fetchImpl:fetchStub,nowSeconds:now});
+          const resolveStaffAccess=createStaffAccessResolverR46({lookupMembership:createDbStaffMembershipLookupR46({pool})});
+          const authenticate=createCar02Authenticator({shopCode:shop,lineClientId,verifyStaffJwt,resolveStaffAccess,
+            verifyLineIdToken:async()=>{throw Error('NO_REAL_LINE')},resolveLineCustomer:async()=>{throw Error('NO_REAL_LINE')},nowSeconds:now});
+          const request=(token,extra={})=>({headers:new Headers({authorization:'Bearer '+token}),body:{...extra,role:'owner',trustedAuthVersion:999999,shopCode:'attacker-shop'}});
+          const count=async()=>Number((await pool.query('SELECT count(*)::integer AS n FROM public.ksh_car02_work_orders WHERE shop_code=$1',[shop])).rows[0].n);
+          const create=async t=>{await t.assertLinks({customerId,vehicleId,reservationId:null});return t.create({customerId,vehicleId,reservationId:null});};
+          async function denied(p,code){await assert.rejects(Promise.resolve().then(p),e=>e?.code===code||e?.message===code,code);}
+          async function bridge(req,key,fn=create){
+            // R44/R46 are the only sources of the authenticated subject and role in this QA helper.
+            // The *second* version query is untrusted/stale until guarded R43 checks it FOR UPDATE.
+            // Critical: never map body.role or body.authVersion into this actor.
+            const identity=await authenticate(req);
+            if(identity.verified!==true||identity.shopCode!==shop||!identity.subject.startsWith('staff:'))throw Error('V416_STAFF_BRIDGE_REJECTED');
+            const userSub=identity.subject.slice('staff:'.length);
+            if(userSub!==sub)throw Error('V416_STAFF_BRIDGE_REJECTED');
+            const rows=(await pool.query(`SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2`,[shop,userSub])).rows;
+            if(rows.length!==1)throw Error('V416_STAFF_BRIDGE_REJECTED');
+            const actor=Object.freeze({verified:true,role:identity.role,subject:userSub,shopCode:identity.shopCode,trustedAuthVersion:rows[0].auth_version});
+            return adapter.transaction({actor,shop,key,intent:{op:'v416-r44-r46-bridge',customerId,vehicleId,reservationId:null}},fn);
+          }
+          try {
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+              VALUES ($1,$2,'staff',true,'v416-disposable')`,[shop,sub]);
+            const original=await authenticate(request(fakeAccessToken(),{role:'owner',trustedAuthVersion:2147483647}));
+            assert.deepEqual({verified:original.verified,role:original.role,subject:original.subject,shopCode:original.shopCode},
+              {verified:true,role:'staff',subject:'staff:'+sub,shopCode:shop});
+            assert.equal(original.trustedAuthVersion,undefined);
+            assert.equal(providerCalls,1);
+            console.log('V416_REAL_R44_R46_STAFF_IDENTITY_PASS: actual R44/R46 verify boundary, server DB role, client body ignored');
+            // R44's output is NOT directly accepted by guarded R43: requires internal canonicalization/version binding.
+            await denied(()=>adapter.transaction({actor:original,shop,key:'v416-direct-r44-denied',intent:{op:'v416-r44-raw'}},create),
+              'CAR02_TX_TRUSTED_STAFF_CLAIM_REQUIRED');
+            const before=await count();
+            const token=fakeAccessToken();
+            const key='v416-authorized-bridge-key';
+            const first=await bridge(request(token,{role:'owner',trustedAuthVersion:999}),key);
+            assert.equal(first.status,'draft');
+            let called=false;
+            const again=await bridge(request(token),key,()=>{called=true;throw Error('V416_DUPLICATE_CALL');});
+            assert.equal(again.id,first.id);assert.equal(called,false);assert.equal(await count(),before+1);
+            console.log('V416_R44_SUBJECT_VERSION_BRIDGE_PASS: prefixed R44 subject converted server-side; DB auth_version fenced by R43; no double insert');
+            await denied(()=>authenticate(request(fakeAccessToken({aud:'anon'}))),'CAR02_UNAUTHORIZED');
+            await denied(()=>authenticate(request(fakeAccessToken({iss:'https://evil.invalid/auth/v1'}))),'CAR02_UNAUTHORIZED');
+            await denied(()=>authenticate(request(fakeAccessToken({exp:now()-30}))),'CAR02_UNAUTHORIZED');
+            const oldProvider=fakeProviderResponse;
+            fakeProviderResponse={...oldProvider,is_anonymous:true};
+            await denied(()=>authenticate(request(token)),'CAR02_UNAUTHORIZED');
+            fakeProviderResponse={...oldProvider,id:'00000000-0000-0000-0000-000000000999'};
+            await denied(()=>authenticate(request(token)),'CAR02_UNAUTHORIZED');
+            fakeProviderResponse={...oldProvider,banned_until:'2099-01-01T00:00:00Z'};
+            await denied(()=>authenticate(request(token)),'CAR02_UNAUTHORIZED');
+            fakeProviderResponse=oldProvider;
+            await denied(()=>authenticate({headers:new Headers({authorization:'Bearer '+token,'x-line-id-token':'nonsenseidtoken'})}),'CAR02_UNAUTHORIZED');
+            assert.equal(await count(),before+1);
+            console.log('V416_R46_NEGATIVE_AUTH_PASS: wrong issuer/audience/expiry, anonymous, mismatched user, banned user, mixed tokens rejected');
+            // Revocation closes both R44/R46 membership lookup and guarded R43 for an old actor.
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await denied(()=>bridge(request(token),key),'CAR02_UNAUTHORIZED');
+            const staleActor={verified:true,role:'staff',subject:sub,shopCode:shop,trustedAuthVersion:1};
+            await denied(()=>adapter.transaction({actor:staleActor,shop,key,intent:{op:'v416-r44-r46-bridge',customerId,vehicleId,reservationId:null}},create),
+              'CAR02_TX_MEMBERSHIP_REVOKED');
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await denied(()=>adapter.transaction({actor:staleActor,shop,key,intent:{op:'v416-r44-r46-bridge',customerId,vehicleId,reservationId:null}},create),
+              'CAR02_TX_SESSION_STALE');
+            // IMPORTANT: R44/R46 returned no issuer-bound auth_version. A new DB lookup
+            // can incorrectly re-bind the *original provider token* to the newly rotated version.
+            // Reproduce this limitation; DO NOT call this a secured session issuance.
+            const revivedOldToken=await bridge(request(token),key,()=>{throw Error('V416_UNEXPECTED_REPLAY_AFTER_ROTATION')});
+            assert.equal(revivedOldToken.id,first.id);assert.equal(await count(),before+1);
+            console.log('V416_DB_LOCK_AND_REVOKE_PASS: immediate revocation denied, captured stale actor denied after reactivation');
+            console.log('V416_REACTIVATED_OLD_PROVIDER_TOKEN_GAP_CONFIRMED: R44/R46 does not cryptographically bind the JWT to auth_version; old provider token re-binds after reactivation');
+            console.log('V416_FINAL_NO_GO_HOLD: Auth /user stubbed; no production signer; R44/R46 missing version in trusted session; Worker/runtime unproven');
+          } finally {await pool.end()}
+          NODEJS
+          node --check "$RUNNER_TEMP/v416-real-r44-r46-qa.mjs"
+          node "$RUNNER_TEMP/v416-real-r44-r46-qa.mjs" | tee "$RUNNER_TEMP/car02-v416-r44-r46.log"
+          for marker in \
+            V416_REAL_R44_R46_STAFF_IDENTITY_PASS \
+            V416_R44_SUBJECT_VERSION_BRIDGE_PASS \
+            V416_R46_NEGATIVE_AUTH_PASS \
+            V416_DB_LOCK_AND_REVOKE_PASS \
+            V416_REACTIVATED_OLD_PROVIDER_TOKEN_GAP_CONFIRMED \
+            V416_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v416-r44-r46.log"
           done
