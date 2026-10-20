@@ -1,0 +1,200 @@
+name: CAR02 V4.30 Full R13-R46-V41 Auth Schema Contract (NO_GO HOLD)
+# Independent read-only checkout, disposable PG17 only. Detects current schema gaps; NOT an approved migration.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v430-r13-schema-contract-pg17-qa.yml'
+      - 'R13_MIGRATION_QA_ONLY.sql'
+      - 'R46_STAFF_GRANTS_QA_ONLY.sql'
+      - 'CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-schema-contract:
+    name: V4.30 exact R13/R46/V41 SQL compatibility in disposable PG17 (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: car02_v430_disposable_only
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: car02_v430_disposable_only
+    steps:
+      - name: Checkout QA-only source without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Apply exact review-only SQL to disposable PG17 and identify real identity contract gaps
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No production credentials, migrations, deploys, or external network calls.
+          for var in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!var:-}"
+          done
+          for f in R13_MIGRATION_QA_ONLY.sql R46_STAFF_GRANTS_QA_ONLY.sql CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql car02-edge-entry-r52.ts; do
+            test -s "$f"
+          done
+          # Git object identities anchored to the exact reviewed sources.
+          test "$(git hash-object R13_MIGRATION_QA_ONLY.sql)" = '5136872276b3403f036bae768410c937119398b2'
+          test "$(git hash-object R46_STAFF_GRANTS_QA_ONLY.sql)" = '2a63ac0788cb6b0deb6bb3f9ca30db4da752b9fc'
+          test "$(git hash-object CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql)" = '07211b0f20673a48cf0b185acd0c33f937611470'
+          grep -Eq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          pg_isready -h 127.0.0.1 -p 55432 -U postgres -d postgres
+          run_pg() {
+            docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" \
+              -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$RUNNER_TEMP:/scratch:ro" \
+              postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55432 -U postgres "$@"
+          }
+          # All roles and data are synthetic, created only inside the disposable PG17 service.
+          for role in service_role anon authenticated; do
+            run_pg -d postgres -c "CREATE ROLE $role NOLOGIN" > /dev/null
+          done
+          run_pg -d postgres -c 'CREATE DATABASE car02_v430_disposable' > /dev/null
+          cat > "$RUNNER_TEMP/car02-v430-contract.sql" <<'PGSQL'
+          \set ON_ERROR_STOP on
+          DO $$ BEGIN
+           IF current_setting('server_version_num')::int NOT BETWEEN 170000 AND 179999 THEN
+            RAISE EXCEPTION 'V430_REAL_POSTGRESQL_17_REQUIRED';
+           END IF;
+          END $$;
+          -- Same minimal ksh_demo prerequisite shape used by the V4.12 full-R13 PASS.
+          CREATE TABLE public.ksh_demo_shop_settings(shop_code text PRIMARY KEY);
+          CREATE TABLE public.ksh_demo_customers(id uuid PRIMARY KEY, shop_code text NOT NULL);
+          CREATE TABLE public.ksh_demo_vehicles(id uuid PRIMARY KEY, shop_code text NOT NULL, customer_id uuid NOT NULL);
+          CREATE TABLE public.ksh_demo_reservations(id uuid PRIMARY KEY, shop_code text NOT NULL, customer_id uuid NOT NULL, vehicle_id uuid NOT NULL);
+          INSERT INTO public.ksh_demo_shop_settings(shop_code) VALUES ('street_house_kitsuki'),('qa-other-shop');
+          INSERT INTO public.ksh_demo_customers(id,shop_code) VALUES
+           ('00000000-0000-0000-0000-000000000121','street_house_kitsuki'),
+           ('00000000-0000-0000-0000-000000000123','qa-other-shop');
+          INSERT INTO public.ksh_demo_vehicles(id,shop_code,customer_id) VALUES
+           ('00000000-0000-0000-0000-000000000122','street_house_kitsuki','00000000-0000-0000-0000-000000000121');
+          -- Apply exactly the three committed review-only SQL files without modifying them.
+          \i /workspace/R13_MIGRATION_QA_ONLY.sql
+          \i /workspace/R46_STAFF_GRANTS_QA_ONLY.sql
+          \i /workspace/CAR02_V41_STAFF_AUTH_VERSION_PG17_ISOLATED_REVIEW_ONLY.sql
+          DO $schema$
+          DECLARE n integer;
+          BEGIN
+           SELECT count(*) INTO n FROM pg_catalog.pg_tables
+            WHERE schemaname='public' AND tablename IN
+            ('ksh_car02_work_orders','ksh_car02_reports','ksh_car02_photos',
+             'ksh_car02_quotes','ksh_car02_decisions','ksh_car02_events',
+             'ksh_car02_operations','ksh_car02_notification_outbox');
+           IF n<>8 THEN RAISE EXCEPTION 'V430_FULL_R13_SCHEMA_MISSING'; END IF;
+           IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+             AND table_name='ksh_car02_staff_access' AND column_name='credential_not_before')
+           THEN RAISE EXCEPTION 'V430_EXPECTED_SOURCE_DRIFT_MISSING_COLUMN'; END IF;
+           IF NOT EXISTS(SELECT 1 FROM information_schema.columns
+             WHERE table_schema='public' AND table_name='ksh_car02_staff_access'
+               AND column_name='auth_version' AND data_type='integer')
+           THEN RAISE EXCEPTION 'V430_AUTH_VERSION_TYPE_DRIFT'; END IF;
+           IF NOT EXISTS(SELECT 1 FROM information_schema.columns
+             WHERE table_schema='public' AND table_name='ksh_car02_staff_access'
+               AND column_name='updated_at' AND data_type='timestamp with time zone')
+           THEN RAISE EXCEPTION 'V430_UPDATED_AT_TYPE_DRIFT'; END IF;
+           IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.ksh_car02_staff_access'::regclass)
+           OR has_table_privilege('anon','public.ksh_car02_staff_access','SELECT')
+           OR has_table_privilege('authenticated','public.ksh_car02_staff_access','SELECT')
+           THEN RAISE EXCEPTION 'V430_R46_MEMBERSHIP_RLS_GAP'; END IF;
+          END $schema$;
+          \echo V430_REAL_FULL_R13_R46_V41_SCHEMA_PASS
+          \echo V430_V429_CREDENTIAL_NOT_BEFORE_SCHEMA_GAP_CONFIRMED
+          -- A reviewed, temporary *test-only* issue-time check using existing updated_at.
+          -- IMPORTANT: updated_at is transaction_timestamp() in V4.1. It is not a durable
+          -- cryptographic session version, and alone cannot prove provider logout or commit time.
+          CREATE FUNCTION public.v430_qa_authorize(p_shop text,p_sub uuid,p_role text,
+           p_version integer,p_issued_at bigint,p_server_epoch bigint)
+          RETURNS boolean LANGUAGE plpgsql AS $auth$
+          DECLARE m record;
+          BEGIN
+           SELECT active,staff_role,auth_version,updated_at INTO m
+            FROM public.ksh_car02_staff_access
+            WHERE shop_code=p_shop AND user_sub=p_sub FOR UPDATE;
+           IF NOT FOUND THEN RETURN FALSE; END IF;
+           RETURN m.active=TRUE AND m.staff_role=p_role AND m.auth_version=p_version
+             AND p_issued_at > ceil(extract(epoch from m.updated_at))::bigint
+             AND p_issued_at <= p_server_epoch;
+          END $auth$;
+          INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+          VALUES ('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',TRUE,'ci-only');
+          DO $normal$
+          DECLARE ver integer; t timestamptz; sec bigint;
+          BEGIN
+           SELECT auth_version,updated_at INTO ver,t FROM public.ksh_car02_staff_access
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430';
+           sec:=ceil(extract(epoch FROM t))::bigint;
+           IF ver<>1 OR NOT public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',1,sec+1,sec+30)
+           OR public.v430_qa_authorize('qa-other-shop','00000000-0000-0000-0000-000000004430','staff',1,sec+1,sec+30)
+           OR public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','owner',1,sec+1,sec+30)
+           OR public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',2,sec+1,sec+30)
+           OR public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',1,sec-10,sec+30)
+           OR public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',1,sec+31,sec+30)
+           THEN RAISE EXCEPTION 'V430_VERSION_TIME_TENANT_FAIL_CLOSED_FAILED'; END IF;
+          END $normal$;
+          \echo V430_REAL_PG17_VERSION_ROLE_TENANT_IAT_CHECK_PASS
+          -- Native V41 trigger bump covers both revocation and reactivation, no invented columns.
+          UPDATE public.ksh_car02_staff_access SET active=false
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430';
+          DO $revoked$
+          BEGIN
+           IF public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',1,2147483647,2147483647)
+           OR (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430')<>2
+           THEN RAISE EXCEPTION 'V430_V41_REVOKE_FAILED'; END IF;
+          END $revoked$;
+          UPDATE public.ksh_car02_staff_access SET active=true
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430';
+          DO $reactivated$
+          DECLARE t timestamptz; sec bigint;
+          BEGIN
+           SELECT updated_at INTO t FROM public.ksh_car02_staff_access WHERE shop_code='street_house_kitsuki'
+            AND user_sub='00000000-0000-0000-0000-000000004430';
+           sec:=ceil(extract(epoch FROM t))::bigint;
+           IF (SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430')<>3
+           OR public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',1,sec+1,sec+30)
+           OR public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',3,sec-100,sec+30)
+           OR NOT public.v430_qa_authorize('street_house_kitsuki','00000000-0000-0000-0000-000000004430','staff',3,sec+1,sec+30)
+           THEN RAISE EXCEPTION 'V430_V41_ROTATION_FAILED'; END IF;
+          END $reactivated$;
+          \echo V430_REAL_PG17_REVOKE_REACTIVATE_NATIVE_TRIGGER_PASS
+          -- Demonstrate an important limitation: the V41 updated_at trigger uses now(),
+          -- which is fixed at transaction BEGIN even if more changes occur before COMMIT.
+          BEGIN;
+          UPDATE public.ksh_car02_staff_access SET staff_role='owner'
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430';
+          SELECT pg_sleep(0.05);
+          UPDATE public.ksh_car02_staff_access SET staff_role='staff'
+           WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430';
+          DO $timegap$
+          DECLARE t timestamptz; v integer;
+          BEGIN
+           SELECT updated_at,auth_version INTO t,v FROM public.ksh_car02_staff_access
+            WHERE shop_code='street_house_kitsuki' AND user_sub='00000000-0000-0000-0000-000000004430';
+           IF t<>transaction_timestamp() OR v<>5 OR clock_timestamp()<=t
+           THEN RAISE EXCEPTION 'V430_V41_TIMESTAMP_BEHAVIOR_CHANGED_REVIEW_REQUIRED'; END IF;
+          END $timegap$;
+          COMMIT;
+          \echo V430_V41_TRANSACTION_TIMESTAMP_COMMIT_WINDOW_GAP_CONFIRMED
+          \echo V430_FINAL_NO_GO_HOLD
+          PGSQL
+          run_pg -d car02_v430_disposable -f /scratch/car02-v430-contract.sql | tee "$RUNNER_TEMP/car02-v430.log"
+          for marker in \
+            V430_REAL_FULL_R13_R46_V41_SCHEMA_PASS \
+            V430_V429_CREDENTIAL_NOT_BEFORE_SCHEMA_GAP_CONFIRMED \
+            V430_REAL_PG17_VERSION_ROLE_TENANT_IAT_CHECK_PASS \
+            V430_REAL_PG17_REVOKE_REACTIVATE_NATIVE_TRIGGER_PASS \
+            V430_V41_TRANSACTION_TIMESTAMP_COMMIT_WINDOW_GAP_CONFIRMED \
+            V430_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v430.log"
+          done
