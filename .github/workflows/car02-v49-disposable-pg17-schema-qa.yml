@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.16 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.17 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1221,4 +1221,160 @@ jobs:
             V416_REACTIVATED_OLD_PROVIDER_TOKEN_GAP_CONFIRMED \
             V416_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/car02-v416-r44-r46.log"
+          done
+      - name: V4.17 disposable R44/R46 provider-token iat fence to signed guarded R43 (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s car02-identity-r44.mjs
+          test -s car02-auth-providers-r46.mjs
+          test -f "$RUNNER_TEMP/v414-disposable-copy/car02-pg-adapter.mjs"
+          test -f "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          cat > "$RUNNER_TEMP/v417-iat-fence-qa.mjs" <<'NODEJS'
+          // V4.17 QA ONLY: reproduce/close the V4.16 old-provider-token rebind gap.
+          // Uses actual R44 and R46 source with stubbed Supabase Auth /user. NO LIVE VERIFICATION.
+          // All DB mutations target GitHub Actions disposable PostgreSQL 17, not production.
+          import assert from 'node:assert/strict';
+          import {generateKeyPairSync,sign,verify} from 'node:crypto';
+          import {createRequire} from 'node:module';
+          import {join,resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const temp=process.env.RUNNER_TEMP;
+          const root=process.env.GITHUB_WORKSPACE;
+          const require=createRequire(join(temp,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const {createCar02PgAdapter}=await import(pathToFileURL(join(temp,'v414-disposable-copy','car02-pg-adapter.mjs')).href);
+          const {createCar02Authenticator}=await import(pathToFileURL(resolve(root,'car02-identity-r44.mjs')).href);
+          const {createSupabaseStaffTokenVerifierR46,createDbStaffMembershipLookupR46,createStaffAccessResolverR46}=
+            await import(pathToFileURL(resolve(root,'car02-auth-providers-r46.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:4,connectionTimeoutMillis:5000});
+          const adapter=createCar02PgAdapter(pool);
+          const shop='street_house_kitsuki';
+          const sub='00000000-0000-0000-0000-000000000417';
+          const customerId='00000000-0000-0000-0000-000000000121';
+          const vehicleId='00000000-0000-0000-0000-000000000122';
+          const providerBase='https://supabase-stub.invalid';
+          const issuer=providerBase+'/auth/v1';
+          const audience='car02-ephemeral-qa-v417';
+          const sessionIssuer='car02-v417-disposable-issuer';
+          const now=()=>Math.floor(Date.now()/1000);
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          const b64=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
+          const fromB64=s=>JSON.parse(Buffer.from(s,'base64url').toString('utf8'));
+          // Both the token and the /user response are fabricated! Never rely on this as live identity proof.
+          const providerToken=(claims={})=>`${b64({alg:'ES256',typ:'JWT'})}.${b64({sub,iss:issuer,aud:'authenticated',role:'authenticated',iat:now(),exp:now()+180,...claims})}.fictional-signature`;
+          const fakeUser={id:sub,aud:'authenticated',is_anonymous:false};
+          const fetchStub=async(url,opts)=>{
+            assert.equal(url,issuer+'/user');assert.equal(opts?.method,'GET');
+            assert.equal(opts?.headers?.apikey,'qa-only-anon-placeholder');
+            return {ok:true,json:async()=>({...fakeUser})};
+          };
+          const verifyStaffJwt=createSupabaseStaffTokenVerifierR46({supabaseUrl:providerBase,anonKey:'qa-only-anon-placeholder',fetchImpl:fetchStub,nowSeconds:now});
+          const resolveStaffAccess=createStaffAccessResolverR46({lookupMembership:createDbStaffMembershipLookupR46({pool})});
+          const authenticate=createCar02Authenticator({shopCode:shop,lineClientId:'qa-no-real-line',verifyStaffJwt,resolveStaffAccess,
+            verifyLineIdToken:async()=>{throw Error('NO_LINE')},resolveLineCustomer:async()=>{throw Error('NO_LINE')},nowSeconds:now});
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+          function problem(code){const e=new Error(code);e.code=code;throw e;}
+          function signedSession(claims){
+            const head=b64({alg:'EdDSA',typ:'JWT'});const body=b64(claims);
+            const input=`${head}.${body}`;
+            return input+'.'+sign(null,Buffer.from(input),privateKey).toString('base64url');
+          }
+          function verifySession(token){
+            if(typeof token!=='string'||!/^[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+$/.test(token))problem('V417_SESSION_INVALID');
+            const parts=token.split('.');let hdr,payload;
+            try{hdr=fromB64(parts[0]);payload=fromB64(parts[1])}catch{problem('V417_SESSION_INVALID')}
+            if(hdr?.alg!=='EdDSA'||hdr.typ!=='JWT'||payload?.iss!==sessionIssuer||payload?.aud!==audience||payload?.sub!==sub||payload?.shop!==shop||
+              payload?.role!=='staff'||!Number.isSafeInteger(payload?.authVersion)||!Number.isSafeInteger(payload?.iat)||
+              !Number.isSafeInteger(payload?.exp)||payload.iat>now()||payload.exp<=now()||payload.exp-payload.iat>180)problem('V417_SESSION_INVALID');
+            if(!verify(null,Buffer.from(parts[0]+'.'+parts[1]),publicKey,Buffer.from(parts[2],'base64url')))problem('V417_SESSION_INVALID');
+            return payload;
+          }
+          const request=(token,body={})=>({headers:new Headers({authorization:'Bearer '+token}),body:{role:'owner',authVersion:99999,shopCode:'attacker-shop',...body}});
+          const create=async t=>{await t.assertLinks({customerId,vehicleId,reservationId:null});return t.create({customerId,vehicleId,reservationId:null});};
+          async function denied(fn,code){await assert.rejects(Promise.resolve().then(fn),e=>e?.code===code||e?.message===code,code);}
+          async function issue(providerAccessToken){
+            // R44/R46 verify origin, audience, exp, Auth /user response, DB membership and banned status.
+            // The real Auth /user response is STUBBED in this test, never used for real security.
+            const identity=await authenticate(request(providerAccessToken));
+            if(identity?.role!=='staff'||identity?.shopCode!==shop||identity?.subject!=='staff:'+sub)problem('V417_STAFF_IDENTITY_INVALID');
+            // Decode iat ONLY FROM THE EXACT provider access token just validated by R44/R46.
+            // R46 does not currently export iat; this is an isolated proposal, NOT production code.
+            let jwt;try{jwt=fromB64(providerAccessToken.split('.')[1])}catch{problem('V417_PROVIDER_IAT_INVALID')}
+            if(jwt?.sub!==sub||jwt?.iss!==issuer||jwt?.aud!=='authenticated'||!Number.isSafeInteger(jwt?.iat)||
+              jwt.iat<=0||jwt.iat>now()||jwt.iat<now()-3600)problem('V417_PROVIDER_IAT_INVALID');
+            const c=await pool.connect();let open=false;
+            try{
+              await c.query('BEGIN');open=true;
+              const rows=(await c.query(`SELECT staff_role,active,auth_version,updated_at FROM public.ksh_car02_staff_access
+                WHERE shop_code=$1 AND user_sub=$2 FOR UPDATE`,[shop,sub])).rows;
+              if(rows.length!==1||rows[0].active!==true||rows[0].staff_role!=='staff')problem('V417_STAFF_REVOKED');
+              const member=rows[0];const changedMs=new Date(member.updated_at).getTime();
+              // Fail closed if a verified provider JWT predates the most recent permission change.
+              // Strict sub-second DB cutoff means a token minted in the same second may be rejected.
+              if(!Number.isFinite(changedMs)||jwt.iat*1000<changedMs)problem('V417_PROVIDER_TOKEN_PREDATES_GRANT_CHANGE');
+              const issued=signedSession({iss:sessionIssuer,aud:audience,sub,shop,role:member.staff_role,
+                authVersion:Number(member.auth_version),iat:now(),exp:now()+120});
+              await c.query('COMMIT');open=false;return issued;
+            }catch(e){if(open)await c.query('ROLLBACK');throw e}finally{c.release()}
+          }
+          async function gateway(session,key,fn=create){
+            const verified=verifySession(session);
+            const actor=Object.freeze({verified:true,role:verified.role,subject:verified.sub,shopCode:verified.shop,
+              trustedAuthVersion:verified.authVersion});
+            return adapter.transaction({actor,shop,key,intent:{op:'v417-iatsafe-bridge',customerId,vehicleId,reservationId:null}},fn);
+          }
+          const count=async()=>Number((await pool.query(`SELECT count(*)::int AS n FROM public.ksh_car02_work_orders WHERE shop_code=$1`,[shop])).rows[0].n);
+          try {
+            // The fixed earlier grant is a QA fixture only, never a real user.
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source,updated_at)
+              VALUES ($1,$2,'staff',true,'v417-disposable-iatsafe',now()-interval '10 seconds')`,[shop,sub]);
+            const oldToken=providerToken();
+            const oldSession=await issue(oldToken);
+            const before=await count();
+            const key='v417-idempotent-key-qa';
+            const first=await gateway(oldSession,key);assert.equal(first.status,'draft');
+            let called=false;const again=await gateway(oldSession,key,()=>{called=true;throw Error('V417_DUPLICATE_CREATE')});
+            assert.equal(first.id,again.id);assert.equal(called,false);assert.equal(await count(),before+1);
+            console.log('V417_PROVIDER_FRESH_IAT_GUARD_PASS: verified-token iat checked against DB membership updated_at; one write + idempotent replay');
+            await denied(()=>issue(providerToken({iat:undefined})),'V417_PROVIDER_IAT_INVALID'); // JSON omits undefined iat
+            await denied(()=>issue(providerToken({iat:'invalid'})),'V417_PROVIDER_IAT_INVALID');
+            await denied(()=>issue(providerToken({iat:now()+60})),'V417_PROVIDER_IAT_INVALID');
+            const forgedBody=oldSession.split('.');
+            const altered={...fromB64(forgedBody[1]),role:'owner'};
+            const tampered=forgedBody[0]+'.'+b64(altered)+'.'+forgedBody[2];
+            await denied(()=>gateway(tampered,'v417-tamper'),'V417_SESSION_INVALID');
+            assert.equal(await count(),before+1);
+            console.log('V417_TOKEN_TAMPER_AND_MISSING_IAT_REJECTED_PASS: missing/invalid/future iat and session role tamper denied');
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await denied(()=>gateway(oldSession,key),'CAR02_TX_MEMBERSHIP_REVOKED');
+            await denied(()=>issue(oldToken),'CAR02_UNAUTHORIZED');
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await denied(()=>gateway(oldSession,key),'CAR02_TX_SESSION_STALE');
+            await denied(()=>issue(oldToken),'V417_PROVIDER_TOKEN_PREDATES_GRANT_CHANGE');
+            await denied(()=>issue(providerToken({iat:now()-60})),'V417_PROVIDER_TOKEN_PREDATES_GRANT_CHANGE');
+            console.log('V417_OLD_PROVIDER_REBIND_BLOCKED_PASS: reactivated membership cannot mint new signed session from pre-revocation JWT');
+            await sleep(1150);
+            const freshProvider=providerToken();
+            const freshSession=await issue(freshProvider);
+            assert.notEqual(freshSession,oldSession);
+            assert.equal((await gateway(freshSession,key,()=>{throw Error('V417_DUPLICATE_CREATE_AFTER_REFRESH')})).id,first.id);
+            assert.equal(await count(),before+1);
+            console.log('V417_FRESH_PROVIDER_SESSION_REISSUE_PASS: newly issued provider token passes and old receipt remains idempotent; expired old sessions cannot be upgraded');
+            console.log('V417_FINAL_NO_GO_HOLD: all checks use fake Auth /user, ephemeral keys, QA R43 clone and disposable PG; R44/R46 unchanged; Worker/real signer unverified');
+          } finally {await pool.end()}
+          NODEJS
+          node --check "$RUNNER_TEMP/v417-iat-fence-qa.mjs"
+          node "$RUNNER_TEMP/v417-iat-fence-qa.mjs" | tee "$RUNNER_TEMP/car02-v417-iat-fence.log"
+          for marker in \
+            V417_PROVIDER_FRESH_IAT_GUARD_PASS \
+            V417_TOKEN_TAMPER_AND_MISSING_IAT_REJECTED_PASS \
+            V417_OLD_PROVIDER_REBIND_BLOCKED_PASS \
+            V417_FRESH_PROVIDER_SESSION_REISSUE_PASS \
+            V417_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v417-iat-fence.log"
           done
