@@ -1,0 +1,261 @@
+name: CAR02 V4.29 Real Disposable PG17 R43-R44-R46 Candidate (NO_GO HOLD)
+# Isolated tests only. Supabase /user is mocked; no live secrets, prod DB, deployment, or LINE.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v429-identity-real-pg17-qa.yml'
+      - 'car02-pg-adapter.mjs'
+      - 'car02-identity-r44.mjs'
+      - 'car02-auth-providers-r46.mjs'
+      - 'car02-core.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r43-r44-r46-pg17:
+    name: V4.29 isolated true PostgreSQL17 version/lock QA (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: car02_v429_disposable_only
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: car02_v429_disposable_only
+    steps:
+      - name: Checkout source read-only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Isolated PG17 schema, source candidate and actual transaction locking
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          for p in car02-pg-adapter.mjs car02-identity-r44.mjs car02-auth-providers-r46.mjs car02-core.mjs car02-edge-entry-r52.ts; do test -s "$p"; done
+          test -n "$PGPASSWORD"
+          pg_isready -h 127.0.0.1 -p 55432 -U postgres -d postgres
+          # No production migrations; minimal disposable tables for isolated contract test.
+          cat > "$RUNNER_TEMP/v429-schema.sql" <<'PGSQL'
+          \set ON_ERROR_STOP on
+          DO $$ BEGIN
+            IF current_setting('server_version_num')::int < 170000 OR current_setting('server_version_num')::int >= 180000 THEN
+              RAISE EXCEPTION 'V429_POSTGRESQL_17_REQUIRED';
+            END IF;
+          END $$;
+          CREATE TABLE public.ksh_car02_staff_access (
+            shop_code text NOT NULL, user_sub uuid NOT NULL,
+            staff_role text NOT NULL CHECK (staff_role IN ('staff','owner')),
+            active boolean NOT NULL, auth_version bigint NOT NULL,
+            credential_not_before timestamptz NOT NULL,
+            PRIMARY KEY(shop_code,user_sub)
+          );
+          CREATE TABLE public.ksh_car02_operations (
+            shop_code text NOT NULL, actor_scope text NOT NULL,
+            idempotency_key text NOT NULL, request_digest text NOT NULL,
+            response_snapshot jsonb, completed_at timestamptz,
+            PRIMARY KEY(shop_code,actor_scope,idempotency_key)
+          );
+          INSERT INTO public.ksh_car02_staff_access
+            (shop_code,user_sub,staff_role,active,auth_version,credential_not_before)
+          VALUES ('v429-qa-shop','00000000-0000-0000-0000-000000004429','staff',true,1,to_timestamp(1799999880)),
+                 ('v429-other-shop','00000000-0000-0000-0000-000000004429','staff',true,1,to_timestamp(1799999880));
+          PGSQL
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55432 -U postgres -d postgres -f "$RUNNER_TEMP/v429-schema.sql"
+          mkdir -p "$RUNNER_TEMP/v429-js-deps"
+          npm install --prefix "$RUNNER_TEMP/v429-js-deps" --no-audit --no-fund --ignore-scripts pg@8.16.3
+          cat > "$RUNNER_TEMP/v429-qa.mjs" <<'V429JS'
+          // DPRO CAR02 V4.29: isolate and test a server-trusted R44/R46 auth-version bridge.
+          // All identity responses and database queries below are simulated. NO_GO / HOLD.
+          import assert from 'node:assert/strict';
+          import {readFileSync,writeFileSync,mkdtempSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {tmpdir} from 'node:os';
+          import {join,resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const root=process.env.GITHUB_WORKSPACE||process.cwd();
+          const expected={
+           'car02-pg-adapter.mjs':'cb4c83ddac1205c5855aacbb803fcb3492d46b6101f496140996daf6231d2ed4',
+           'car02-identity-r44.mjs':'83baa424c7b5142ec925729e3ceb4c57f07cf428512fe373d1e0595146a49304',
+           'car02-auth-providers-r46.mjs':'f4d3c50801d377fee94e97f310e5c6ff3b6b51404d7f22953615e61a02dacfb9'
+          };
+          const read=p=>readFileSync(resolve(root,p),'utf8');
+          const original={};for(const [f,d] of Object.entries(expected)){
+           original[f]=read(f);assert.equal(createHash('sha256').update(original[f]).digest('hex'),d,'V428_UPSTREAM_DRIFT_'+f);
+          }
+          assert.match(read('car02-edge-entry-r52.ts'),/\bconst\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          const patch=(src,a,b,id)=>{assert.equal(src.split(a).length,2,'V428_ANCHOR_DRIFT_'+id);return src.replace(a,b)};
+          let r46=original['car02-auth-providers-r46.mjs'];
+          r46=patch(r46,'    return {verified:true,sub:user.id,exp:claims.exp};',
+           `    if(!Number.isSafeInteger(claims.iat)||claims.iat<=0||claims.iat>nowSeconds()||claims.iat>=claims.exp)fail();
+              return {verified:true,sub:user.id,exp:claims.exp,issuedAt:claims.iat};`,'jwt_issued_at');
+          r46=patch(r46,'    return {active:true,userSub,shopCode,role:result.role};',
+           `    if(!Number.isSafeInteger(result.trustedAuthVersion)||result.trustedAuthVersion<1||
+                 !Number.isSafeInteger(result.credentialNotBeforeEpochMs)||result.credentialNotBeforeEpochMs<0)fail();
+              return {active:true,userSub,shopCode,role:result.role,
+                trustedAuthVersion:result.trustedAuthVersion,credentialNotBeforeEpochMs:result.credentialNotBeforeEpochMs};`,'resolve_staff');
+          r46=patch(r46,'SELECT shop_code,user_sub,staff_role,active\n      FROM public.ksh_car02_staff_access',
+           'SELECT shop_code,user_sub,staff_role,active,auth_version,credential_not_before\n      FROM public.ksh_car02_staff_access','membership_columns');
+          r46=patch(r46,'    return {active:true,userSub:x.user_sub,shopCode:x.shop_code,role:x.staff_role};',
+           `    const version=Number(x.auth_version);
+              const notBefore=x.credential_not_before instanceof Date ? x.credential_not_before.getTime() : Date.parse(x.credential_not_before);
+              if(!Number.isSafeInteger(version)||version<1||!Number.isSafeInteger(notBefore)||notBefore<0)fail();
+              return {active:true,userSub:x.user_sub,shopCode:x.shop_code,role:x.staff_role,
+                trustedAuthVersion:version,credentialNotBeforeEpochMs:notBefore};`,'membership_version');
+          let r44=original['car02-identity-r44.mjs'];
+          r44=patch(r44,'      return Object.freeze({verified:true,role:staff.role,subject:`staff:${jwt.sub}`,shopCode});',
+           `      if(!Number.isSafeInteger(jwt.issuedAt)||jwt.issuedAt<=0||jwt.issuedAt>nowSeconds()||
+                  !Number.isSafeInteger(staff.trustedAuthVersion)||staff.trustedAuthVersion<1||
+                  !Number.isSafeInteger(staff.credentialNotBeforeEpochMs)||
+                  jwt.issuedAt*1000<staff.credentialNotBeforeEpochMs)bad();
+                return Object.freeze({verified:true,role:staff.role,subject:'staff:'+jwt.sub,shopCode,
+                  staffUserSub:jwt.sub,trustedAuthVersion:staff.trustedAuthVersion});`,'trusted_actor');
+          let r43=original['car02-pg-adapter.mjs'];
+          const anchor="        await c.query('BEGIN');open=true;\n";
+          const guard=`        // V4.29 QA ONLY: enforce trusted staff UUID/version BEFORE any old replay.
+                  if(actor?.verified!==true||actor.shopCode!==shop||!['staff','owner'].includes(actor.role))
+                    throw E('CAR02_TX_UNTRUSTED_ACTOR',403);
+                  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.staffUserSub||'')||
+                     actor.subject!=='staff:'+actor.staffUserSub||
+                     !Number.isSafeInteger(actor.trustedAuthVersion)||actor.trustedAuthVersion<1)
+                    throw E('CAR02_TX_STAFF_CONTRACT_INVALID',403);
+                  const member=await one(c,\`SELECT active,staff_role,auth_version FROM public.ksh_car02_staff_access
+                    WHERE shop_code=$1 AND user_sub=$2 FOR UPDATE\`,[shop,actor.staffUserSub]);
+                  if(!member||member.active!==true)throw E('CAR02_TX_REVOKED',403);
+                  if(member.staff_role!==actor.role)throw E('CAR02_TX_ROLE_CHANGED',403);
+                  if(Number(member.auth_version)!==actor.trustedAuthVersion)throw E('CAR02_TX_VERSION_STALE',403);
+          `;
+          r43=patch(r43,anchor,anchor+guard,'transaction_guard');
+          assert.ok(r43.indexOf('CAR02_TX_REVOKED')<r43.indexOf('pg_advisory_xact_lock'));
+          const dir=mkdtempSync(join(process.env.RUNNER_TEMP||tmpdir(),'v428-isolated-'));
+          for(const [file,src] of Object.entries({
+           'car02-identity-r44.mjs':r44,'car02-auth-providers-r46.mjs':r46,
+           'car02-pg-adapter.mjs':r43,'car02-core.mjs':read('car02-core.mjs')
+          }))writeFileSync(join(dir,file),src);
+          const imp=async f=>import(pathToFileURL(join(dir,f)).href);
+          const [{createCar02Authenticator},{createCar02AuthProvidersR46},{createCar02PgAdapter}]=await Promise.all([
+           imp('car02-identity-r44.mjs'),imp('car02-auth-providers-r46.mjs'),imp('car02-pg-adapter.mjs')]);
+          const {default:pg}=await import('pg');
+          const shop='v429-qa-shop',sub='00000000-0000-0000-0000-000000004429';
+          const otherShop='v429-other-shop';
+          const now=1800000000;
+          let fakeAuthUserCalls=0,callbacks=0;
+          const pool=new pg.Pool({host:'127.0.0.1',port:55432,user:'postgres',database:'postgres',
+           password:process.env.PGPASSWORD,max:16,connectionTimeoutMillis:5000});
+          const b64=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
+          const token=(iat=now-10,claims={})=>[b64({alg:'HS256',typ:'JWT'}),b64({
+           sub,iss:'https://v429-project.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',
+           exp:now+1200,iat,...claims}),'c2lnbmF0dXJl'].join('.');
+          // Supabase /user is intentionally a STUB. Never mistake it for real JWT crypto validation.
+          const fetchImpl=async(url,opts)=>{
+           fakeAuthUserCalls++;
+           assert.equal(url,'https://v429-project.supabase.co/auth/v1/user');
+           const claims=JSON.parse(Buffer.from(opts.headers.Authorization.split(' ')[1].split('.')[1],'base64url'));
+           return new Response(JSON.stringify({id:claims.sub,aud:'authenticated',is_anonymous:false}),{status:200});
+          };
+          const providers=createCar02AuthProvidersR46({lineChannelId:'v429-line-client',
+           supabaseUrl:'https://v429-project.supabase.co',supabaseAnonKey:'v429-public-anon',
+           pool,fetchImpl,nowSeconds:()=>now});
+          const authenticate=createCar02Authenticator({shopCode:shop,lineClientId:'v429-line-client',
+           ...providers,nowSeconds:()=>now});
+          const request=jwt=>new Request('https://qa.example/',{headers:{Authorization:'Bearer '+jwt}});
+          const db=createCar02PgAdapter(pool);
+          const args=(actor,key='v429-original')=>({actor,shop,key,intent:{op:'v429-test-create'}});
+          const denied=async(fn,code)=>assert.rejects(Promise.resolve().then(fn),e=>
+           code?e.code===code:true,`expected rejection ${code||'auth'}`);
+          const count=async()=>Number((await pool.query('SELECT count(*)::int AS n FROM public.ksh_car02_operations')).rows[0].n);
+          try {
+           let v=(await pool.query('SHOW server_version_num')).rows[0].server_version_num;
+           assert(Number(v)>=170000&&Number(v)<180000,'V429_DISPOSABLE_PG17_REQUIRED');
+           const current=(await pool.query('SELECT * FROM public.ksh_car02_staff_access WHERE shop_code=$1',[shop])).rows;
+           assert.equal(current.length,1);assert.equal(Number(current[0].auth_version),1);
+           const jwt=token();
+           const actor=await authenticate(request(jwt));
+           assert.equal(actor.staffUserSub,sub);assert.equal(actor.subject,'staff:'+sub);
+           assert.equal(actor.trustedAuthVersion,1);
+           const first=await db.transaction(args(actor),()=>{callbacks++;return {id:'v429-original-unique'};});
+           assert.equal(first.id,'v429-original-unique');
+           assert.equal((await db.transaction(args(actor),()=>{throw Error('V429_BAD_REPLAY_EXECUTION');})).id,first.id);
+           assert.equal(callbacks,1);assert.equal(await count(),1);
+           console.log('V429_REAL_PG17_VERSION_BOUND_STAFF_IDENTITY_PASS');
+           console.log('V429_REAL_PG17_ATOMIC_IDEMPOTENT_REPLAY_PASS');
+           // Invalid tenant, role and version must never touch data or expose a saved receipt.
+           await denied(()=>db.transaction(args({...actor,role:'owner'},'v429-role'),()=>{callbacks++;}),'CAR02_TX_ROLE_CHANGED');
+           await denied(()=>db.transaction(args({...actor,shopCode:otherShop},'v429-tenant'),()=>{callbacks++;}),'CAR02_TX_UNTRUSTED_ACTOR');
+           await denied(()=>db.transaction(args({...actor,trustedAuthVersion:5},'v429-version'),()=>{callbacks++;}),'CAR02_TX_VERSION_STALE');
+           assert.equal(await count(),1);assert.equal(callbacks,1);
+           console.log('V429_REAL_PG17_FORGED_ROLE_TENANT_VERSION_REJECTED_PASS');
+           // Real DB revoke changes row state. Both replay and a brand-new business action denied.
+           await pool.query('UPDATE public.ksh_car02_staff_access SET active=false,auth_version=2 WHERE shop_code=$1',[shop]);
+           await denied(()=>db.transaction(args(actor),()=>{callbacks++;}),'CAR02_TX_REVOKED');
+           await denied(()=>db.transaction(args(actor,'v429-after-revoke'),()=>{callbacks++;}),'CAR02_TX_REVOKED');
+           await denied(()=>authenticate(request(jwt)));
+           assert.equal(await count(),1);assert.equal(callbacks,1);
+           console.log('V429_REAL_PG17_REVOKED_REPLAY_AND_NEW_WRITE_DENIED_PASS');
+           // Re-activate, version changes, and issued-at threshold moves ahead of old JWT.
+           await pool.query('UPDATE public.ksh_car02_staff_access SET active=true,auth_version=3,credential_not_before=to_timestamp($2) WHERE shop_code=$1',[shop,now-5]);
+           await denied(()=>authenticate(request(jwt))); // original iat was now-10
+           await denied(()=>db.transaction(args(actor),()=>{callbacks++;}),'CAR02_TX_VERSION_STALE');
+           const fresh=await authenticate(request(token(now-1)));
+           assert.equal(fresh.trustedAuthVersion,3);
+           assert.equal((await db.transaction(args(fresh),()=>{throw Error('V429_UNEXPECTED_AFTER_REAUTH');})).id,first.id);
+           assert.equal(await count(),1);
+           console.log('V429_REAL_PG17_REACTIVATION_OLD_TOKEN_DENIED_PASS');
+           // Parallel idempotent insert with real row lock + transaction advisory lock.
+           const races=await Promise.all(Array.from({length:8},(_,i)=>db.transaction(args(fresh,'v429-eight-race'),()=>{
+             callbacks++;return {id:'v429-race-receipt',worker:i};
+           })));
+           assert(races.every(x=>x.id==='v429-race-receipt'));
+           assert.equal(callbacks,2);assert.equal(await count(),2);
+           console.log('V429_REAL_PG17_EIGHT_WRITER_SINGLE_RECEIPT_PASS');
+           // Hold membership row while another transaction waits; revoke BEFORE it resumes.
+           const hold=await pool.connect();let holdTx=true;
+           try{
+             await hold.query('BEGIN');
+             await hold.query('SELECT * FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2 FOR UPDATE',[shop,sub]);
+             let state='pending';
+             const pending=db.transaction(args(fresh,'v429-lock-contender'),()=>{
+               callbacks++;return {id:'should-never-write'};
+             }).then(()=>{state='unexpected_success';},e=>{state=e.code;});
+             await new Promise(res=>setTimeout(res,120));
+             assert.equal(state,'pending','V429_TX_NOT_BLOCKED_BY_MEMBERSHIP_ROW');
+             await hold.query('UPDATE public.ksh_car02_staff_access SET active=false,auth_version=4 WHERE shop_code=$1',[shop]);
+             await hold.query('COMMIT');holdTx=false;
+             await pending;
+             assert.equal(state,'CAR02_TX_REVOKED');
+           }finally{if(holdTx)await hold.query('ROLLBACK');hold.release();}
+           assert.equal(await count(),2);assert.equal(callbacks,2);
+           console.log('V429_REAL_PG17_CONCURRENT_REVOKE_ROW_LOCK_PASS');
+           // Failed new operation must roll back; no snapshot written.
+           await pool.query('UPDATE public.ksh_car02_staff_access SET active=true,auth_version=5,credential_not_before=to_timestamp($2) WHERE shop_code=$1',[shop,now-1]);
+           const actor5=await authenticate(request(token(now)));
+           await assert.rejects(db.transaction(args(actor5,'v429-failure-rollback'),()=>{throw Error('V429_EXPECTED_SYNTHETIC_CALLBACK_FAILURE');}),/V429_EXPECTED_SYNTHETIC_CALLBACK_FAILURE/);
+           assert.equal(await count(),2);
+           console.log('V429_REAL_PG17_ROLLBACK_ON_CALLBACK_ERROR_PASS');
+           console.log('V429_FINAL_NO_GO_HOLD: real disposable PostgreSQL 17 for membership and operation receipts only; R13 full migration, real Supabase /user signature, customer authentication, production R43/R44/R46, Worker, LINE untouched.');
+          }finally{await pool.end();}
+          V429JS
+          node --check "$RUNNER_TEMP/v429-qa.mjs"
+          ln -s "$RUNNER_TEMP/v429-js-deps/node_modules" "$RUNNER_TEMP/node_modules"
+          node "$RUNNER_TEMP/v429-qa.mjs" | tee "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_VERSION_BOUND_STAFF_IDENTITY_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_ATOMIC_IDEMPOTENT_REPLAY_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_FORGED_ROLE_TENANT_VERSION_REJECTED_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_REVOKED_REPLAY_AND_NEW_WRITE_DENIED_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_REACTIVATION_OLD_TOKEN_DENIED_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_EIGHT_WRITER_SINGLE_RECEIPT_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_CONCURRENT_REVOKE_ROW_LOCK_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_REAL_PG17_ROLLBACK_ON_CALLBACK_ERROR_PASS" "$RUNNER_TEMP/v429-result.log"
+          grep -Fq "V429_FINAL_NO_GO_HOLD" "$RUNNER_TEMP/v429-result.log"
