@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.22 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.23 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -2111,4 +2111,126 @@ jobs:
             V422_AUDIT_APPEND_ONLY_PRIVATE_PASS \
             V422_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/v422-manual-reconciliation-qa.log"
+          done
+      - name: V4.23 actual R52/R51 hard release lock and bypass regression (REVIEW NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f car02-edge-entry-r52.ts
+          test -f car02-edge-boundary-r51.mjs
+          test -f car02-unified-runtime-r50.mjs
+          test -f car02-identity-r44.mjs
+          cat > "$RUNNER_TEMP/car02-v423-release-lock-review.mjs" <<'NODEJS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          
+          // V4.23 - REVIEW-ONLY guard test; executed against checked-out repository sources.
+          // No Worker, Supabase, LINE, DB or secret is contacted by this test.
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          const edge=readFileSync('car02-edge-boundary-r51.mjs','utf8');
+          const runtime=readFileSync('car02-unified-runtime-r50.mjs','utf8');
+          const status=readFileSync('car02-identity-r44.mjs','utf8');
+          if(!entry||!edge||!runtime||!status) throw Error('V423_MISSING_SOURCE');
+          const releaseMatch=[...entry.matchAll(/\bconst\s+CAR02_RELEASE_LOCK\s*=\s*(true|false)\s*;/g)];
+          assert.equal(releaseMatch.length,1,'release lock must be set exactly once');
+          assert.equal(releaseMatch[0][1],'true','release lock must stay hardcoded closed');
+          assert.match(entry,/if\s*\(\s*CAR02_RELEASE_LOCK\s*\)\s*throw\s+Error\(\s*['"]CAR02_NOT_RELEASED['"]\s*\)/);
+          assert.match(entry,/isServerReleased\s*:\s*\(\)\s*=>\s*!CAR02_RELEASE_LOCK/);
+          assert.match(entry,/contracted\s*:\s*false/);
+          assert.match(entry,/goLiveApproved\s*:\s*false/);
+          assert.match(entry,/migrationVerified\s*:\s*false/);
+          assert.match(entry,/verifiedIdentityBound\s*:\s*false/);
+          assert.match(entry,/workerBackendReady\s*:\s*false/);
+          assert.match(entry,/externalNotificationsReviewed\s*:\s*false/);
+          assert.ok(entry.indexOf("if(CAR02_RELEASE_LOCK)throw") < entry.indexOf("import('npm:pg@"), 'runtime import must be after the lock');
+          assert.doesNotMatch(entry,/getenv\s*\(\s*['"]CAR02_RELEASE_LOCK['"]\s*\)/);
+          console.log('V423_R52_HARDCODED_RELEASE_LOCK_SOURCE_PASS: release locked, all approvals false; no premature DB import');
+          
+          const {createCar02EdgeBoundaryR51} = await import(pathToFileURL(resolve('car02-edge-boundary-r51.mjs')).href);
+          const base='https://stage.example.invalid';
+          const prefix='/functions/v1/dpro-car02-stage';
+          const uid='00000000-0000-0000-0000-000000000088';
+          let init=0, checked=0;
+          const route=createCar02EdgeBoundaryR51({
+           isServerReleased:async()=>{checked++;return false},
+           createRuntime:async()=>{init++;throw Error('V423_UNEXPECTED_BACKEND_INIT');}
+          });
+          const call=(pathname,method='GET', headers={}) =>route(new Request(base+pathname,{method,headers}));
+          const allowed=[
+           [prefix+'/api/car02','GET'],[prefix+'/api/car02','POST'],
+           [prefix+'/api/car02/'+uid,'GET'],[prefix+'/api/car02/'+uid+'/history','GET'],
+           [prefix+'/api/car02/'+uid+'/quote','POST'],[prefix+'/api/car02/'+uid+'/decision','POST'],
+           [prefix+'/api/car02/photos/'+uid,'GET'],
+           ['/dpro-car02-stage/api/car02','POST'],
+           [prefix+'/api/car02','DELETE'],[prefix+'/api/car02','OPTIONS']
+          ];
+          for(const [pathname,method] of allowed){
+           const r=await call(pathname,method,{'Authorization':'Bearer QA_DO_NOT_SEND'});
+           assert.equal(r.status,503,`${method} ${pathname} was not blocked`);
+           assert.equal((await r.json()).code,'CAR02_NOT_RELEASED');
+          }
+          assert.equal(init,0);
+          console.log('V423_R51_LOCKED_API_NO_RUNTIME_INITIALIZATION_PASS: all CAR02 paths and methods fail before backend setup');
+          
+          const hostile=[
+           '/api/car02', '/api/car02/'+uid,
+           prefix+'/api/car02?release=true', prefix+'/api/car02#unlock',
+           prefix+'/api/car02/invalid',prefix+'/api/car02/'+uid+'/unknown',
+           '/functions/v1/another-function/api/car02',
+           prefix+'/api/car02/'+uid+'/../../etc/passwd',
+           prefix+'/api/car02/uploads/'+uid,
+           prefix+'/api/legacy-reservations'
+          ];
+          for(const pathname of hostile){
+           const r=await call(pathname);
+           assert.equal(r.status,404,`unexpected path was not rejected: ${pathname} (${r.status})`);
+          }
+          const health=await call(prefix+'/health');
+          assert.equal(health.status,200);
+          const hp=await health.json();
+          assert.equal(hp.live,false);
+          assert.equal(hp.deployment,'review-only');
+          assert.equal(init,0);
+          console.log('V423_R51_UNPREFIXED_QUERY_BYPASS_AND_UNKNOWN_ROUTE_DENIED_PASS: unprefixed/query/legacy paths excluded; health declares review-only');
+          
+          for(const releaseAnswer of [undefined, false, null, 0, {}, 'true']){
+           const gate=createCar02EdgeBoundaryR51({
+             isServerReleased:async()=>releaseAnswer,
+             createRuntime:async()=>{init++;throw Error('V423_UNEXPECTED_RUNTIME');}
+           });
+           const r=await gate(new Request(base+prefix+'/api/car02'));
+           assert.equal(r.status,503,'non-literal true result must not release');
+          }
+          const throwing=createCar02EdgeBoundaryR51({
+           isServerReleased:async()=>{throw Error('V423_SIMULATED_LOCK_READ_FAILURE')},
+           createRuntime:async()=>{init++;throw Error('V423_UNEXPECTED_RUNTIME')}
+          });
+          const r=await throwing(new Request(base+prefix+'/api/car02'));
+          assert.equal(r.status,503);
+          assert.equal(init,0);
+          const responses=await Promise.all(Array.from({length:48},()=>call(prefix+'/api/car02/'+uid+'/history')));
+          assert.ok(responses.every(r=>r.status===503));
+          assert.equal(init,0);
+          assert.ok(checked>=allowed.length+48);
+          console.log('V423_RELEASE_GATE_FAILURE_AND_48_CONCURRENT_REQUESTS_FAIL_CLOSED_PASS: false/undefined/error never opens runtime');
+          
+          assert.match(edge,/if\s*\(\s*!released\s*\)\s*return\s+json\(503,\s*['"]CAR02_NOT_RELEASED['"]\)/);
+          assert.match(status,/contracted\s*===\s*true/);
+          assert.match(status,/goLiveApproved\s*===\s*true/);
+          assert.match(status,/migrationVerified\s*===\s*true/);
+          console.log('V423_INDEPENDENT_RELEASE_GATES_RETAINED_PASS: independent R44 and R51 approval checks still present');
+          console.log('V423_FINAL_NO_GO_HOLD: source/test attestation only; repository release lock remains TRUE; no production deployment, DB, Worker, signer or LINE tested');
+          NODEJS
+          node --check "$RUNNER_TEMP/car02-v423-release-lock-review.mjs"
+          node "$RUNNER_TEMP/car02-v423-release-lock-review.mjs" | tee "$RUNNER_TEMP/car02-v423-release-lock-review.log"
+          for marker in \
+            V423_R52_HARDCODED_RELEASE_LOCK_SOURCE_PASS \
+            V423_R51_LOCKED_API_NO_RUNTIME_INITIALIZATION_PASS \
+            V423_R51_UNPREFIXED_QUERY_BYPASS_AND_UNKNOWN_ROUTE_DENIED_PASS \
+            V423_RELEASE_GATE_FAILURE_AND_48_CONCURRENT_REQUESTS_FAIL_CLOSED_PASS \
+            V423_INDEPENDENT_RELEASE_GATES_RETAINED_PASS \
+            V423_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v423-release-lock-review.log"
           done
