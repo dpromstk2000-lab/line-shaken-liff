@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.23 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.24 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -2233,4 +2233,138 @@ jobs:
             V423_INDEPENDENT_RELEASE_GATES_RETAINED_PASS \
             V423_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/car02-v423-release-lock-review.log"
+          done
+      - name: V4.24 R50/R45 inner release denial under simulated R51 gate mistake (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f car02-edge-entry-r52.ts
+          test -f car02-edge-boundary-r51.mjs
+          test -f car02-unified-runtime-r50.mjs
+          test -f car02-runtime-r45.mjs
+          test -f car02-api.mjs
+          test -f car02-identity-r44.mjs
+          cat > "$RUNNER_TEMP/car02-v424-nested-gate.mjs" <<'NODEJS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          // V4.24: only ephemeral mock dependencies; no external connections or secrets.
+          // This runner NEVER toggles R52 source and NEVER touches any production runtime.
+          for(const name of ['car02-edge-entry-r52.ts','car02-edge-boundary-r51.mjs',
+                              'car02-unified-runtime-r50.mjs','car02-runtime-r45.mjs',
+                              'car02-api.mjs','car02-identity-r44.mjs']) {
+            assert.ok(readFileSync(name,'utf8').length>300,`missing source ${name}`);
+          }
+          const releaseSource=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(releaseSource,/\bconst\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          const {createCar02UnifiedRuntimeR50} = await import(pathToFileURL(resolve('car02-unified-runtime-r50.mjs')).href);
+          const {createCar02RuntimeR45} = await import(pathToFileURL(resolve('car02-runtime-r45.mjs')).href);
+          const {createCar02EdgeBoundaryR51} = await import(pathToFileURL(resolve('car02-edge-boundary-r51.mjs')).href);
+          let dbConnect=0,dbQuery=0,externalFetch=0,identityCalls=0;
+          const pool={
+            connect:async()=>{dbConnect++;throw Error('V424_UNEXPECTED_DB_CONNECT')},
+            query:async()=>{dbQuery++;throw Error('V424_UNEXPECTED_DB_QUERY')}
+          };
+          const network=async()=>{externalFetch++;throw Error('V424_UNEXPECTED_PROVIDER_CALL')};
+          const uuid='00000000-0000-0000-0000-000000000088';
+          const shop='qa-shop-a';
+          const base='https://qa.example.invalid';
+          const prefixes=['/api/car02/'+uuid,'/api/car02/'+uuid+'/history','/api/car02/photos/'+uuid];
+          const noEffect=()=>{
+            assert.deepEqual({dbConnect,dbQuery,externalFetch,identityCalls},
+                             {dbConnect:0,dbQuery:0,externalFetch:0,identityCalls:0});
+          };
+          const required={systemCode:'CAR02',contracted:true,goLiveApproved:true,
+            migrationVerified:true,verifiedIdentityBound:true,
+            workerBackendReady:true,externalNotificationsReviewed:true};
+          const config={
+            pool,shopCode:shop,lineChannelId:'qa_channel_review_only',
+            supabaseUrl:'https://qa-only.supabase.co',
+            supabaseAnonKey:'qa_anon_key_review_only',
+            storageServiceRoleKey:'qa_fake_private_storage_key_0000000000',
+            allowedOrigins:['https://qa.example.invalid'],
+            fetchImpl:network
+          };
+          async function checkLocked(handler,label,includePhoto=true){
+           const variants=[
+            [prefixes[0],'GET'],[prefixes[1],'GET'],
+            ...(includePhoto?[[prefixes[2],'GET']]:[]),
+            ['/api/car02','POST'],['/api/car02/'+uuid+'/quote','POST'],
+           ];
+           for(const [path,method] of variants){
+            const req=new Request(base+path,{method,headers:{
+              'origin':'https://qa.example.invalid',
+              ...(method==='POST'?{'content-type':'application/json'}:{})
+            },...(method==='POST'?{body:'{"qa":"not real"}'}:{})});
+            const res=await handler(req);
+            assert.equal(res.status,503,`${label}: ${method} ${path} must be closed`);
+            assert.equal((await res.json()).code,'CAR02_NOT_RELEASED');
+            noEffect();
+           }
+          }
+          const flags=['contracted','goLiveApproved','migrationVerified',
+                       'verifiedIdentityBound','workerBackendReady','externalNotificationsReviewed'];
+          for (const absent of flags){
+           const releaseState={...required,[absent]:false};
+           const r50=createCar02UnifiedRuntimeR50({...config,releaseState});
+           await checkLocked(r50,'R50 '+absent);
+          }
+          console.log('V424_R50_ALL_RELEASE_FLAGS_FAIL_CLOSED_PASS: each missing approval blocks business/photo routes without DB, Auth or Storage');
+          const r45=createCar02RuntimeR45({
+           pool,shopCode:shop,lineClientId:'qa_channel_review_only',releaseState:{...required,contracted:false},
+           allowedOrigins:['https://qa.example.invalid'],
+           verifyLineIdToken:async()=>{identityCalls++;throw Error('V424_IDENTITY_CALL')},
+           verifyStaffJwt:async()=>{identityCalls++;throw Error('V424_IDENTITY_CALL')},
+           resolveLineCustomer:async()=>{identityCalls++;throw Error('V424_IDENTITY_CALL')},
+           resolveStaffAccess:async()=>{identityCalls++;throw Error('V424_IDENTITY_CALL')}
+          });
+          await checkLocked(r45,'R45 contracted false',false);
+          console.log('V424_R45_INDEPENDENT_RELEASE_LOCK_PASS: R45 business boundary blocks before authenticator and database');
+          // Deliberately fake ONLY the *outer* R51 stage release condition.
+          // R52 source itself always remains hard-locked; all inner R50 flags stay false.
+          let runtimeCreates=0;
+          const r50locked=createCar02UnifiedRuntimeR50({...config,releaseState:{...required,goLiveApproved:false}});
+          const edge=createCar02EdgeBoundaryR51({
+           isServerReleased:async()=>true,
+           createRuntime:async()=>{runtimeCreates++;return r50locked}
+          });
+          const prefix='/functions/v1/dpro-car02-stage';
+          for(const path of [prefix+'/api/car02/'+uuid,
+                             prefix+'/api/car02/'+uuid+'/history',
+                             prefix+'/api/car02/photos/'+uuid,
+                             prefix+'/api/car02']){
+           const res=await edge(new Request(base+path));
+           assert.equal(res.status,503,`outer-stage-failure simulation: ${path}`);
+           assert.equal((await res.json()).code,'CAR02_NOT_RELEASED');
+           noEffect();
+          }
+          assert.equal(runtimeCreates,1,'R51 should reuse same R50 review runtime');
+          console.log('V424_OUTER_GATE_MISCONFIG_INNER_GATE_STILL_DENIES_PASS: simulated R51 approval does not bypass R50 locked routes');
+          const disallowed=await r50locked(new Request(base+'/api/car02/'+uuid,{headers:{origin:'https://evil.example.invalid'}}));
+          assert.equal(disallowed.status,403);
+          const legacy=await r50locked(new Request(base+'/api/legacy-reservations'));
+          assert.equal(legacy.status,404);
+          const malformedPhoto=await r50locked(new Request(base+'/api/car02/photos/bad-id'));
+          assert.equal(malformedPhoto.status,404);
+          noEffect();
+          console.log('V424_R50_ORIGIN_LEGACY_AND_PHOTO_ROUTING_DENIED_PASS: denied origins, legacy and malformed photos cannot reach external services');
+          // The full release gate is tested as a pure function, NEVER by connecting to any service.
+          const {createCar02ReleaseGate} = await import(pathToFileURL(resolve('car02-identity-r44.mjs')).href);
+          assert.equal(await createCar02ReleaseGate({systemCode:'WRONG',...required,systemCode:'WRONG'})(),false);
+          assert.equal(await createCar02ReleaseGate({...required,externalNotificationsReviewed:false})(),false);
+          assert.equal(await createCar02ReleaseGate({systemCode:'CAR02'})(),false);
+          console.log('V424_NO_GO_RELEASE_CONTRACT_PASS: no default release or bypass from incomplete flags');
+          console.log('V424_FINAL_NO_GO_HOLD: synthetic mocks only, R52 hard lock stays TRUE; unpatched R43/R44/R46 and production Worker remain unchanged');
+          NODEJS
+          node --check "$RUNNER_TEMP/car02-v424-nested-gate.mjs"
+          node "$RUNNER_TEMP/car02-v424-nested-gate.mjs" | tee "$RUNNER_TEMP/car02-v424-nested-gate.log"
+          for marker in \
+            V424_R50_ALL_RELEASE_FLAGS_FAIL_CLOSED_PASS \
+            V424_R45_INDEPENDENT_RELEASE_LOCK_PASS \
+            V424_OUTER_GATE_MISCONFIG_INNER_GATE_STILL_DENIES_PASS \
+            V424_R50_ORIGIN_LEGACY_AND_PHOTO_ROUTING_DENIED_PASS \
+            V424_NO_GO_RELEASE_CONTRACT_PASS \
+            V424_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v424-nested-gate.log"
           done
