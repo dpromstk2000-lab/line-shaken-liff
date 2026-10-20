@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.20 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.21 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1815,4 +1815,129 @@ jobs:
             V420_OUTBOX_PRIVATE_RLS_PASS \
             V420_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/v420-outbox-lease-qa.log"
+          done
+      - name: V4.21 simulated LINE transport acknowledgment gap and manual review quarantine (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          test -s "$RUNNER_TEMP/v420-outbox-lease-qa.log"
+          cat > "$RUNNER_TEMP/v421-remote-ambiguity-qa.mjs" <<'NODEJS'
+          // CAR02 V4.21: isolated external-delivery ambiguity QA. Simulated provider only.
+          // A remote 200 before local COMMIT can never prove exactly-once delivery.
+          import assert from 'node:assert/strict';
+          import {randomUUID} from 'node:crypto';
+          import {createRequire} from 'node:module';
+          import {join} from 'node:path';
+          const require=createRequire(join(process.env.RUNNER_TEMP,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:16,connectionTimeoutMillis:5000});
+          const shop='street_house_kitsuki', other='qa-other-shop', kind='v421-transport-qa';
+          const prefix='v421:'+randomUUID()+':';
+          const fail=()=>{const e=Error('V421_FAIL_CLOSED');e.code='V421_FAIL_CLOSED';throw e;};
+          async function tx(fn){const c=await pool.connect();let open=false;try{await c.query('BEGIN');open=true;const result=await fn(c);await c.query('COMMIT');open=false;return result;}catch(e){if(open)await c.query('ROLLBACK');throw e;}finally{c.release();}}
+          async function denied(fn){await assert.rejects(Promise.resolve().then(fn),e=>e?.code==='V421_FAIL_CLOSED');}
+          async function seed(tag,target=shop){const order=await pool.query(`SELECT id FROM public.ksh_car02_work_orders WHERE shop_code=$1 LIMIT 1`,[target]);assert.equal(order.rows.length,1);return (await pool.query(`INSERT INTO public.ksh_car02_notification_outbox(work_order_id,event_type,channel,dedupe_key) VALUES($1,$2,'LINE',$3) RETURNING id`,[order.rows[0].id,kind,prefix+tag])).rows[0].id;}
+          async function claim(id,target=shop){return tx(async c=>{
+           const o=await c.query(`SELECT o.id,o.delivery_status,o.next_attempt_at FROM public.ksh_car02_notification_outbox o
+           JOIN public.ksh_car02_work_orders w ON w.id=o.work_order_id
+           WHERE o.id=$1 AND w.shop_code=$2 AND o.event_type=$3 AND o.dedupe_key LIKE $4 FOR UPDATE OF o`,[id,target,kind,prefix+'%']);
+           if(o.rows.length!==1)fail();const row=o.rows[0];
+           if(!['pending','retry'].includes(row.delivery_status)||row.next_attempt_at && new Date(row.next_attempt_at)>new Date())fail();
+           const latest=await c.query(`SELECT phase FROM public.car02_v421_attempts_qa_only WHERE outbox_id=$1 ORDER BY seq DESC LIMIT 1 FOR UPDATE`,[id]);
+           // Once any delivery may have reached the external provider, never auto retry.
+           if(latest.rows.length && latest.rows[0].phase!=='rate_limited')fail();
+           const token=randomUUID();await c.query(`INSERT INTO public.car02_v421_attempts_qa_only(outbox_id,claim_token,phase) VALUES($1,$2,'inflight')`,[id,token]);
+           await c.query(`UPDATE public.ksh_car02_notification_outbox SET delivery_status='sending',attempts=attempts+1,next_attempt_at=NULL WHERE id=$1`,[id]);
+           return {id,token};
+          });}
+          async function finish(id,target,token,outcome){return tx(async c=>{
+           const result=await c.query(`SELECT o.delivery_status,a.seq,a.phase,a.claim_token FROM public.ksh_car02_notification_outbox o
+           JOIN public.ksh_car02_work_orders w ON w.id=o.work_order_id
+           JOIN LATERAL (SELECT seq,phase,claim_token FROM public.car02_v421_attempts_qa_only
+           WHERE outbox_id=o.id ORDER BY seq DESC LIMIT 1) a ON true
+           WHERE o.id=$1 AND w.shop_code=$2 AND o.event_type=$3 AND o.dedupe_key LIKE $4 FOR UPDATE OF o`,[id,target,kind,prefix+'%']);
+           if(result.rows.length!==1||result.rows[0].delivery_status!=='sending'||result.rows[0].phase!=='inflight'||result.rows[0].claim_token!==token)fail();
+           if(!['accepted','rate_limited','permanent','ambiguous'].includes(outcome))fail();
+           const next=outcome==='accepted'?'sent':outcome==='rate_limited'?'retry':'failed';
+           await c.query(`UPDATE public.car02_v421_attempts_qa_only SET phase=$2 WHERE seq=$1`,[result.rows[0].seq,outcome]);
+           await c.query(`UPDATE public.ksh_car02_notification_outbox
+           SET delivery_status=$2,sent_at=CASE WHEN $2='sent' THEN clock_timestamp() ELSE NULL END,
+           next_attempt_at=CASE WHEN $2='retry' THEN clock_timestamp()+interval '60 seconds' ELSE NULL END
+           WHERE id=$1`,[id,next]);
+           return next;
+          });}
+          async function recoverUnknown(id,target){return tx(async c=>{
+           const rows=await c.query(`SELECT o.delivery_status,a.seq,a.phase FROM public.ksh_car02_notification_outbox o
+           JOIN public.ksh_car02_work_orders w ON w.id=o.work_order_id
+           JOIN LATERAL (SELECT seq,phase FROM public.car02_v421_attempts_qa_only WHERE outbox_id=o.id ORDER BY seq DESC LIMIT 1) a ON true
+           WHERE o.id=$1 AND w.shop_code=$2 AND o.event_type=$3 AND o.dedupe_key LIKE $4 FOR UPDATE OF o`,[id,target,kind,prefix+'%']);
+           if(rows.rows.length!==1||rows.rows[0].delivery_status!=='sending'||rows.rows[0].phase!=='inflight')fail();
+           await c.query(`UPDATE public.car02_v421_attempts_qa_only SET phase='ambiguous' WHERE seq=$1`,[rows.rows[0].seq]);
+           await c.query(`UPDATE public.ksh_car02_notification_outbox SET delivery_status='failed',next_attempt_at=NULL WHERE id=$1`,[id]);
+           return 'manual_review_required';
+          });}
+          let externalCalls=0;
+          const fakeProvider=async (code)=>{externalCalls++;return {status:code};};
+          async function mockDispatch(id,code,target=shop){const h=await claim(id,target);const r=await fakeProvider(code);
+           const outcome=r.status===200?'accepted':r.status===429?'rate_limited':[400,401,403].includes(r.status)?'permanent':'ambiguous';
+           return finish(id,target,h.token,outcome);
+          }
+          try{
+           const v=await pool.query('SHOW server_version_num');assert.ok(+v.rows[0].server_version_num>=170000 && +v.rows[0].server_version_num<180000);
+           await pool.query(`CREATE TABLE public.car02_v421_attempts_qa_only(
+            seq bigserial PRIMARY KEY, outbox_id uuid NOT NULL REFERENCES public.ksh_car02_notification_outbox(id),
+            claim_token uuid NOT NULL UNIQUE,phase text NOT NULL CHECK(phase IN ('inflight','accepted','rate_limited','permanent','ambiguous')),
+            created_at timestamptz NOT NULL DEFAULT clock_timestamp())`);
+           const idOk=await seed('success');assert.equal(await mockDispatch(idOk,200),'sent');await denied(()=>claim(idOk));
+           let status=(await pool.query(`SELECT delivery_status,attempts,sent_at FROM public.ksh_car02_notification_outbox WHERE id=$1`,[idOk])).rows[0];
+           assert.equal(status.delivery_status,'sent');assert.equal(status.attempts,1);assert.ok(status.sent_at);
+           console.log('V421_SIMULATED_REMOTE_SUCCESS_ACK_PASS: accepted response persists one sent record, repeated send rejected');
+           const idRate=await seed('throttle'),first=await claim(idRate);
+           assert.equal((await fakeProvider(429)).status,429);assert.equal(await finish(idRate,shop,first.token,'rate_limited'),'retry');
+           await denied(()=>claim(idRate));await pool.query(`UPDATE public.ksh_car02_notification_outbox SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=$1`,[idRate]);
+           const second=await claim(idRate);assert.notEqual(second.token,first.token);await denied(()=>finish(idRate,shop,first.token,'accepted'));
+           await fakeProvider(200);assert.equal(await finish(idRate,shop,second.token,'accepted'),'sent');
+           console.log('V421_SIMULATED_RATE_LIMIT_RETRY_FENCE_PASS: 429 backoff and stale completion token rejection');
+           const idAmb=await seed('crash-between-remote-and-db');const inflight=await claim(idAmb);
+           assert.equal((await fakeProvider(200)).status,200); // Simulated remote success, no DB ack: crash.
+           assert.equal(await recoverUnknown(idAmb,shop),'manual_review_required');await denied(()=>claim(idAmb));
+           await denied(()=>finish(idAmb,shop,inflight.token,'accepted'));
+           status=(await pool.query(`SELECT delivery_status,sent_at FROM public.ksh_car02_notification_outbox WHERE id=$1`,[idAmb])).rows[0];
+           assert.equal(status.delivery_status,'failed');assert.equal(status.sent_at,null);
+           console.log('V421_REMOTE_ACCEPT_DB_CRASH_QUARANTINED_PASS: unknown outcome quarantined for manual review; automatic resend blocked');
+           const idTimeout=await seed('timeout'),t=await claim(idTimeout);
+           assert.equal(await finish(idTimeout,shop,t.token,'ambiguous'),'failed');await denied(()=>claim(idTimeout));
+           const idPermanent=await seed('permission'),p=await claim(idPermanent);await fakeProvider(401);
+           assert.equal(await finish(idPermanent,shop,p.token,'permanent'),'failed');await denied(()=>claim(idPermanent));
+           console.log('V421_TIMEOUT_AND_PERMANENT_FAILURE_FAIL_CLOSED_PASS: uncertain/error responses require investigation, not infinite resend');
+           const idOther=await seed('tenant',other);
+           await denied(()=>claim(idOther,shop));const hOther=await claim(idOther,other);await denied(()=>finish(idOther,shop,hOther.token,'accepted'));
+           await fakeProvider(200);await finish(idOther,other,hOther.token,'accepted');
+           console.log('V421_REMOTE_ATTEMPT_TENANT_ISOLATION_PASS: remote attempts cannot be claimed or acknowledged across shops');
+           const idRace=await seed('race');const results=await Promise.allSettled(Array.from({length:8},()=>claim(idRace)));
+           assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.filter(x=>x.status==='rejected'&&x.reason?.code==='V421_FAIL_CLOSED').length,7);
+           const win=results.find(x=>x.status==='fulfilled').value;await finish(idRace,shop,win.token,'ambiguous');
+           console.log('V421_PARALLEL_CLAIM_SINGLE_WINNER_PASS: 8 concurrent remote claims yield one and only one authorized attempt');
+           const forbidden=await pool.query(`SELECT has_table_privilege('anon','public.ksh_car02_notification_outbox','SELECT') AS a,has_table_privilege('authenticated','public.ksh_car02_notification_outbox','SELECT') AS b`);
+           assert.equal(forbidden.rows[0].a,false);assert.equal(forbidden.rows[0].b,false);
+           assert.equal(externalCalls,6); // 200 + 429 + retry 200 + crash 200 + permanent 401 + other 200
+           console.log('V421_FINAL_NO_GO_HOLD: remote provider SIMULATED; manual reconciliation needed; cannot claim exactly-once; source R13/V420 and live Worker unchanged');
+          }finally{await pool.end();}
+          NODEJS
+          node --check "$RUNNER_TEMP/v421-remote-ambiguity-qa.mjs"
+          node "$RUNNER_TEMP/v421-remote-ambiguity-qa.mjs" | tee "$RUNNER_TEMP/v421-remote-ambiguity-qa.log"
+          for marker in \
+            V421_SIMULATED_REMOTE_SUCCESS_ACK_PASS \
+            V421_SIMULATED_RATE_LIMIT_RETRY_FENCE_PASS \
+            V421_REMOTE_ACCEPT_DB_CRASH_QUARANTINED_PASS \
+            V421_TIMEOUT_AND_PERMANENT_FAILURE_FAIL_CLOSED_PASS \
+            V421_REMOTE_ATTEMPT_TENANT_ISOLATION_PASS \
+            V421_PARALLEL_CLAIM_SINGLE_WINNER_PASS \
+            V421_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v421-remote-ambiguity-qa.log"
           done
