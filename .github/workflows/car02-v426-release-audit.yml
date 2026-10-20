@@ -1,0 +1,108 @@
+name: CAR02 V4.26 Independent Release Audit (NO_GO HOLD)
+# Read-only evidence. Does not release CAR02. Does not require secrets.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v426-release-audit.yml'
+      - 'car02-pg-adapter.mjs'
+      - 'car02-identity-r44.mjs'
+      - 'car02-auth-providers-r46.mjs'
+      - 'car02-private-photo-view-r48.mjs'
+      - 'car02-unified-runtime-r50.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-audit-only:
+    name: V4.26 Repository Release Blockers (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout sources (read only)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Audit release blockers without any credentials or services
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Must not silently use GitHub Actions secrets or production credentials.
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          cat > "$RUNNER_TEMP/car02-v426-release-audit.mjs" <<'NODEJS'
+          // CAR02 V4.26 read-only release-readiness audit, run only in GitHub Actions.
+          // NO_GO never becomes GO based on green disposable CI tests.
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const sources={
+           r43:'car02-pg-adapter.mjs',r44:'car02-identity-r44.mjs',
+           r46:'car02-auth-providers-r46.mjs',r48:'car02-private-photo-view-r48.mjs',
+           r50:'car02-unified-runtime-r50.mjs',r52:'car02-edge-entry-r52.ts'
+          };
+          const s={};const hashes={};
+          for(const [k,path] of Object.entries(sources)){
+           let v;try{v=readFileSync(path,'utf8');}catch{throw Error('V426_REQUIRED_SOURCE_MISSING:'+path)}
+           if(v.length<500)throw Error('V426_SOURCE_TOO_SHORT:'+path);
+           s[k]=v;hashes[path]=createHash('sha256').update(v).digest('hex');
+          }
+          const knownGaps=[
+           {id:'RAW_R43_TX_MEMBERSHIP_FENCE_NOT_INTEGRATED',file:sources.r43,
+            found:s.r43.includes('ksh_car02_operations')&&!s.r43.includes('ksh_car02_staff_access'),
+            fix:'Port guarded R43 to reviewed runtime and test read/modify/replay authorization on a real candidate patch'},
+           {id:'RAW_R44_STAFF_AUTH_VERSION_NOT_BOUND',file:sources.r44,
+            found:s.r44.includes('staff:')&&!s.r44.includes('trustedAuthVersion'),
+            fix:'Add trusted server-side version binding across the auth actor and session contracts'},
+           {id:'RAW_R46_STAFF_VERSION_NOT_QUERIED',file:sources.r46,
+            found:s.r46.includes('ksh_car02_staff_access')&&!/\bauth_version\b/.test(s.r46),
+            fix:'Review DB membership schema and version-aware grants and session rotation'},
+           {id:'RAW_R48_PHOTO_JTI_REVOCATION_NOT_INTEGRATED',file:sources.r48,
+            found:s.r48.includes('createCar02PrivatePhotoViewR48')&&!/\bjti\b/.test(s.r48),
+            fix:'Require a trusted revocation-aware photo access gateway and re-check before private storage'},
+           {id:'R50_PHOTO_UPLOAD_ROUTE_NOT_COMPOSED',file:sources.r50,
+            found:s.r50.includes('createCar02VerifiedRuntimeR46')&&!s.r50.includes('createCar02PhotoUploadHttpR82'),
+            fix:'Complete strict upload routing, durable intent, compensation and 5MiB controls in reviewed staging'}
+          ];
+          const lock=/(?:const|let)\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/.test(s.r52)
+           && /isServerReleased\s*:\s*\(\)\s*=>\s*!CAR02_RELEASE_LOCK/.test(s.r52)
+           && /if\s*\(\s*CAR02_RELEASE_LOCK\s*\)\s*throw\s+Error\(\s*['"]CAR02_NOT_RELEASED['"]\s*\)/.test(s.r52);
+          assert(lock,'V426_CRITICAL_R52_HARD_LOCK_MISSING_OR_MODIFIED');
+          // If a source contract changes, this detector itself must be reviewed.
+          // Never let a previously known gap silently become a green release claim.
+          const changed=knownGaps.filter(x=>!x.found);
+          const prodUnverified=[
+           'PRODUCTION_DATABASE_BACKUP_AND_RESTORE',
+           'PRODUCTION_R13_R46_MIGRATION_AND_ROW_LEVEL_SECURITY',
+           'SIGNED_RUNTIME_SESSION_ISSUER_ROTATION_LOGOUT',
+           'PRODUCTION_LINE_DELIVERY_AND_MANUAL_RECONCILIATION',
+           'PRODUCTION_PRIVATE_STORAGE_AND_UPLOAD_COMPENSATION',
+           'STAGING_WORKER_HTTP_E2E_AND_CUSTOMER_ACCEPTANCE',
+           'EXPLICIT_CONTRACT_AND_OWNER_RELEASE_APPROVAL'
+          ];
+          const result={schema:'DPRO_CAR02_V426_RELEASE_AUDIT',mode:'READ_ONLY_SOURCE_AUDIT',
+           baseline:'V4.25_CI_PASS_DISPOSABLE_PG17',releaseDecision:'NO_GO',migrationDecision:'HOLD',
+           deployAuthorized:false,realIntegrationVerified:false,r52HardLock:lock,
+           detectedKnownSourceGaps:knownGaps.map(({id,file,found,fix})=>({id,file,detected:found,requiredAction:fix})),
+           productionEvidenceNotVerified:prodUnverified,
+           evidenceFileSha256:hashes,sourceContractChangeRequiresManualReview:changed.map(x=>x.id),
+           warning:'Passing disposable GitHub CI does not authorize production database, Worker, Storage, LINE or release.'
+          };
+          console.log(JSON.stringify(result,null,2));
+          console.log('V426_R52_HARD_RELEASE_LOCK_PASS');
+          if(changed.length){
+           console.error('V426_SOURCE_CONTRACT_CHANGE_REVIEW_REQUIRED:'+changed.map(x=>x.id).join(','));
+           process.exitCode=1;
+          }else{
+           console.log('V426_KNOWN_PRODUCTION_GAPS_DETECTED_PASS');
+           console.log('V426_SOURCE_HASH_EVIDENCE_RECORDED_PASS');
+           console.log('V426_PRODUCTION_EVIDENCE_UNVERIFIED_PASS');
+           console.log('V426_FINAL_NO_GO_HOLD');
+          }
+          NODEJS
+          node --check "$RUNNER_TEMP/car02-v426-release-audit.mjs"
+          node "$RUNNER_TEMP/car02-v426-release-audit.mjs" | tee "$RUNNER_TEMP/car02-v426-release-audit.log"
+          for marker in V426_R52_HARD_RELEASE_LOCK_PASS V426_KNOWN_PRODUCTION_GAPS_DETECTED_PASS V426_SOURCE_HASH_EVIDENCE_RECORDED_PASS V426_PRODUCTION_EVIDENCE_UNVERIFIED_PASS V426_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v426-release-audit.log"
+          done
