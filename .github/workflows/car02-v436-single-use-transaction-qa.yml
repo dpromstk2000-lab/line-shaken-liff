@@ -1,0 +1,58 @@
+name: CAR02 V4.36 Single-Use Transaction Gate QA (NO_GO HOLD)
+# REVIEW-ONLY: mocked pool and trusted adapter interfaces; no production connections.
+# A passing CI does NOT validate a real Supabase session attestor or production migration.
+on:
+  push:
+    branches:
+      - car02-v434-review-only
+    paths:
+      - 'car02-transaction-gate-r436.mjs'
+      - 'car02-transaction-gate-r436.test.mjs'
+      - 'car02-staff-authority-r435.mjs'
+      - 'car02-staff-authority-r435.test.mjs'
+      - 'car02-staff-generation-r434.mjs'
+      - 'car02-staff-generation-r434.test.mjs'
+      - '.github/workflows/car02-v436-single-use-transaction-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-atomic-write:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout review-only source, no persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: V4.34 V4.35 V4.36 syntax and transaction mock tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in car02-staff-generation-r434.mjs car02-staff-authority-r435.mjs car02-transaction-gate-r436.mjs car02-transaction-gate-r436.test.mjs; do
+            node --check "$file"
+          done
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V434_RELEASE_LOCK} from './car02-staff-generation-r434.mjs';
+          import {CAR02_V435_RELEASE_LOCK} from './car02-staff-authority-r435.mjs';
+          import {CAR02_V436_RELEASE_LOCK} from './car02-transaction-gate-r436.mjs';
+          assert.equal(CAR02_V434_RELEASE_LOCK,true);
+          assert.equal(CAR02_V435_RELEASE_LOCK,true);
+          assert.equal(CAR02_V436_RELEASE_LOCK,true);
+          const originalEntry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(originalEntry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(originalEntry,/car02-transaction-gate-r436|car02-staff-authority-r435|car02-staff-generation-r434/);
+          const source=readFileSync('car02-transaction-gate-r436.mjs','utf8');
+          assert.match(source,/consumed\.add\(actor\)/);
+          assert.match(source,/await authority\.assertMutation\(/);
+          assert.match(source,/await client\.query\('COMMIT'\)/);
+          assert.match(source,/await client\.query\('ROLLBACK'\)/);
+          assert.match(source,/!stillFresh\(actor\)/);
+          console.log('V436_SOURCE_BOUND_SINGLE_USE_AND_RELEASE_LOCK_PASS');
+          console.log('V436_MOCKED_TRANSACTION_ORDER_AND_NEGATIVE_CASES_PASS');
+          console.log('V436_PROVIDER_ATTESTATION_AND_COMMIT_FENCE_NOT_IMPLEMENTED_NO_GO');
+          NODE
