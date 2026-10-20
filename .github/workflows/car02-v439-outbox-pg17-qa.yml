@@ -1,0 +1,118 @@
+name: CAR02 V4.39 Synthetic Transactional Outbox and Ambiguous Send PG17 QA (NO_GO HOLD)
+# ONLY isolated review branch; offline mock transport and disposable PostgreSQL 17.
+# SUCCESS does not authorize Supabase, LINE, Worker, production SQL, or deployment.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-outbox-r439.mjs'
+      - 'car02-outbox-r439.test.mjs'
+      - 'car02-v439-disposable-pg17.sql'
+      - '.github/workflows/car02-v439-outbox-pg17-qa.yml'
+      - 'car02-idempotency-r438.mjs'
+      - 'car02-staff-authority-r435.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-transactional-outbox:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v439_disposable_only
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v439_disposable_only
+    steps:
+      - name: Checkout isolated source without stored credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: 77 offline tests and live release lock verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          for n in CAR02_DATABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!n:-}" || { echo "Unexpected live env: $n" >&2; exit 1; }
+          done
+          for f in car02-outbox-r439.mjs car02-outbox-r439.test.mjs car02-v439-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-outbox-r439.mjs
+          node --check car02-outbox-r439.test.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V439_RELEASE_LOCK,CAR02_V439_CLAIM_SQL,CAR02_V439_FINISH_SQL} from './car02-outbox-r439.mjs';
+          assert.equal(CAR02_V439_RELEASE_LOCK,true);
+          assert.equal(CAR02_V439_CLAIM_SQL,'SELECT event_id,payload FROM public.v439_qa_claim_next($1::text,$2::uuid)');
+          assert.equal(CAR02_V439_FINISH_SQL,'SELECT public.v439_qa_finish($1::text,$2::uuid,$3::uuid,$4::text) AS completed');
+          const edge=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(edge,/car02-outbox-r439|v439_qa_/);
+          for(const f of ['car02-staff-generation-r434.mjs','car02-staff-authority-r435.mjs','car02-transaction-gate-r436.mjs','car02-tenant-cas-gate-r437.mjs','car02-idempotency-r438.mjs']){
+            assert.match(readFileSync(f,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V439_OFFLINE_77_TESTS_AND_HARD_RELEASE_LOCK_PASS');
+          console.log('V439_NO_LIVE_PROVIDER_AND_NO_EXTERNAL_SIDE_EFFECTS_NO_GO');
+          NODE
+      - name: Real disposable PostgreSQL 17 receipt, rollback, eight-claim concurrency and uncertain delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55439 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v439_disposable' >/dev/null
+          pg -d car02_v439_disposable -f /workspace/car02-v439-disposable-pg17.sql | tee "$RUNNER_TEMP/v439-pg.log"
+          for mark in V439_PG17_UNPRIVILEGED_ACCESS_DENIED_PASS V439_PG17_ATOMIC_RECEIPT_OUTBOX_REPLAY_PASS V439_PG17_TENANT_AND_INTENT_CONFLICT_DENIED_PASS V439_PG17_ROLLBACK_REMOVES_RECEIPT_AND_OUTBOX_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v439-pg.log"
+          done
+          # Eight different CLAIM TOKENS race for ONE pending event.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v439_disposable -c "SELECT * FROM public.v439_qa_claim_next('qa_shop_a','00000000-0000-0000-0000-00000000440$i')" > "$RUNNER_TEMP/v439-claim-$i.out") &
+            pids+=("$!")
+          done
+          for p in "${pids[@]}"; do wait "$p"; done
+          total=0
+          for i in 1 2 3 4 5 6 7 8; do
+            lines=$(grep -c '|' "$RUNNER_TEMP/v439-claim-$i.out" || true)
+            total=$((total+lines))
+          done
+          test "$total" -eq 1 || { echo "V439_DUPLICATE_CLAIM: $total" >&2; exit 1; }
+          state=$(pg -Atq -d car02_v439_disposable -c "SELECT (SELECT count(*) FROM public.v439_qa_outbox WHERE status='dispatching')::text||':'||(SELECT count(*) FROM public.v439_qa_outbox)::text")
+          test "$state" = '1:1' || { echo "V439_CLAIM_STATE_INVALID: $state" >&2; exit 1; }
+          echo V439_PG17_EIGHT_WORKERS_SINGLE_CLAIM_PASS
+          # Lost/ambiguous external ACK -> MANUAL_REVIEW, never requeue/retry.
+          claim=$(pg -Atq -d car02_v439_disposable -c "SELECT id::text||'|'||claim_token::text FROM public.v439_qa_outbox WHERE status='dispatching'")
+          IFS='|' read -r event token <<< "$claim"
+          test -n "$event" && test -n "$token"
+          bad=$(pg -Atq -d car02_v439_disposable -c "SELECT public.v439_qa_finish('qa_shop_b','$event','$token','confirmed')")
+          test "$bad" = 'f'
+          bad=$(pg -Atq -d car02_v439_disposable -c "SELECT public.v439_qa_finish('qa_shop_a','$event','00000000-0000-0000-0000-000000009999','confirmed')")
+          test "$bad" = 'f'
+          outcome=$(pg -Atq -d car02_v439_disposable -c "SELECT public.v439_qa_finish('qa_shop_a','$event','$token','uncertain')")
+          test "$outcome" = 't'
+          bad=$(pg -Atq -d car02_v439_disposable -c "SELECT public.v439_qa_finish('qa_shop_a','$event','$token','confirmed')")
+          test "$bad" = 'f'
+          retry=$(pg -Atq -d car02_v439_disposable -c "SELECT * FROM public.v439_qa_claim_next('qa_shop_a','00000000-0000-0000-0000-000000004419')")
+          test -z "$retry" || { echo 'V439_MANUAL_REVIEW_REQUEUED' >&2; exit 1; }
+          echo V439_PG17_MANUAL_REVIEW_FAIL_CLOSED_NO_RETRY_PASS
+          # One separate NEW synthetic event may be confirmed once.
+          pg -Atq -d car02_v439_disposable -c "SELECT public.v439_qa_apply_touch('qa_shop_a','00000000-0000-0000-0000-000000004394','00000000-0000-0000-0000-000000004420','00000000-0000-0000-0000-000000004392',1)" >/dev/null
+          pg -Atq -d car02_v439_disposable -c "SELECT * FROM public.v439_qa_claim_next('qa_shop_a','00000000-0000-0000-0000-000000004421')" > "$RUNNER_TEMP/v439-confirm-claim.out"
+          test "$(grep -c '|' "$RUNNER_TEMP/v439-confirm-claim.out")" -eq 1
+          event2=$(pg -Atq -d car02_v439_disposable -c "SELECT id FROM public.v439_qa_outbox WHERE claim_token='00000000-0000-0000-0000-000000004421'")
+          test "$(pg -Atq -d car02_v439_disposable -c "SELECT public.v439_qa_finish('qa_shop_a','$event2','00000000-0000-0000-0000-000000004421','confirmed')")" = 't'
+          result=$(pg -Atq -d car02_v439_disposable -c "SELECT (SELECT count(*) FROM public.v439_qa_outbox WHERE status='manual_review')::text||':'||(SELECT count(*) FROM public.v439_qa_outbox WHERE status='delivered')::text||':'||(SELECT count(*) FROM public.v439_qa_outbox WHERE status IN ('pending','dispatching'))::text||':'||(SELECT count(*) FROM public.v439_qa_receipts)::text||':'||(SELECT state_version FROM public.v439_qa_orders WHERE shop_code='qa_shop_b')::text")
+          test "$result" = '1:1:0:2:1' || { echo "V439_FINAL_INVARIANT_BROKEN: $result" >&2; exit 1; }
+          echo V439_PG17_CONFIRMED_AND_UNKNOWN_SEPARATION_PASS
+          echo V439_FINAL_RELEASE_NO_GO_HOLD_TRUE
