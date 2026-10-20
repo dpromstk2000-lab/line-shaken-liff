@@ -1,0 +1,163 @@
+name: CAR02 V4.27 R43 Transaction Guard Candidate (NO_GO HOLD)
+# Standalone review-only; no deployment, production DB, secrets, storage, or LINE.
+on:
+  push:
+    paths:
+      - '.github/workflows/car02-v427-r43-transaction-guard-qa.yml'
+      - 'car02-pg-adapter.mjs'
+      - 'car02-core.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r43-patch-candidate:
+    name: V4.27 Raw R43 candidate transaction guard (NO_GO HOLD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout readonly
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Copy R43 to isolated path and test guard against mocked PG boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s car02-pg-adapter.mjs
+          test -s car02-core.mjs
+          cat > "$RUNNER_TEMP/v427-r43-candidate-qa.mjs" <<'NODEJS'
+          // V4.27: R43 in-transaction guard candidate, isolated source copy and mock-PG ONLY.
+          // No production DB, no actual Supabase identity verification, no worker, no LINE.
+          import assert from 'node:assert/strict';
+          import {readFileSync, writeFileSync, mkdtempSync} from 'node:fs';
+          import {tmpdir} from 'node:os';
+          import {join,resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          import {createHash} from 'node:crypto';
+          const root=process.env.GITHUB_WORKSPACE||process.cwd();
+          const original=readFileSync(resolve(root,'car02-pg-adapter.mjs'),'utf8');
+          const checksum=createHash('sha256').update(original).digest('hex');
+          assert.equal(checksum,'cb4c83ddac1205c5855aacbb803fcb3492d46b6101f496140996daf6231d2ed4','V427_R43_BASELINE_CHANGED_STOP_AND_REVIEW');
+          const edge=readFileSync(resolve(root,'car02-edge-entry-r52.ts'),'utf8');
+          assert.match(edge,/\bconst\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/,'V427_R52_LOCK_MISSING');
+          const anchor="        await c.query('BEGIN');open=true;\n";
+          assert.equal(original.split(anchor).length,2,'V427_TRANSACTION_ANCHOR_DRIFT');
+          assert.ok(original.includes('return obj(existing.response_snapshot);'));
+          assert.ok(!original.includes('ksh_car02_staff_access'),'V427_EXPECT_RAW_R43_GAP');
+          // REQUIRED upstream contract: verified subject and trustedAuthVersion must come from
+          // a reviewed server authority, never from HTTP request/body/claims without verification.
+          const guard=`        // V4.27 ISOLATED PATCH CANDIDATE: R43 transaction-bound staff re-authorization.
+                  // Staff authorization MUST precede even an idempotent old receipt.
+                  if(!actor || actor.verified!==true || actor.shopCode!==shop ||
+                     !['owner','staff','customer'].includes(actor.role))
+                    throw E('CAR02_TX_VERIFIED_ACTOR_REQUIRED',403);
+                  if(actor.role==='staff' || actor.role==='owner') {
+                    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.subject||'') ||
+                       !Number.isSafeInteger(actor.trustedAuthVersion) || actor.trustedAuthVersion<1)
+                      throw E('CAR02_TX_TRUSTED_STAFF_CLAIM_REQUIRED',403);
+                    const currentMember=await one(c,\`SELECT active,staff_role,auth_version
+                      FROM public.ksh_car02_staff_access
+                      WHERE shop_code=$1 AND user_sub=$2 FOR UPDATE\`,[shop,actor.subject]);
+                    if(!currentMember || currentMember.active!==true)
+                      throw E('CAR02_TX_MEMBERSHIP_REVOKED',403);
+                    if(currentMember.staff_role!==actor.role)
+                      throw E('CAR02_TX_ROLE_CHANGED',403);
+                    if(Number(currentMember.auth_version)!==actor.trustedAuthVersion)
+                      throw E('CAR02_TX_SESSION_STALE',403);
+                  } else {
+                    // Customer identity remains dependent on external verified LINE contract.
+                    if(typeof actor.subject!=='string'||!actor.subject ||
+                       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.customerId||''))
+                      throw E('CAR02_TX_VERIFIED_CUSTOMER_REQUIRED',403);
+                  }
+          `;
+          const candidate=original.replace(anchor,anchor+guard);
+          assert.equal(candidate.split('CAR02_TX_MEMBERSHIP_REVOKED').length,2);
+          assert.ok(candidate.indexOf('FOR UPDATE')<candidate.indexOf("pg_advisory_xact_lock"));
+          assert.ok(candidate.indexOf('FOR UPDATE')<candidate.indexOf('SELECT request_digest,response_snapshot,completed_at'));
+          const folder=mkdtempSync(join(process.env.RUNNER_TEMP||tmpdir(),'car02-v427-'));
+          writeFileSync(join(folder,'car02-pg-adapter.mjs'),candidate);
+          writeFileSync(join(folder,'car02-core.mjs'),readFileSync(resolve(root,'car02-core.mjs')));
+          const module=await import(pathToFileURL(join(folder,'car02-pg-adapter.mjs')).href);
+          const shop='v427-test-shop',sub='00000000-0000-0000-0000-000000004427';
+          const membership={active:true,staff_role:'staff',auth_version:1};
+          const ops=new Map(),queries=[];
+          let committed=0,rolledback=0;
+          const pool={async connect(){
+            let open=false;
+            return {async query(sql,values=[]){
+              queries.push(sql);
+              if(sql==='BEGIN'){open=true;return {rows:[],rowCount:0};}
+              if(sql==='COMMIT'){assert(open);open=false;committed++;return {rows:[],rowCount:0};}
+              if(sql==='ROLLBACK'){open=false;rolledback++;return {rows:[],rowCount:0};}
+              if(sql.includes('FROM public.ksh_car02_staff_access')){
+                const ok=values[0]===shop&&values[1]===sub;
+                return {rows:ok?[{...membership}]:[],rowCount:ok?1:0};
+              }
+              if(sql.includes('pg_advisory_xact_lock'))return {rows:[{}],rowCount:1};
+              if(sql.includes('FROM public.ksh_car02_operations')){
+                const k=values.join('|');const item=ops.get(k);
+                return {rows:item?[item]:[],rowCount:item?1:0};
+              }
+              if(sql.includes('INSERT INTO public.ksh_car02_operations')){
+                assert(open);ops.set(values.slice(0,3).join('|'),{
+                  request_digest:values[3],response_snapshot:values[4],completed_at:'now'
+                });return {rows:[],rowCount:1};
+              }
+              throw Error('V427_UNEXPECTED_SQL:'+sql.slice(0,120));
+            },release(){}};
+          }};
+          const db=module.createCar02PgAdapter(pool);
+          const actor=(v=1,mod={})=>({role:'staff',subject:sub,shopCode:shop,verified:true,trustedAuthVersion:v,...mod});
+          const args=(who,key='v427-once')=>({actor:who,shop:who.shopCode,key,intent:{op:'v427-unit'}});
+          const error=async(p,code)=>assert.rejects(p,e=>e.code===code&&e.status===403,code);
+          let callbacks=0;
+          const make=()=>{callbacks++;return {id:'synthetic-receipt-v427',shop};};
+          const first=await db.transaction(args(actor()),make);
+          assert.equal(first.id,'synthetic-receipt-v427');assert.equal(callbacks,1);assert.equal(ops.size,1);
+          const same=await db.transaction(args(actor()),()=>{throw Error('V427_UNEXPECTED_DUPLICATE');});
+          assert.equal(same.id,first.id);assert.equal(callbacks,1);
+          console.log('V427_R43_CANDIDATE_ATOMIC_REPLAY_PASS');
+          await error(db.transaction(args(actor(1,{verified:false}),'v427-bad-verified'),make),'CAR02_TX_VERIFIED_ACTOR_REQUIRED');
+          await error(db.transaction(args(actor(1,{trustedAuthVersion:undefined}),'v427-missing-proof'),make),'CAR02_TX_TRUSTED_STAFF_CLAIM_REQUIRED');
+          await error(db.transaction(args(actor(1,{role:'owner'}),'v427-wrong-role'),make),'CAR02_TX_ROLE_CHANGED');
+          await error(db.transaction(args(actor(1,{shopCode:'other-shop'}),'v427-other-tenant'),make),'CAR02_TX_MEMBERSHIP_REVOKED');
+          await error(db.transaction(args(actor(4),'v427-stale'),make),'CAR02_TX_SESSION_STALE');
+          assert.equal(callbacks,1);assert.equal(ops.size,1);
+          console.log('V427_R43_CANDIDATE_STAFF_SCOPE_DENIAL_PASS');
+          membership.active=false;membership.auth_version=2;
+          await error(db.transaction(args(actor()),()=>{throw Error('V427_OLD_REPLAY_CALLED');}),'CAR02_TX_MEMBERSHIP_REVOKED');
+          await error(db.transaction(args(actor(),'v427-revoked-new'),make),'CAR02_TX_MEMBERSHIP_REVOKED');
+          assert.equal(callbacks,1);assert.equal(ops.size,1);
+          console.log('V427_R43_CANDIDATE_REVOKED_REPLAY_AND_WRITE_DENIED_PASS');
+          membership.active=true;membership.auth_version=3;
+          await error(db.transaction(args(actor()),make),'CAR02_TX_SESSION_STALE');
+          const renewed=await db.transaction(args(actor(3)),()=>{throw Error('V427_REPLAY_AFTER_REISSUE');});
+          assert.equal(renewed.id,first.id);
+          assert.equal(callbacks,1);assert.equal(ops.size,1);
+          console.log('V427_R43_CANDIDATE_VERSION_ROTATION_PASS');
+          const begin=queries.filter(q=>q==='BEGIN').length;
+          const guardReads=queries.filter(q=>q.includes('FROM public.ksh_car02_staff_access')).length;
+          const operationReads=queries.filter(q=>q.includes('FROM public.ksh_car02_operations')).length;
+          assert.equal(guardReads,begin-2); // unverified and missing-version denied before DB membership
+          assert.equal(committed,3);assert.ok(rolledback>=7);
+          assert.equal(operationReads,3); // first insert, authorized replay, renewed replay
+          console.log('V427_R43_SOURCE_SHA_LOCK_AND_NO_UNAUTHORIZED_REPLAY_PASS');
+          console.log('V427_FINAL_NO_GO_HOLD: mock DB only; trustedAuthVersion issuer, R44/R46, customer auth, real PG, production R43/Worker remain unmodified');
+          NODEJS
+          node --check "$RUNNER_TEMP/v427-r43-candidate-qa.mjs"
+          node "$RUNNER_TEMP/v427-r43-candidate-qa.mjs" | tee "$RUNNER_TEMP/v427.log"
+          for marker in \
+            V427_R43_CANDIDATE_ATOMIC_REPLAY_PASS \
+            V427_R43_CANDIDATE_STAFF_SCOPE_DENIAL_PASS \
+            V427_R43_CANDIDATE_REVOKED_REPLAY_AND_WRITE_DENIED_PASS \
+            V427_R43_CANDIDATE_VERSION_ROTATION_PASS \
+            V427_R43_SOURCE_SHA_LOCK_AND_NO_UNAUTHORIZED_REPLAY_PASS \
+            V427_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v427.log"
+          done
