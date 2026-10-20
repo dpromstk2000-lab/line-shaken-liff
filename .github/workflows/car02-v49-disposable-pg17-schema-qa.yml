@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.18 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.19 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -1517,4 +1517,155 @@ jobs:
             V418_CONCURRENT_LOGOUT_ROW_LOCK_PASS \
             V418_FINAL_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/v418-session-jti-qa.log"
+          done
+      - name: V4.19 guarded R43 lookup/history with signed JTI and staff role fence (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s "$RUNNER_TEMP/v418-disposable-copy/car02-pg-adapter.mjs"
+          test -s "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          test -s "$RUNNER_TEMP/v418-session-jti-qa.mjs"
+          cat > "$RUNNER_TEMP/v419-read-boundary-qa.mjs" <<'NODEJS'
+          // CAR02 V4.19: isolated read-only authorization boundary / REVIEW-ONLY.
+          // Uses actual R43 lookup/history on disposable PostgreSQL 17. NEVER deploy as an HTTP endpoint.
+          import assert from 'node:assert/strict';
+          import {generateKeyPairSync,randomUUID,sign,verify} from 'node:crypto';
+          import {readFileSync} from 'node:fs';
+          import {join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          import {createRequire} from 'node:module';
+          const temp=process.env.RUNNER_TEMP;
+          const require=createRequire(join(temp,'v413-deps','package.json'));
+          const {Pool}=require('pg');
+          const {createCar02PgAdapter}=await import(pathToFileURL(join(temp,'v418-disposable-copy','car02-pg-adapter.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:8,connectionTimeoutMillis:5000});
+          const adapter=createCar02PgAdapter(pool);
+          const shop='street_house_kitsuki',sub='00000000-0000-0000-0000-000000000418';
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+          const now=()=>Math.floor(Date.now()/1000),b64=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
+          const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const err=code=>{const e=new Error(code);e.code=code;throw e};
+          const parse=s=>JSON.parse(Buffer.from(s,'base64url').toString('utf8'));
+          function issue(jti,{role='staff',shopCode=shop,authVersion=1,issuedAt=now(),expiresAt=now()+90}={}){
+            const h=b64({alg:'EdDSA',typ:'JWT'}),p=b64({iss:'car02-v419-read-qa',aud:'car02-disposable-only',sub,shop:shopCode,role,authVersion,jti,iat:issuedAt,exp:expiresAt});
+            const msg=h+'.'+p;
+            return msg+'.'+sign(null,Buffer.from(msg),privateKey).toString('base64url');
+          }
+          function verifySession(token){
+            if(typeof token!=='string'||!/^[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+\.[-_A-Za-z0-9]+$/.test(token))err('V419_SESSION_INVALID');
+            const parts=token.split('.');let h,p;
+            try{h=parse(parts[0]);p=parse(parts[1]);}catch{err('V419_SESSION_INVALID')}
+            if(h?.alg!=='EdDSA'||h?.typ!=='JWT'||p?.iss!=='car02-v419-read-qa'||p?.aud!=='car02-disposable-only'||
+               p?.sub!==sub||!uuid.test(p?.sub||'')||p?.shop!==shop||p?.role!=='staff'||
+               !Number.isSafeInteger(p?.authVersion)||p.authVersion<1||!uuid.test(p?.jti||'')||
+               !Number.isSafeInteger(p?.iat)||!Number.isSafeInteger(p?.exp)||p.iat>now()||p.exp<=now()||p.exp-p.iat>90)
+                err('V419_SESSION_INVALID');
+            if(!verify(null,Buffer.from(parts[0]+'.'+parts[1]),publicKey,Buffer.from(parts[2],'base64url')))err('V419_SESSION_INVALID');
+            return Object.freeze({subject:p.sub,shopCode:p.shop,role:p.role,authVersion:p.authVersion,jti:p.jti});
+          }
+          function createCar02ReadGuardV419({pool,adapter,verifySession}) {
+            // All staff identity fields are derived from a validated server-issued signature.
+            // Hold FOR SHARE membership + session locks for the entire actual R43 lookup/history.
+            async function authorizedRead(token,requestedShop,requestedId,method){
+              const identity=verifySession(token);
+              if(requestedShop!==identity.shopCode||!uuid.test(requestedId||''))err('V419_SCOPE_REJECTED');
+              const c=await pool.connect();let tx=false;
+              try {
+                await c.query('BEGIN');tx=true;
+                const m=await c.query(`SELECT staff_role,active,auth_version FROM public.ksh_car02_staff_access
+                  WHERE shop_code=$1 AND user_sub=$2 FOR SHARE`,[requestedShop,identity.subject]);
+                if(m.rows?.length!==1||m.rows[0].active!==true||m.rows[0].staff_role!==identity.role||m.rows[0].auth_version!==identity.authVersion)
+                  err('V419_MEMBERSHIP_REVOKED');
+                const ticket=await c.query(`SELECT active FROM public.car02_v418_staff_sessions_qa_only
+                  WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3 FOR SHARE`,[requestedShop,identity.subject,identity.jti]);
+                if(ticket.rows?.length!==1||ticket.rows[0].active!==true)err('V419_SESSION_REVOKED');
+                const value=await adapter[method](requestedShop,requestedId);
+                await c.query('COMMIT');tx=false;
+                return value;
+              } catch(e){if(tx)await c.query('ROLLBACK');throw e}
+              finally{c.release()}
+            }
+            return Object.freeze({
+              getOrder:(token,s,id)=>authorizedRead(token,s,id,'lookup'),
+              getHistory:(token,s,id)=>authorizedRead(token,s,id,'history')
+            });
+          }
+          const guard=createCar02ReadGuardV419({pool,adapter,verifySession});
+          async function denied(fn,code){await assert.rejects(Promise.resolve().then(fn),e=>e?.code===code||e?.message===code,code)}
+          async function ledger(jti){await pool.query(`INSERT INTO public.car02_v418_staff_sessions_qa_only(shop_code,user_sub,session_id,active)
+           VALUES($1,$2,$3,true)`,[shop,sub,jti]);}
+          async function logout(jti){await pool.query(`UPDATE public.car02_v418_staff_sessions_qa_only SET active=false,revoked_at=now()
+           WHERE shop_code=$1 AND user_sub=$2 AND session_id=$3`,[shop,sub,jti]);}
+          try{
+            const r=await pool.query(`SELECT id FROM public.ksh_car02_work_orders WHERE shop_code=$1 ORDER BY created_at DESC LIMIT 1`,[shop]);
+            assert.ok(r.rows.length>0,'v418 created real R43 work order');const orderId=r.rows[0].id;
+            const jti=randomUUID();await ledger(jti);const token=issue(jti);
+            const order=await guard.getOrder(token,shop,orderId),history=await guard.getHistory(token,shop,orderId);
+            assert.equal(order.id,orderId);assert.ok(Array.isArray(history));assert.ok(history.some(e=>e.event_type==='created'));
+            console.log('V419_R43_ACTUAL_LOOKUP_HISTORY_AUTH_PASS: signed staff + DB membership + active JTI authorize real order and history');
+            const parts=token.split('.'),forged={...parse(parts[1]),jti:randomUUID()};
+            await denied(()=>guard.getOrder(parts[0]+'.'+b64(forged)+'.'+parts[2],shop,orderId),'V419_SESSION_INVALID');
+            await denied(()=>guard.getHistory(issue(jti,{shopCode:'another-shop'}),shop,orderId),'V419_SESSION_INVALID');
+            await denied(()=>guard.getOrder(issue(jti,{authVersion:214}),shop,orderId),'V419_MEMBERSHIP_REVOKED');
+            await denied(()=>guard.getOrder(issue(jti,{role:'owner'}),shop,orderId),'V419_SESSION_INVALID');
+            await denied(()=>guard.getHistory(issue(jti,{expiresAt:now()-1}),shop,orderId),'V419_SESSION_INVALID');
+            await denied(()=>guard.getOrder(token,'qa-shop-b',orderId),'V419_SCOPE_REJECTED');
+            await denied(()=>guard.getOrder(token,shop,'not-a-uuid'),'V419_SCOPE_REJECTED');
+            console.log('V419_READ_INVALID_CLAIM_TENANT_TAMPER_DENIED_PASS: forged JTI, role, version, expiry and cross-tenant reads denied');
+            await logout(jti);
+            await denied(()=>guard.getOrder(token,shop,orderId),'V419_SESSION_REVOKED');
+            await denied(()=>guard.getHistory(token,shop,orderId),'V419_SESSION_REVOKED');
+            // Source R43 intentionally delegates identity to upstream API; its unguarded
+            // method still reads data directly. NEVER wire direct R43 lookup/history to HTTP.
+            assert.equal((await adapter.lookup(shop,orderId)).id,orderId);
+            assert.ok(Array.isArray(await adapter.history(shop,orderId)));
+            console.log('V419_LOGOUT_ORDER_AND_HISTORY_DENIED_PASS: both guarded reads deny logout; raw R43 still external-auth-only / NO_GO');
+            const current=await pool.query(`SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]);
+            const version=current.rows[0].auth_version;
+            const freshJti=randomUUID();await ledger(freshJti);const fresh=issue(freshJti,{authVersion:version});
+            assert.equal((await guard.getOrder(fresh,shop,orderId)).id,orderId);
+            await pool.query(`UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]);
+            await denied(()=>guard.getOrder(fresh,shop,orderId),'V419_MEMBERSHIP_REVOKED');
+            await denied(()=>guard.getHistory(fresh,shop,orderId),'V419_MEMBERSHIP_REVOKED');
+            await pool.query(`UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]);
+            await denied(()=>guard.getOrder(fresh,shop,orderId),'V419_MEMBERSHIP_REVOKED');
+            const bumped=(await pool.query(`SELECT auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2`,[shop,sub])).rows[0].auth_version;
+            assert.equal(bumped,version+2);
+            const rotatedJti=randomUUID();await ledger(rotatedJti);const rotated=issue(rotatedJti,{authVersion:bumped});
+            assert.equal((await guard.getOrder(rotated,shop,orderId)).id,orderId);
+            console.log('V419_READ_ROLE_REVOCATION_VERSION_FENCE_PASS: revoke and reactivation block reads with old version; new session succeeds');
+            // Test FOR SHARE row lock cannot be overtaken by membership revoke.
+            let entered,release;const didEnter=new Promise(r=>entered=r),finish=new Promise(r=>release=r);
+            const delayed={lookup:async(s,id)=>{entered();await finish;return adapter.lookup(s,id)},history:adapter.history.bind(adapter)};
+            const guardedSlow=createCar02ReadGuardV419({pool,adapter:delayed,verifySession});
+            const pendingRead=guardedSlow.getOrder(rotated,shop,orderId);await didEnter;
+            const competing=await pool.connect();let timeoutError;
+            try {
+              await competing.query('SET statement_timeout=500');
+              const update=competing.query(`UPDATE public.ksh_car02_staff_access SET active=false
+                WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]).then(()=>null,e=>e);
+              await new Promise(r=>setTimeout(r,850));release();
+              assert.equal((await pendingRead).id,orderId);timeoutError=await update;
+            }finally{release();competing.release()}
+            assert.equal(timeoutError?.code,'57014');
+            await pool.query(`UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]);
+            await denied(()=>guard.getOrder(rotated,shop,orderId),'V419_MEMBERSHIP_REVOKED');
+            console.log('V419_CONCURRENT_READ_REVOKE_LOCK_PASS: authorized read completes first; concurrent revoke waits; subsequent read rejected');
+            console.log('V419_FINAL_NO_GO_HOLD: isolated read guard module only; direct R43 lookup/history remain unguarded and no production HTTP/Worker/Auth/JTI integration');
+          } finally {await pool.end()}
+          NODEJS
+          node --check "$RUNNER_TEMP/v419-read-boundary-qa.mjs"
+          node "$RUNNER_TEMP/v419-read-boundary-qa.mjs" | tee "$RUNNER_TEMP/v419-read-boundary-qa.log"
+          for marker in \
+            V419_R43_ACTUAL_LOOKUP_HISTORY_AUTH_PASS \
+            V419_READ_INVALID_CLAIM_TENANT_TAMPER_DENIED_PASS \
+            V419_LOGOUT_ORDER_AND_HISTORY_DENIED_PASS \
+            V419_READ_ROLE_REVOCATION_VERSION_FENCE_PASS \
+            V419_CONCURRENT_READ_REVOKE_LOCK_PASS \
+            V419_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v419-read-boundary-qa.log"
           done
