@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.13 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.14 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -804,3 +804,143 @@ jobs:
           grep -Fq 'V413_R43_REVOKED_NEW_MUTATION_GAP_CONFIRMED' "$RUNNER_TEMP/car02-v413-r43.log"
           grep -Fq 'V413_R43_REAL_ADAPTER_ROLLBACK_PASS' "$RUNNER_TEMP/car02-v413-r43.log"
           grep -Fq 'V413_FINAL_NO_GO_HOLD' "$RUNNER_TEMP/car02-v413-r43.log"
+      - name: V4.14 disposable guarded R43 source-copy integration and revoke fence (NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # V4.14: NEVER modify tracked R43 or deploy anything. Only temporary QA source clone.
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -s car02-pg-adapter.mjs
+          test -s car02-core.mjs
+          # Reuse the pg@8.16.3 runner-temp dependency installed by V4.13.
+          test -f "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          cat > "$RUNNER_TEMP/v414-guarded-r43.mjs" <<'NODEJS'
+          import assert from 'node:assert/strict';
+          import {createRequire} from 'node:module';
+          import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
+          import {resolve,join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const req=createRequire(join(process.env.RUNNER_TEMP,'v413-deps','package.json'));
+          const {Pool}=req('pg');
+          const root=process.env.GITHUB_WORKSPACE;
+          const old=readFileSync(resolve(root,'car02-pg-adapter.mjs'),'utf8');
+          const anchor="        await c.query('BEGIN');open=true;\n";
+          assert.equal(old.split(anchor).length,2,'R43 transaction anchor must match exactly once');
+          assert.ok(old.includes('return obj(existing.response_snapshot);'),'R43 raw replay must remain in source');
+          const guard = `        // V4.14 QA-only variation: DB-check a hypothetical server-trusted
+                  // actor version INSIDE the same transaction before idempotency replay.
+                  // This does NOT verify the origin/signature of trustedAuthVersion.
+                  if(!actor || actor.verified!==true || actor.shopCode!==shop ||
+                     !['owner','staff'].includes(actor.role) ||
+                     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.subject||'') ||
+                     !Number.isInteger(actor.trustedAuthVersion) || actor.trustedAuthVersion<1) {
+                    throw E('CAR02_TX_TRUSTED_STAFF_CLAIM_REQUIRED',403);
+                  }
+                  const membership=await one(c,'SELECT active,staff_role,auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2 FOR UPDATE',[shop,actor.subject]);
+                  if(!membership || membership.active!==true)
+                    throw E('CAR02_TX_MEMBERSHIP_REVOKED',403);
+                  if(membership.staff_role!==actor.role)
+                    throw E('CAR02_TX_ROLE_CHANGED',403);
+                  if(membership.auth_version!==actor.trustedAuthVersion)
+                    throw E('CAR02_TX_SESSION_STALE',403);
+          `;
+          // Only the disposable CI copy is modified. The R43 repository file is never touched.
+          const modified=old.replace(anchor,anchor+guard);
+          assert.notEqual(modified,old);
+          assert.equal(modified.split('CAR02_TX_MEMBERSHIP_REVOKED').length,2);
+          const dst=join(process.env.RUNNER_TEMP,'v414-disposable-copy');
+          mkdirSync(dst,{recursive:true});
+          writeFileSync(join(dst,'car02-pg-adapter.mjs'),modified);
+          writeFileSync(join(dst,'car02-core.mjs'),readFileSync(resolve(root,'car02-core.mjs')));
+          const mod=await import(pathToFileURL(join(dst,'car02-pg-adapter.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',
+            user:'postgres',password:process.env.PGPASSWORD,max:4,connectionTimeoutMillis:5000});
+          const adapter=mod.createCar02PgAdapter(pool);
+          const shop='street_house_kitsuki';
+          const sub='00000000-0000-0000-0000-000000000414';
+          const customerId='00000000-0000-0000-0000-000000000121';
+          const vehicleId='00000000-0000-0000-0000-000000000122';
+          const actor=(version=1,changes={})=>({role:'staff',subject:sub,shopCode:shop,
+            verified:true,trustedAuthVersion:version,...changes});
+          const txn=(a,key,op='v414-create')=>({actor:a,shop:a.shopCode,key,intent:{op,customerId,vehicleId,reservationId:null}});
+          const create=async t=>{await t.assertLinks({customerId,vehicleId,reservationId:null});return t.create({customerId,vehicleId,reservationId:null});};
+          const count=async(table)=>Number((await pool.query(`SELECT count(*)::int AS n FROM public.${table} WHERE shop_code=$1`,[shop])).rows[0].n);
+          const deny=async(p,code)=>{await assert.rejects(p,e=>e?.code===code && e?.status===403,code);};
+          try {
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access
+              (shop_code,user_sub,staff_role,active,grant_source)
+              VALUES ($1,$2,'staff',true,'v414-disposable-qa')`,[shop,sub]);
+            const before=await count('ksh_car02_work_orders');
+            const key='v414-safe-first-key';
+            const first=await adapter.transaction(txn(actor(),key),create);
+            assert.equal(first.shop,shop);
+            assert.equal(first.status,'draft');
+            assert.equal(await count('ksh_car02_work_orders'),before+1);
+            let called=false;
+            const same=await adapter.transaction(txn(actor(),key),async()=>{called=true;throw Error('UNEXPECTED_REPLAY_CALLBACK');});
+            assert.equal(same.id,first.id);assert.equal(called,false);
+            assert.equal(await count('ksh_car02_work_orders'),before+1);
+            console.log('V414_GUARDED_R43_ATOMIC_REPLAY_PASS: correct version permits exactly one create');
+            await deny(adapter.transaction(txn(actor(undefined,{trustedAuthVersion:undefined}),'v414-missing-proof'),create),'CAR02_TX_TRUSTED_STAFF_CLAIM_REQUIRED');
+            await deny(adapter.transaction(txn(actor(1,{verified:false}),'v414-unverified'),create),'CAR02_TX_TRUSTED_STAFF_CLAIM_REQUIRED');
+            await deny(adapter.transaction(txn(actor(999),'v414-stale-version'),create),'CAR02_TX_SESSION_STALE');
+            await deny(adapter.transaction(txn(actor(1,{role:'owner'}),'v414-role-mismatch'),create),'CAR02_TX_ROLE_CHANGED');
+            await deny(adapter.transaction(txn(actor(1,{shopCode:'qa-other-shop'}),'v414-cross-tenant'),create),'CAR02_TX_MEMBERSHIP_REVOKED');
+            assert.equal(await count('ksh_car02_work_orders'),before+1);
+            console.log('V414_GUARDED_R43_CLAIM_SCOPE_PASS: invalid version, role, tenant and missing verified marker denied');
+            await pool.query(`UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]);
+            const revoked=(await pool.query('SELECT active,auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub])).rows[0];
+            assert.equal(revoked.active,false);assert.equal(revoked.auth_version,2);
+            await deny(adapter.transaction(txn(actor(),key),async()=>{throw Error('UNEXPECTED_REVOKED_REPLAY');}),'CAR02_TX_MEMBERSHIP_REVOKED');
+            await deny(adapter.transaction(txn(actor(),'v414-denied-new-write'),create),'CAR02_TX_MEMBERSHIP_REVOKED');
+            assert.equal(await count('ksh_car02_work_orders'),before+1);
+            console.log('V414_GUARDED_R43_REVOKED_REPLAY_AND_WRITE_DENIED_PASS: both old response and new work blocked');
+            await pool.query(`UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]);
+            const resumed=(await pool.query('SELECT active,auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub])).rows[0];
+            assert.equal(resumed.auth_version,3);
+            await deny(adapter.transaction(txn(actor(),key),create),'CAR02_TX_SESSION_STALE');
+            let reused=false;
+            const replay=await adapter.transaction(txn(actor(3),key),async()=>{reused=true;throw Error('UNEXPECTED_VALID_REPLAY_CALLBACK');});
+            assert.equal(reused,false);assert.equal(replay.id,first.id);
+            assert.equal(await count('ksh_car02_work_orders'),before+1);
+            console.log('V414_GUARDED_R43_REVOCATION_VERSION_FENCE_PASS: stale token denied; updated version allows idempotent receipt');
+            // Hold a transaction open AFTER the membership FOR UPDATE lock is acquired;
+            // a competing revoke must time out without altering membership.
+            let enter,release;
+            const entered=new Promise(r=>enter=r), resumedTx=new Promise(r=>release=r);
+            const held=adapter.transaction(txn(actor(3),'v414-concurrency-lock'),async t=>{
+              enter();await resumedTx;return create(t);
+            });
+            await entered;
+            const competing=await pool.connect();
+            let err;
+            try {
+              await competing.query('SET statement_timeout=500');
+              const blocked=competing.query(`UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2`,[shop,sub]).then(()=>null,e=>e);
+              await new Promise(r=>setTimeout(r,850));
+              release();
+              const output=await held; assert.equal(output.status,'draft');
+              err=await blocked;
+            } finally {release();competing.release();}
+            assert.equal(err?.code,'57014');
+            const after=(await pool.query('SELECT active,auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub])).rows[0];
+            assert.equal(after.active,true);assert.equal(after.auth_version,3);
+            assert.equal(await count('ksh_car02_work_orders'),before+2);
+            console.log('V414_GUARDED_R43_CONCURRENT_REVOKE_LOCK_PASS: transaction held row until commit, concurrent revoke timed out');
+            console.log('V414_RELEASE_NO_GO_HOLD: QA-only patched R43 copy; no cryptographic signer; no production adapter/HTTP/Worker changes');
+          } finally {await pool.end();}
+          NODEJS
+          node --check "$RUNNER_TEMP/v414-guarded-r43.mjs"
+          node "$RUNNER_TEMP/v414-guarded-r43.mjs" | tee "$RUNNER_TEMP/car02-v414-guarded.log"
+          for marker in \
+            V414_GUARDED_R43_ATOMIC_REPLAY_PASS \
+            V414_GUARDED_R43_CLAIM_SCOPE_PASS \
+            V414_GUARDED_R43_REVOKED_REPLAY_AND_WRITE_DENIED_PASS \
+            V414_GUARDED_R43_REVOCATION_VERSION_FENCE_PASS \
+            V414_GUARDED_R43_CONCURRENT_REVOKE_LOCK_PASS \
+            V414_RELEASE_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v414-guarded.log"
+          done
