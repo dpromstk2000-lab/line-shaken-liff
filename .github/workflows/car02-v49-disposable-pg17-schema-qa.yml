@@ -1,4 +1,4 @@
-name: CAR02 V4.9-V4.14 Disposable PG17 Authorization QA (NO_GO HOLD)
+name: CAR02 V4.9-V4.15 Disposable PG17 Authorization QA (NO_GO HOLD)
 # V4.10 additive test, preserving V4.9 success checks. All DB calls target a NEW disposable postgres:17 service only.
 # NO production DNS, secrets, Supabase URLs, Worker, LINE, real users, or release changes.
 on:
@@ -943,4 +943,144 @@ jobs:
             V414_GUARDED_R43_CONCURRENT_REVOKE_LOCK_PASS \
             V414_RELEASE_NO_GO_HOLD; do
             grep -Fq "$marker" "$RUNNER_TEMP/car02-v414-guarded.log"
+          done
+      - name: V4.15 ephemeral Ed25519 signed session to guarded R43 disposable PG17 (QA NO_GO HOLD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${CAR02_DATABASE_URL:-}"
+          test -z "${SUPABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${LINE_CHANNEL_ACCESS_TOKEN:-}"
+          test -f "$RUNNER_TEMP/v414-disposable-copy/car02-pg-adapter.mjs"
+          test -f "$RUNNER_TEMP/v413-deps/node_modules/pg/package.json"
+          cat > "$RUNNER_TEMP/v415-signed-gateway.mjs" <<'NODEJS'
+          // QA-only ephemeral Ed25519 server-signed session -> V4.14 guarded R43 copy -> throwaway PG17.
+          // NOT an implementation of the external Supabase identity verifier or production entrypoint.
+          import assert from 'node:assert/strict';
+          import {generateKeyPairSync, sign, verify, randomUUID} from 'node:crypto';
+          import {createRequire} from 'node:module';
+          import {join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const temp=process.env.RUNNER_TEMP;
+          const req=createRequire(join(temp,'v413-deps','package.json'));
+          const {Pool}=req('pg');
+          const {createCar02PgAdapter}=await import(pathToFileURL(join(temp,'v414-disposable-copy','car02-pg-adapter.mjs')).href);
+          const pool=new Pool({host:'127.0.0.1',port:55432,database:'car02_v412_full',user:'postgres',password:process.env.PGPASSWORD,max:4,connectionTimeoutMillis:5000});
+          const adapter=createCar02PgAdapter(pool);
+          const {publicKey,privateKey}=generateKeyPairSync('ed25519'); // ephemeral QA only, NEVER exported
+          const issuer='https://qa.invalid/dpro-car02/ephemeral-issuer';
+          const audience='car02-qa-staff-gateway';
+          const shop='street_house_kitsuki';
+          const sub='00000000-0000-0000-0000-000000000415';
+          const customerId='00000000-0000-0000-0000-000000000121';
+          const vehicleId='00000000-0000-0000-0000-000000000122';
+          const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
+          const clock=()=>Math.floor(Date.now()/1000);
+          const json64=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
+          const header={alg:'EdDSA',typ:'JWT'};
+          function signPayload(payload) { // NEVER provide to the actual client; test fixture only
+            const first=json64(header)+'.'+json64(payload);
+            return first+'.'+sign(null,Buffer.from(first),privateKey).toString('base64url');
+          }
+          function bad() {const e=Error('V415_SIGNED_SESSION_REJECTED');e.code='V415_SIGNED_SESSION_REJECTED';throw e;}
+          function validate(token) {
+            if(typeof token!=='string'||token.length>4096||token.length<50)bad();
+            const parts=token.split('.');
+            if(parts.length!==3 || parts.some(p=>!/^[A-Za-z0-9_-]+$/.test(p)))bad();
+            const msg=parts[0]+'.'+parts[1];
+            let h,p;
+            try{h=JSON.parse(Buffer.from(parts[0],'base64url').toString());p=JSON.parse(Buffer.from(parts[1],'base64url').toString())}catch{bad()}
+            if(!h || h.alg!=='EdDSA'||h.typ!=='JWT'||Object.keys(h).sort().join(',')!=='alg,typ')bad();
+            if(!verify(null,Buffer.from(msg),publicKey,Buffer.from(parts[2],'base64url')))bad();
+            if(!p||typeof p!=='object'||Array.isArray(p)||
+               Object.keys(p).sort().join(',')!=='aud,av,exp,iat,iss,jti,role,shop,sub')bad();
+            if(p.iss!==issuer||p.aud!==audience||!uuid(p.sub)||p.shop!==shop||
+               !['staff','owner'].includes(p.role)||!Number.isSafeInteger(p.av)||p.av<1||
+               !uuid(p.jti)||!Number.isSafeInteger(p.iat)||!Number.isSafeInteger(p.exp)||
+               p.iat>clock()+5||p.exp<=clock()||p.exp>p.iat+180||p.exp<=p.iat)bad();
+            return Object.freeze(p);
+          }
+          const verifiedIdentity=Object.freeze({verified:true,provider:'qa-supabase-auth-callback-stub',sub});
+          async function issue(proof=verifiedIdentity) {
+            // Production must independently verify the actual provider signature/session.
+            if(proof!==verifiedIdentity)bad();
+            const r=await pool.query('SELECT active,staff_role,auth_version FROM public.ksh_car02_staff_access WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            if(r.rows.length!==1||r.rows[0].active!==true)bad();
+            const row=r.rows[0], t=clock();
+            return signPayload({iss:issuer,aud:audience,sub,shop,role:row.staff_role,av:row.auth_version,iat:t,exp:t+120,jti:randomUUID()});
+          }
+          async function run(token,key,callback,op='v415-draft') {
+            const claims=validate(token); // verify the signature BEFORE touching transaction
+            const actor=Object.freeze({verified:true,role:claims.role,subject:claims.sub,shopCode:claims.shop,trustedAuthVersion:claims.av});
+            const txn={actor,shop:claims.shop,key,intent:{op,customerId,vehicleId,reservationId:null}};
+            return adapter.transaction(txn,callback);
+          }
+          const create=async t=>{await t.assertLinks({customerId,vehicleId,reservationId:null});return t.create({customerId,vehicleId,reservationId:null});};
+          const count=async()=>Number((await pool.query('SELECT count(*)::int AS n FROM public.ksh_car02_work_orders WHERE shop_code=$1',[shop])).rows[0].n);
+          async function denied(f,code='V415_SIGNED_SESSION_REJECTED') {
+            await assert.rejects(Promise.resolve().then(f),e=>e?.code===code||e?.message===code,code);
+          }
+          try{
+            await pool.query(`INSERT INTO public.ksh_car02_staff_access(shop_code,user_sub,staff_role,active,grant_source)
+              VALUES ($1,$2,'staff',true,'v415-disposable-qa')`,[shop,sub]);
+            const before=await count();
+            const token=await issue();
+            assert.equal(validate(token).av,1);
+            const key='v415-correct-signed-token';
+            const first=await run(token,key,create);
+            assert.equal(first.status,'draft');
+            let invoked=false;
+            const replay=await run(token,key,()=>{invoked=true;throw Error('UNEXPECTED_REPLAY');});
+            assert.equal(replay.id,first.id);assert.equal(invoked,false);assert.equal(await count(),before+1);
+            console.log('V415_SIGNED_ISSUANCE_TO_R43_PASS: ephemeral Ed25519 gateway to guarded R43, idempotency preserved');
+            // Neither JWT payload nor signature can be substituted by a client.
+            const three=token.split('.');
+            const forgedPayload={...validate(token),role:'owner',av:999};
+            const tampered=three[0]+'.'+json64(forgedPayload)+'.'+three[2];
+            await denied(()=>run(tampered,'v415-tampered-role',create));
+            await denied(()=>run(three[0]+'.'+three[1]+'.'+((three[2][0]==='A'?'B':'A')+three[2].slice(1)),'v415-tampered-sig',create));
+            await denied(()=>run(json64({alg:'none',typ:'JWT'})+'.'+three[1]+'.'+three[2],'v415-none-alg',create));
+            await denied(()=>run('bad.jwt.token','v415-malformed',create));
+            assert.equal(await count(),before+1);
+            console.log('V415_SIGNATURE_TAMPER_REJECTED_PASS: roles, versions, EdDSA signature, alg none, malformed token');
+            const original=validate(token), t=clock();
+            await denied(()=>run(signPayload({...original,exp:t-1,iat:t-121}),'v415-expired',create));
+            await denied(()=>run(signPayload({...original,aud:'different-service'}),'v415-wrong-audience',create));
+            await denied(()=>run(signPayload({...original,iss:'https://rogue.invalid'}),'v415-wrong-issuer',create));
+            await denied(()=>run(signPayload({...original,iat:t+60,exp:t+120}),'v415-future-iat',create));
+            assert.equal(await count(),before+1);
+            console.log('V415_TOKEN_CLAIMS_REJECTED_PASS: expired, incorrect issuer/audience, issued-in-future');
+            // Role is derived from DB membership at issuance, never from the caller.
+            await denied(()=>issue({...verifiedIdentity,role:'owner'}));
+            const forgedRole=signPayload({...original,role:'owner'}); // a synthetic signed stale role, still denied by DB
+            await denied(()=>run(forgedRole,'v415-forged-signed-role',create),'CAR02_TX_ROLE_CHANGED');
+            console.log('V415_ROLE_DB_BINDING_PASS: caller role ignored; DB transaction enforces current role');
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=false WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await denied(()=>issue());
+            await denied(()=>run(token,key,create),'CAR02_TX_MEMBERSHIP_REVOKED');
+            await denied(()=>run(token,'v415-after-revoke',create),'CAR02_TX_MEMBERSHIP_REVOKED');
+            assert.equal(await count(),before+1);
+            console.log('V415_REVOKED_SESSION_DENIED_PASS: both replay and new mutation rejected');
+            await pool.query('UPDATE public.ksh_car02_staff_access SET active=true WHERE shop_code=$1 AND user_sub=$2',[shop,sub]);
+            await denied(()=>run(token,key,create),'CAR02_TX_SESSION_STALE');
+            const refresh=await issue();assert.equal(validate(refresh).av,3);
+            let called=false;
+            const safeReplay=await run(refresh,key,()=>{called=true;throw Error('UNEXPECTED_REPLAY_AFTER_REFRESH');});
+            assert.equal(called,false);assert.equal(safeReplay.id,first.id);assert.equal(await count(),before+1);
+            console.log('V415_REFRESHED_TOKEN_REPLAY_PASS: real DB version rotation fences stale sessions');
+            console.log('V415_FINAL_NO_GO_HOLD: QA identity stub; ephemeral keys; direct adapter can still be called; R44/R46/Worker integration and session lifecycle not proven');
+          } finally {await pool.end();}
+          NODEJS
+          node --check "$RUNNER_TEMP/v415-signed-gateway.mjs"
+          node "$RUNNER_TEMP/v415-signed-gateway.mjs" | tee "$RUNNER_TEMP/car02-v415-signed-gateway.log"
+          for marker in \
+            V415_SIGNED_ISSUANCE_TO_R43_PASS \
+            V415_SIGNATURE_TAMPER_REJECTED_PASS \
+            V415_TOKEN_CLAIMS_REJECTED_PASS \
+            V415_ROLE_DB_BINDING_PASS \
+            V415_REVOKED_SESSION_DENIED_PASS \
+            V415_REFRESHED_TOKEN_REPLAY_PASS \
+            V415_FINAL_NO_GO_HOLD; do
+            grep -Fq "$marker" "$RUNNER_TEMP/car02-v415-signed-gateway.log"
           done
