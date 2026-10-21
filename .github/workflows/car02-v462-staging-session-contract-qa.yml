@@ -1,0 +1,62 @@
+name: CAR02 V4.62 Staging Session Attestation Contract and V461R1 Regression (NO_GO HOLD)
+# Review-only. Synthetic adapters, NO network / Supabase / LINE / credentials / deploy.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-staging-session-observation-r462.mjs'
+      - 'car02-staging-session-observation-r462.test.mjs'
+      - 'car02-v462-staging-session-acceptance.json'
+      - 'car02-review-evidence-seal-r457.test.mjs'
+      - '.github/workflows/car02-v462-staging-session-contract-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-session-contract:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout isolated review branch, no persisted tokens
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Refuse any production credentials and protect R52 original
+        shell: bash
+        run: |
+          set -euo pipefail
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo "V462_LIVE_PROVIDER_ENV_REFUSED: $k" >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Fq 'const CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          node --check car02-staging-session-observation-r462.mjs
+          node --check car02-staging-session-observation-r462.test.mjs
+          echo V462_ORIGINAL_R52_LOCK_AND_NO_EXTERNAL_CREDENTIALS_PASS
+      - name: Run 483 regression and safe nonproduction session observation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s car02-v462-staging-session-acceptance.json
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v462-node.log"
+          grep -Fxq '# tests 483' "$RUNNER_TEMP/v462-node.log"
+          grep -Fxq '# pass 483' "$RUNNER_TEMP/v462-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v462-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V462_RELEASE_LOCK,CAR02_V462_REQUIRED_PROOFS} from './car02-staging-session-observation-r462.mjs';
+          const manifest=JSON.parse(readFileSync('car02-v462-staging-session-acceptance.json','utf8'));
+          assert.equal(CAR02_V462_RELEASE_LOCK,true);
+          assert.equal(CAR02_V462_REQUIRED_PROOFS.length,5);
+          assert.equal(manifest.realProviderSessionProof,'UNVERIFIED');
+          assert.equal(manifest.realPostcommitFence,'UNVERIFIED');
+          assert.equal(manifest.releaseState,'NO_GO_HOLD');
+          const original=readFileSync('car02-auth-providers-r46.mjs','utf8');
+          assert.match(original,/return\s*\{verified:true,sub:user\.id,exp:claims\.exp\}/);
+          console.log('V462_REAL_R46_SESSION_BINDING_GAP_AND_NO_GO_PASS');
+          console.log('V462_NONPRODUCTION_STAGING_ONLY_NO_AUTH_GRANTED_PASS');
+          NODE
+          echo V462_FINAL_RELEASE_NO_GO_HOLD_TRUE

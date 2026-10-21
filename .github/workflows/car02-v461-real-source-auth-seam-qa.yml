@@ -1,9 +1,10 @@
-name: CAR02 V4.61 Real Source R46-R52 Auth Session Gap Audit (NO_GO HOLD)
+name: CAR02 V4.61R1 Actual Auth Gap Audit and Deterministic Signature Regression (NO_GO HOLD)
 # Source-only gap audit: no Supabase, no LINE, no PG, no network test, no release.
 on:
   push:
     branches: [car02-v434-review-only]
     paths:
+      - 'car02-review-evidence-seal-r457.test.mjs'
       - 'car02-auth-seam-audit-r461.mjs'
       - 'car02-auth-seam-audit-r461.test.mjs'
       - 'car02-v461-staging-auth-gap-checklist.json'
@@ -44,8 +45,10 @@ jobs:
           node --check car02-auth-seam-audit-r461.mjs
           node --check car02-auth-seam-audit-r461.test.mjs
           node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v461-node.log"
-          grep -Fxq '# tests 465' "$RUNNER_TEMP/v461-node.log"
-          grep -Fxq '# pass 465' "$RUNNER_TEMP/v461-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v461-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v461-node.log")
+          test "$tests" -ge 465
+          test "$passed" = "$tests"
           grep -Fxq '# fail 0' "$RUNNER_TEMP/v461-node.log"
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
