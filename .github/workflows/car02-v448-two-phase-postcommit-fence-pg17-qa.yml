@@ -1,0 +1,110 @@
+name: CAR02 V4.48 Two-Connection Post-COMMIT Fence Disposable PG17 (NO_GO HOLD)
+# ONLY isolated review branch; no real auth.sessions, Supabase, Worker, LINE or production writes.
+# This does not prove cross-system clock safety or trusted operator auth. NEVER DEPLOY.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-postcommit-fence-r448.mjs'
+      - 'car02-postcommit-fence-r448.test.mjs'
+      - 'car02-v448-disposable-pg17.sql'
+      - '.github/workflows/car02-v448-two-phase-postcommit-fence-pg17-qa.yml'
+      - 'car02-supabase-session-boundary-r447.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-two-phase-fence:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v448_disposable_only
+        ports:
+          - 55448:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v448_disposable_only
+    steps:
+      - name: Checkout strictly isolated review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run 213 isolated Node tests and verify original release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unexpected live secret: $key" >&2; exit 1; }
+          done
+          for f in car02-postcommit-fence-r448.mjs car02-postcommit-fence-r448.test.mjs car02-v448-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-postcommit-fence-r448.mjs
+          node --check car02-postcommit-fence-r448.test.mjs
+          node --test \
+            car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs \
+            car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs \
+            car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs \
+            car02-outbox-recovery-r440.test.mjs car02-manual-review-ledger-r441.test.mjs \
+            car02-review-integrity-r442.test.mjs car02-review-witness-r443.test.mjs \
+            car02-witness-anchor-r444.test.mjs car02-independent-witness-r445.test.mjs \
+            car02-session-cutover-r446.test.mjs car02-supabase-session-boundary-r447.test.mjs \
+            car02-postcommit-fence-r448.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V448_RELEASE_LOCK,CAR02_V448_CUTOVER_SQL,CAR02_V448_FENCE_SQL} from './car02-postcommit-fence-r448.mjs';
+          assert.equal(CAR02_V448_RELEASE_LOCK,true);
+          assert.equal(CAR02_V448_CUTOVER_SQL,'SELECT new_version,generation_nonce FROM v448_private.qa_cutover($1::text,$2::uuid,$3::integer,$4::uuid)');
+          assert.equal(CAR02_V448_FENCE_SQL,'SELECT established FROM v448_private.qa_establish_fence($1::text,$2::uuid,$3::integer,$4::uuid)');
+          const live=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(live,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(live,/postcommit-fence-r448|v448_private/);
+          const mods={434:'staff-generation',435:'staff-authority',436:'transaction-gate',437:'tenant-cas-gate',438:'idempotency',439:'outbox',440:'outbox-recovery',441:'manual-review-ledger',442:'review-integrity',443:'review-witness',444:'witness-anchor',445:'independent-witness',446:'session-cutover',447:'supabase-session-boundary'};
+          for(const [version,name] of Object.entries(mods)){
+            assert.match(readFileSync(`car02-${name}-r${version}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V448_SOURCE_213_OFFLINE_TESTS_AND_HARD_RELEASE_LOCK_PASS');
+          console.log('V448_REAL_PROVIDER_AUTH_AND_COMMIT_ACK_ADAPTER_NOT_IMPLEMENTED_NO_GO');
+          NODE
+      - name: Disposable PostgreSQL 17 separate transactions and eight-writer cutover CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55448 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v448_disposable' >/dev/null
+          pg -d car02_v448_disposable -f /workspace/car02-v448-disposable-pg17.sql | tee "$RUNNER_TEMP/v448-pg17.log"
+          for mark in V448_PG17_PRIVATE_SCHEMA_DENY_PASS V448_PG17_ROLLBACK_NO_FENCE_PASS V448_PG17_COMMITTED_REACTIVATION_NO_FENCE_PASS V448_PG17_SEPARATE_FENCE_OLD_SESSIONS_DENIED_PASS V448_PG17_FRESH_SAME_CLOCK_SESSION_AND_TENANT_PASS V448_PG17_REVOKE_BEFORE_FENCE_BLOCKED_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v448-pg17.log"
+          done
+          # 8 separate committed sessions compete for ONE suspended generation.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v448_disposable -c "SELECT COALESCE((SELECT new_version::text FROM v448_private.qa_cutover('qa_shop_a','00000000-0000-0000-0000-000000004489',2,'00000000-0000-0000-0000-00000000448$i')),'none')" > "$RUNNER_TEMP/v448-race-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          winner=0;rejected=0
+          for i in 1 2 3 4 5 6 7 8; do
+            if grep -Fxq '3' "$RUNNER_TEMP/v448-race-$i.out"; then winner=$((winner+1));
+            elif grep -Fxq 'none' "$RUNNER_TEMP/v448-race-$i.out"; then rejected=$((rejected+1));
+            else cat "$RUNNER_TEMP/v448-race-$i.out";exit 1;fi
+          done
+          test "$winner:$rejected" = '1:7' || { echo "V448_RACE_NOT_CAS: $winner:$rejected" >&2; exit 1; }
+          state=$(pg -Atq -d car02_v448_disposable -c "SELECT auth_version::text||':'||(fence_at IS NULL)::text FROM v448_private.qa_members WHERE shop_code='qa_shop_a' AND user_sub='00000000-0000-0000-0000-000000004489'")
+          test "$state" = '3:true' || test "$state" = '3:t' || { echo "V448_BAD_CUTOVER_STATE: $state" >&2; exit 1; }
+          winning_nonce=$(pg -Atq -d car02_v448_disposable -c "SELECT generation_nonce FROM v448_private.qa_members WHERE shop_code='qa_shop_a' AND user_sub='00000000-0000-0000-0000-000000004489'")
+          result=$(pg -Atq -d car02_v448_disposable -c "SELECT established FROM v448_private.qa_establish_fence('qa_shop_a','00000000-0000-0000-0000-000000004489',3,'$winning_nonce')")
+          test "$result" = 't' || { echo "V448_CORRECT_GENERATION_FENCE_FAILED: $result" >&2; exit 1; }
+          again=$(pg -Atq -d car02_v448_disposable -c "SELECT established FROM v448_private.qa_establish_fence('qa_shop_a','00000000-0000-0000-0000-000000004489',3,'$winning_nonce')")
+          test "$again" = 'f'
+          echo V448_PG17_EIGHT_CUTOVER_CLIENTS_SINGLE_WINNER_PASS
+          echo V448_PG17_SUBSEQUENT_FENCE_SINGLE_WRITE_PASS
+          echo V448_FINAL_RELEASE_NO_GO_HOLD_TRUE
