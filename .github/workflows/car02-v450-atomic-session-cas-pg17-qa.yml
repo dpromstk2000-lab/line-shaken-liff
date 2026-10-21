@@ -1,0 +1,117 @@
+name: CAR02 V4.50 Atomic Bound Session Business CAS Disposable PG17 (NO_GO HOLD)
+# Review branch ONLY. Provider sessions, users, orders are disposable synthetic fixtures.
+# No production Supabase, Auth, Worker, LINE or credentials. This CI never deploys.
+# A passing suite does not prove real session origin or authorize commercial release.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-atomic-session-write-r450.mjs'
+      - 'car02-atomic-session-write-r450.test.mjs'
+      - 'car02-v450-disposable-pg17.sql'
+      - '.github/workflows/car02-v450-atomic-session-cas-pg17-qa.yml'
+      - 'car02-cutover-reconcile-r449.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-atomic-session-cas:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v450_disposable_only
+        ports:
+          - 55450:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v450_disposable_only
+    steps:
+      - name: Checkout review-only branch without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run 248 isolated tests and verify release locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unexpected live environment: $key" >&2; exit 1; }
+          done
+          for file in car02-atomic-session-write-r450.mjs car02-atomic-session-write-r450.test.mjs car02-v450-disposable-pg17.sql car02-edge-entry-r52.ts; do
+            test -s "$file"
+          done
+          node --check car02-atomic-session-write-r450.mjs
+          node --check car02-atomic-session-write-r450.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v450-node.log"
+          grep -Fxq '# tests 248' "$RUNNER_TEMP/v450-node.log"
+          grep -Fxq '# pass 248' "$RUNNER_TEMP/v450-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v450-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V450_RELEASE_LOCK,CAR02_V450_ATOMIC_SQL} from './car02-atomic-session-write-r450.mjs';
+          assert.equal(CAR02_V450_RELEASE_LOCK,true);
+          assert.equal(CAR02_V450_ATOMIC_SQL,
+           'SELECT applied,new_version FROM v450_private.qa_atomic_session_touch($1::text,$2::uuid,$3::uuid,$4::uuid,$5::integer)');
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(entry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(entry,/car02-atomic-session-write-r450|v450_private/);
+          const mods={434:'staff-generation',435:'staff-authority',436:'transaction-gate',437:'tenant-cas-gate',438:'idempotency',439:'outbox',440:'outbox-recovery',441:'manual-review-ledger',442:'review-integrity',443:'review-witness',444:'witness-anchor',445:'independent-witness',446:'session-cutover',447:'supabase-session-boundary',448:'postcommit-fence',449:'cutover-reconcile'};
+          for(const [ver,name] of Object.entries(mods))
+           assert.match(readFileSync(`car02-${name}-r${ver}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          console.log('V450_NODE_248_AND_ALL_RELEASE_LOCKS_PASS');
+          console.log('V450_NO_LIVE_PROVIDER_OR_PRODUCTION_SESSION_PROOF_NO_GO');
+          NODE
+      - name: Disposable PG17 atomic bound write, revoke, rollback and eight-way CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55450 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v450_disposable' >/dev/null
+          pg -d car02_v450_disposable -f /workspace/car02-v450-disposable-pg17.sql | tee "$RUNNER_TEMP/v450-pg.log"
+          for mark in V450_PG17_PRIVATE_SCHEMA_AND_PUBLIC_DENY_PASS V450_PG17_SESSION_BOUND_ATOMIC_TOUCH_PASS V450_PG17_REPLAY_OLD_SESSION_AND_WRONG_SUB_DENIED_PASS V450_PG17_ROLLBACK_NO_PARTIAL_BUSINESS_WRITE_PASS V450_PG17_REVOKED_SESSION_BLOCKS_ATOMIC_WRITE_PASS V450_PG17_REACTIVATION_OLD_SESSION_STAYS_DENIED_PASS V450_PG17_FRESH_SESSION_NEW_GENERATION_WRITE_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v450-pg.log"
+          done
+          # Eight separate transactions compete for ONE version=1 row; only one may update.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (
+              if pg -Atq -d car02_v450_disposable -c "SELECT applied::text||':'||new_version::text FROM v450_private.qa_atomic_session_touch('qa_shop_a','00000000-0000-0000-0000-000000004501','00000000-0000-0000-0000-000000004512','00000000-0000-0000-0000-000000004505',1)" > "$RUNNER_TEMP/v450-race-$i.out" 2> "$RUNNER_TEMP/v450-race-$i.err"; then
+                echo ACCEPTED > "$RUNNER_TEMP/v450-race-$i.status"
+              elif grep -Fq 'V450_TENANT_OR_VERSION_CONFLICT' "$RUNNER_TEMP/v450-race-$i.err"; then
+                echo DENIED > "$RUNNER_TEMP/v450-race-$i.status"
+              else
+                cat "$RUNNER_TEMP/v450-race-$i.err" >&2
+                echo BAD > "$RUNNER_TEMP/v450-race-$i.status"
+              fi
+            ) &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          accepted=0; denied=0
+          for i in 1 2 3 4 5 6 7 8; do
+            status=$(cat "$RUNNER_TEMP/v450-race-$i.status")
+            if test "$status" = ACCEPTED; then
+              grep -Fxq 'true:2' "$RUNNER_TEMP/v450-race-$i.out" || grep -Fxq 't:2' "$RUNNER_TEMP/v450-race-$i.out"
+              accepted=$((accepted+1))
+            elif test "$status" = DENIED; then
+              denied=$((denied+1))
+            else
+              echo "V450_UNEXPECTED_WORKER_$i" >&2; exit 1
+            fi
+          done
+          test "$accepted:$denied" = '1:7' || { echo "V450_DUPLICATE_WRITE: $accepted:$denied" >&2; exit 1; }
+          final=$(pg -Atq -d car02_v450_disposable -c "SELECT (SELECT state_version FROM v450_private.qa_orders WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004505')::text||':'||(SELECT state_version FROM v450_private.qa_orders WHERE shop_code='qa_shop_b' AND id='00000000-0000-0000-0000-000000004503')::text")
+          test "$final" = '2:1' || { echo "V450_ATOMIC_TENANT_CAS_FAILED: $final" >&2; exit 1; }
+          echo V450_PG17_EIGHT_WRITERS_ONE_ATOMIC_UPDATE_PASS
+          echo V450_PG17_OTHER_TENANT_UNCHANGED_PASS
+          echo V450_FINAL_RELEASE_NO_GO_HOLD_TRUE
