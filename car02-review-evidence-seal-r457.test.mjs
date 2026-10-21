@@ -67,7 +67,7 @@ test('expired and future-dated evidence cannot pass verification',async()=>{
   assert.throws(()=>verifyCar02OfflineReviewEvidenceR457(verification(env,over)),/EVIDENCE_UNVERIFIED/);
 });
 test('signature or attached signed-envelope checksum tampering is caught',async()=>{
- const env=await seal();assert.throws(()=>verifyCar02OfflineReviewEvidenceR457(verification({...env,signature:'a'+env.signature.slice(1)})),/EVIDENCE_UNVERIFIED/);
+ const env=await seal();assert.throws(()=>verifyCar02OfflineReviewEvidenceR457(verification({...env,signature:(env.signature[0]==='a'?'b':'a')+env.signature.slice(1)})),/EVIDENCE_UNVERIFIED/);
  assert.throws(()=>verifyCar02OfflineReviewEvidenceR457(verification({...env,envelopeDigest:'b'.repeat(64)})),/EVIDENCE_UNVERIFIED/);
 });
 test('extra unexpected payload or envelope fields fail closed',async()=>{

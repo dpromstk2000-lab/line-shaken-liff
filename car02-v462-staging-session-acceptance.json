@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 462,
+  "project": "DPRO_CAR02",
+  "releaseState": "NO_GO_HOLD",
+  "connectionMode": "disposable_qa_only",
+  "realProviderSessionProof": "UNVERIFIED",
+  "realPostcommitFence": "UNVERIFIED",
+  "sourceR46": "unchanged; verified user sub and exp only, lacks trusted provider sessionId",
+  "nonProductionProbeSteps": [
+    "Authenticate a throwaway user through an authorized isolated provider; validate token signature and issuer/audience with real official verifier",
+    "Recover trusted session_id only from cryptographically verified access token claims, never from caller input, with issuer-compatible semantics checked",
+    "Independently inspect current provider-owned session metadata through an approved isolated read-only interface; do not assume auth.sessions exists or is exposed",
+    "Confirm membership and acknowledged postcommit fence under a single row-locked transaction before any future business write, not via this read-only audit",
+    "Demonstrate expired, rotated, revoked, cross-tenant, stale-fence and timeout behaviors with test accounts without customer data",
+    "Independent security signoff for trust and race conditions; preserve production R52 hard release lock until approval"
+  ],
+  "neverUpload": [
+    "service_role_key",
+    "access_token",
+    "refresh_token",
+    "JWT",
+    "LINE channel secret"
+  ],
+  "decision": "only real independently verified nonproduction evidence can progress; this fixture is not a release capability"
+}
