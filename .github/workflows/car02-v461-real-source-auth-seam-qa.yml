@@ -1,0 +1,70 @@
+name: CAR02 V4.61 Real Source R46-R52 Auth Session Gap Audit (NO_GO HOLD)
+# Source-only gap audit: no Supabase, no LINE, no PG, no network test, no release.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-auth-seam-audit-r461.mjs'
+      - 'car02-auth-seam-audit-r461.test.mjs'
+      - 'car02-v461-staging-auth-gap-checklist.json'
+      - '.github/workflows/car02-v461-real-source-auth-seam-qa.yml'
+      - 'car02-auth-providers-r46.mjs'
+      - 'car02-unified-runtime-r50.mjs'
+      - 'car02-edge-boundary-r51.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-real-source-auth-gap:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout review branch without persisted tokens
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify actual checkout R46 R50 R51 R52 source pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo "V461_REFUSE_LIVE_PROVIDER_ENV: $k" >&2; exit 1; }
+          done
+          test "$(git hash-object car02-auth-providers-r46.mjs)" = 'd90404a880c06b809c30685654029a938913ec09'
+          test "$(git hash-object car02-unified-runtime-r50.mjs)" = '76e4e8cae27599f27e3d887118148718c32ebb80'
+          test "$(git hash-object car02-edge-boundary-r51.mjs)" = '6614f2ed1933aa787576cb8074cb7d4bc704efa0'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          echo V461_ACTUAL_R46_R50_R51_R52_BLOB_PINS_PASS
+      - name: Node regression suite and precise authentication seam identification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-auth-seam-audit-r461.mjs
+          node --check car02-auth-seam-audit-r461.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v461-node.log"
+          grep -Fxq '# tests 465' "$RUNNER_TEMP/v461-node.log"
+          grep -Fxq '# pass 465' "$RUNNER_TEMP/v461-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v461-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V461_REQUIRED_FILES,auditCar02ActualAuthSeamR461,
+            inspectR46StaffVerifierShapeR461} from './car02-auth-seam-audit-r461.mjs';
+          const sources=Object.fromEntries(Object.keys(CAR02_V461_REQUIRED_FILES)
+            .map(n=>[n,readFileSync(n,'utf8')]));
+          const inventory=JSON.parse(readFileSync('car02-v461-staging-auth-gap-checklist.json','utf8'));
+          const shape=inspectR46StaffVerifierShapeR461(sources['car02-auth-providers-r46.mjs']);
+          assert.equal(shape.authUserGet,true);
+          assert.equal(shape.returnsSessionId,false);
+          assert.equal(shape.staffMembershipLookup,true);
+          const r=auditCar02ActualAuthSeamR461({sources,inventory});
+          assert.equal(r.status,'no_go');assert.equal(r.releasePermitted,false);
+          assert.equal(r.providerSessionProven,false);assert.equal(r.postcommitFenceProven,false);
+          assert.equal(r.sourcePinsMatched.length,4);
+          assert.equal(r.reason,'r46_verified_user_without_trusted_session_identity');
+          console.log('V461_R46_VERIFIED_USER_NO_BOUND_PROVIDER_SESSION_ID_GAP_CONFIRMED_PASS');
+          console.log('V461_PINNED_R50_R51_R52_RELEASE_NO_GO_HOLD_PASS');
+          NODE
+          echo V461_FINAL_RELEASE_NO_GO_HOLD_TRUE
