@@ -1,0 +1,93 @@
+name: CAR02 V4.46 Synthetic Post-Commit Session Generation Fence PG17 (NO_GO HOLD)
+# REVIEW ONLY: fake provider events + disposable PostgreSQL 17.
+# Real Supabase provider session proof, production login, key custody and cutover
+# are MISSING. This action cannot deploy, message or touch production secrets.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-session-cutover-r446.mjs'
+      - 'car02-session-cutover-r446.test.mjs'
+      - 'car02-v446-disposable-pg17.sql'
+      - '.github/workflows/car02-v446-postcommit-login-fence-pg17-qa.yml'
+      - 'car02-staff-generation-r434.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-postcommit-login-fence:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v446_disposable_only
+        ports:
+          - 55446:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v446_disposable_only
+    steps:
+      - name: Checkout review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run 179 offline tests and check original release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unexpected live secret: $key" >&2; exit 1; }
+          done
+          for file in car02-session-cutover-r446.mjs car02-session-cutover-r446.test.mjs car02-v446-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$file"; done
+          node --check car02-session-cutover-r446.mjs
+          node --check car02-session-cutover-r446.test.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs car02-outbox-recovery-r440.test.mjs car02-manual-review-ledger-r441.test.mjs car02-review-integrity-r442.test.mjs car02-review-witness-r443.test.mjs car02-witness-anchor-r444.test.mjs car02-independent-witness-r445.test.mjs car02-session-cutover-r446.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V446_RELEASE_LOCK,CAR02_V446_READ_SQL,CAR02_V446_WRITE_SQL} from './car02-session-cutover-r446.mjs';
+          assert.equal(CAR02_V446_RELEASE_LOCK,true);
+          assert.equal(CAR02_V446_READ_SQL,'SELECT staff_role,auth_version,generation_nonce,login_id FROM public.v446_qa_read_bound_login($1::text,$2::uuid,$3::uuid,$4::text)');
+          assert.equal(CAR02_V446_WRITE_SQL,'SELECT staff_role,auth_version,generation_nonce,login_id FROM public.v446_qa_lock_bound_login($1::text,$2::uuid,$3::uuid,$4::text)');
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(entry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(entry,/car02-session-cutover-r446|v446_qa_/);
+          for(const f of ['car02-staff-generation-r434.mjs','car02-staff-authority-r435.mjs','car02-transaction-gate-r436.mjs','car02-tenant-cas-gate-r437.mjs','car02-idempotency-r438.mjs','car02-outbox-r439.mjs','car02-outbox-recovery-r440.mjs','car02-manual-review-ledger-r441.mjs','car02-review-integrity-r442.mjs','car02-review-witness-r443.mjs','car02-witness-anchor-r444.mjs','car02-independent-witness-r445.mjs']){
+            assert.match(readFileSync(f,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V446_NODE_179_AND_HARD_RELEASE_LOCK_PASS');
+          console.log('V446_TRUSTED_REAL_PROVIDER_SIGNIN_ATTESTOR_STILL_MISSING_NO_GO');
+          NODE
+      - name: Real disposable PG17 stop reactivate old-provider-proof rejection and 8-client read race
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55446 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v446_disposable' >/dev/null
+          pg -d car02_v446_disposable -f /workspace/car02-v446-disposable-pg17.sql | tee "$RUNNER_TEMP/v446-pg.log"
+          for mark in V446_PG17_UNPRIVILEGED_PROVIDER_PROOF_DENY_PASS V446_PG17_INITIAL_MATCH_AND_CROSS_TENANT_DENY_PASS V446_PG17_ROLLBACK_PRESERVES_CURRENT_GENERATION_PASS V446_PG17_COMMITTED_REVOKE_INVALIDATES_OLD_LOGIN_PASS V446_PG17_REACTIVATION_REJECTS_OLD_PROVIDER_LOGIN_PASS V446_PG17_FRESH_FIXTURE_AUTHENTICATED_ONLY_AFTER_COMMIT_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v446-pg.log"
+          done
+          # Eight new independent clients must accept ONLY a fresh synthetic post-COMMIT fixture.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v446_disposable -c "SELECT count(*) FROM public.v446_qa_read_bound_login('qa_shop_a','00000000-0000-0000-0000-000000004461','00000000-0000-0000-0000-000000004463','e0fbf939a45f888617cf4c26986609c5424068257b125c9ea15106869120bacb')" > "$RUNNER_TEMP/v446-fresh-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          for i in 1 2 3 4 5 6 7 8; do
+            grep -Fxq '1' "$RUNNER_TEMP/v446-fresh-$i.out" || { echo "V446_FRESH_LOGIN_MISSING_$i"; exit 1; }
+          done
+          old=$(pg -Atq -d car02_v446_disposable -c "SELECT count(*) FROM public.v446_qa_lock_bound_login('qa_shop_a','00000000-0000-0000-0000-000000004461','00000000-0000-0000-0000-000000004462','4c5b5bbdfdd15a4add21867c1969559183873343a77ae1a4c15327a0c3ac41c7')")
+          test "$old" = '0'
+          echo V446_PG17_EIGHT_CLIENTS_NEW_LOGIN_ONLY_PASS
+          echo V446_PG17_SIGNED_OLD_JWT_REMAINS_DENIED_AFTER_REACTIVATION_PASS
+          echo V446_FINAL_RELEASE_NO_GO_HOLD_TRUE
