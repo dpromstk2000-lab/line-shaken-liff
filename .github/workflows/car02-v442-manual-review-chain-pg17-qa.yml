@@ -1,0 +1,108 @@
+name: CAR02 V4.42 Append-Only Review Hash Chain Disposable PG17 (NO_GO HOLD)
+# REVIEW-ONLY branch; offline fixture identities; no LINE, Worker, Supabase or real DB.
+# This chain is NOT independently anchored and is not proof of external message delivery.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-review-integrity-r442.mjs'
+      - 'car02-review-integrity-r442.test.mjs'
+      - 'car02-v442-disposable-pg17.sql'
+      - '.github/workflows/car02-v442-manual-review-chain-pg17-qa.yml'
+      - 'car02-manual-review-ledger-r441.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-review-hash-chain:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v442_disposable_only
+        ports:
+          - 55442:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v442_disposable_only
+    steps:
+      - name: Checkout isolated review branch without stored credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Execute 113 offline tests and assert release is locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          for envname in CAR02_DATABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!envname:-}" || { echo "Unexpected production credentials: $envname" >&2; exit 1; }
+          done
+          test -s car02-review-integrity-r442.mjs
+          test -s car02-review-integrity-r442.test.mjs
+          test -s car02-v442-disposable-pg17.sql
+          node --check car02-review-integrity-r442.mjs
+          node --check car02-review-integrity-r442.test.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs car02-outbox-recovery-r440.test.mjs car02-manual-review-ledger-r441.test.mjs car02-review-integrity-r442.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V442_RELEASE_LOCK,CAR02_V442_APPEND_SQL,CAR02_V442_READ_SQL} from './car02-review-integrity-r442.mjs';
+          assert.equal(CAR02_V442_RELEASE_LOCK,true);
+          assert.equal(CAR02_V442_APPEND_SQL,'SELECT stored,entry_count,entry_hash FROM public.v442_qa_append_review($1::text,$2::uuid,$3::uuid,$4::text,$5::text)');
+          assert.equal(CAR02_V442_READ_SQL,'SELECT snapshot FROM public.v442_qa_read_chain($1::text,$2::uuid)');
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(entry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(entry,/car02-review-integrity-r442|v442_qa_/);
+          for(const f of ['car02-staff-generation-r434.mjs','car02-staff-authority-r435.mjs','car02-transaction-gate-r436.mjs','car02-tenant-cas-gate-r437.mjs','car02-idempotency-r438.mjs','car02-outbox-r439.mjs','car02-outbox-recovery-r440.mjs','car02-manual-review-ledger-r441.mjs']){
+            assert.match(readFileSync(f,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V442_NODE_113_AND_SOURCE_RELEASE_LOCK_PASS');
+          console.log('V442_NO_REAL_REVIEWER_AUTH_OR_EXTERNAL_HASH_ANCHOR_NO_GO');
+          NODE
+      - name: Disposable PostgreSQL 17 immutable hash chain and eight concurrent replay attempts
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55442 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v442_disposable' >/dev/null
+          pg -d car02_v442_disposable -f /workspace/car02-v442-disposable-pg17.sql | tee "$RUNNER_TEMP/v442.log"
+          for mark in V442_PG17_PRIVILEGES_FAIL_CLOSED_PASS V442_PG17_APPEND_REPLAY_AND_CHAIN_PASS V442_PG17_EVIDENCE_TENANT_AND_DELIVERED_DENY_PASS V442_PG17_APPEND_ONLY_AND_NO_DELIVERY_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v442.log"
+          done
+          # Eight callers race with same reviewer and evidence on one separate case.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v442_disposable -c "SELECT stored::text||':'||entry_count::text FROM public.v442_qa_append_review('qa_shop_a','00000000-0000-0000-0000-000000004429','00000000-0000-0000-0000-000000004425',repeat('d',64),'investigated')" > "$RUNNER_TEMP/v442-race-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          one=0
+          seven=0
+          for i in 1 2 3 4 5 6 7 8; do
+            if grep -Fxq 't:1' "$RUNNER_TEMP/v442-race-$i.out" || grep -Fxq 'true:1' "$RUNNER_TEMP/v442-race-$i.out"; then one=$((one+1));
+            elif grep -Fxq 'f:1' "$RUNNER_TEMP/v442-race-$i.out" || grep -Fxq 'false:1' "$RUNNER_TEMP/v442-race-$i.out"; then seven=$((seven+1));
+            else cat "$RUNNER_TEMP/v442-race-$i.out"; exit 1; fi
+          done
+          test "$one:$seven" = '1:7' || { echo "V442_REVIEW_RACE_BAD: $one:$seven" >&2; exit 1; }
+          result=$(pg -Atq -d car02_v442_disposable -c "SELECT (SELECT count(*) FROM public.v442_qa_chain WHERE event_id='00000000-0000-0000-0000-000000004429')::text||':'||(SELECT status FROM public.v442_qa_cases WHERE id='00000000-0000-0000-0000-000000004429')::text||':'||(SELECT count(*) FROM public.v442_qa_chain)::text")
+          test "$result" = '1:manual_review:3' || { echo "V442_REVIEW_CHAIN_WRONG: $result" >&2; exit 1; }
+          # Verify DB hash is identical to the independent Node implementation.
+          got=$(pg -Atq -d car02_v442_disposable -c "SELECT entry_hash FROM public.v442_qa_chain WHERE event_id='00000000-0000-0000-0000-000000004429'")
+          expected=$(node --input-type=module <<'NODE'
+          import {car02ReviewChainHashR442} from './car02-review-integrity-r442.mjs';
+          console.log(car02ReviewChainHashR442({shop:'qa_shop_a',eventId:'00000000-0000-0000-0000-000000004429',seq:1,
+            reviewerSub:'00000000-0000-0000-0000-000000004425',evidenceSha256:'d'.repeat(64),disposition:'investigated',previousHash:'0'.repeat(64)}));
+          NODE
+          )
+          test "$got" = "$expected" || { echo 'V442_SQL_JS_HASH_MISMATCH' >&2; exit 1; }
+          echo V442_PG17_EIGHT_WRITERS_ONE_AUDIT_PASS
+          echo V442_PG17_SQL_NODE_HASH_PARITY_PASS
+          echo V442_FINAL_RELEASE_NO_GO_HOLD_TRUE
