@@ -1,0 +1,107 @@
+name: CAR02 V4.47 Synthetic Supabase Session Row Fence PG17 (NO_GO HOLD)
+# Review branch ONLY. Disposable Postgres session rows are MOCK data, NOT auth.sessions.
+# No Supabase, Worker, LINE, production secrets, actual user session, or deployment.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-supabase-session-boundary-r447.mjs'
+      - 'car02-supabase-session-boundary-r447.test.mjs'
+      - 'car02-v447-disposable-pg17.sql'
+      - '.github/workflows/car02-v447-provider-session-fence-pg17-qa.yml'
+      - 'car02-session-cutover-r446.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-session-row-fence:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v447_disposable_only
+        ports:
+          - 55447:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v447_disposable_only
+    steps:
+      - name: Checkout isolated review branch without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: All 198 offline tests and original release lock check
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unexpected live secret: $key" >&2; exit 1; }
+          done
+          for f in car02-supabase-session-boundary-r447.mjs car02-supabase-session-boundary-r447.test.mjs car02-v447-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-supabase-session-boundary-r447.mjs
+          node --check car02-supabase-session-boundary-r447.test.mjs
+          node --test \
+            car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs \
+            car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs \
+            car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs \
+            car02-outbox-recovery-r440.test.mjs car02-manual-review-ledger-r441.test.mjs \
+            car02-review-integrity-r442.test.mjs car02-review-witness-r443.test.mjs \
+            car02-witness-anchor-r444.test.mjs car02-independent-witness-r445.test.mjs \
+            car02-session-cutover-r446.test.mjs car02-supabase-session-boundary-r447.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V447_RELEASE_LOCK,CAR02_V447_READ_SQL,CAR02_V447_LOCK_SQL} from './car02-supabase-session-boundary-r447.mjs';
+          assert.equal(CAR02_V447_RELEASE_LOCK,true);
+          assert.match(CAR02_V447_READ_SQL,/v447_private\.qa_live_session/);
+          assert.match(CAR02_V447_LOCK_SQL,/v447_private\.qa_lock_live_session/);
+          assert.doesNotMatch(CAR02_V447_READ_SQL,/\bauth\.sessions\b/);
+          const edge=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(edge,/supabase-session-boundary-r447|v447_private/);
+          for(const name of [434,435,436,437,438,439,440,441,442,443,444,445,446]){
+            const modules={434:'staff-generation',435:'staff-authority',436:'transaction-gate',437:'tenant-cas-gate',438:'idempotency',439:'outbox',440:'outbox-recovery',441:'manual-review-ledger',442:'review-integrity',443:'review-witness',444:'witness-anchor',445:'independent-witness',446:'session-cutover'};
+            const source=readFileSync(`car02-${modules[name]}-r${name}.mjs`,'utf8');
+            assert.match(source,/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V447_LOCAL_198_TESTS_AND_RELEASE_LOCK_PASS');
+          console.log('V447_REAL_PROVIDER_SESSION_AND_POSTCOMMIT_FENCE_NOT_YET_VERIFIED_NO_GO');
+          NODE
+      - name: Disposable PG17 synthetic session row, postcommit fence, 8 concurrent reads
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55447 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v447_disposable' >/dev/null
+          pg -d car02_v447_disposable -f /workspace/car02-v447-disposable-pg17.sql | tee "$RUNNER_TEMP/v447-pg17.log"
+          for marker in \
+            V447_PG17_PRIVATE_SCHEMA_AND_PUBLIC_DENY_PASS \
+            V447_PG17_INITIAL_SESSION_TENANT_BOUND_PASS \
+            V447_PG17_COMMITTED_REVOCATION_AND_REACTIVATION_DENY_PASS \
+            V447_PG17_POSTCOMMIT_FENCE_OLD_REFRESH_DENIED_PASS \
+            V447_PG17_SIGNOUT_AND_OTHER_SHOP_PROTECTED_PASS; do
+            grep -Fq "$marker" "$RUNNER_TEMP/v447-pg17.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v447_disposable -c "SELECT count(*) FROM v447_private.qa_live_session('qa_shop_a','00000000-0000-0000-0000-000000004471','00000000-0000-0000-0000-000000004473')" > "$RUNNER_TEMP/v447-fresh-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          for i in 1 2 3 4 5 6 7 8; do grep -Fxq '1' "$RUNNER_TEMP/v447-fresh-$i.out"; done
+          old=$(pg -Atq -d car02_v447_disposable -c "SELECT count(*) FROM v447_private.qa_lock_live_session('qa_shop_a','00000000-0000-0000-0000-000000004471','00000000-0000-0000-0000-000000004472')")
+          test "$old" = '0'
+          boundary=$(pg -Atq -d car02_v447_disposable -c "SELECT count(*) FROM v447_private.qa_live_session('qa_shop_a','00000000-0000-0000-0000-000000004471','00000000-0000-0000-0000-000000004478')")
+          test "$boundary" = '0'
+          echo V447_PG17_EIGHT_READS_NEW_SESSION_ONLY_PASS
+          echo V447_PG17_OLD_SESSION_AND_EQUAL_FENCE_DENIED_PASS
+          echo V447_REAL_AUTH_SESSIONS_AND_COMMIT_ORDER_UNPROVEN_NO_GO
+          echo V447_FINAL_RELEASE_NO_GO_HOLD_TRUE
