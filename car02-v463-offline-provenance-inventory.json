@@ -1,0 +1,23 @@
+{
+  "version": 463,
+  "project": "DPRO_CAR02",
+  "mode": "read_only_offline_qa",
+  "releaseDecision": "NO_GO_HOLD",
+  "reviewBranch": "car02-v434-review-only",
+  "lastVerifiedBranchCommitBeforeV463": "7894f4d6e2e91eb70364d04684bfcf40fec9926e",
+  "mainCommitUnchanged": "ad6e27c5fa866be9b010e349e9d164691d7a8988",
+  "historicalSuccessfulActions": [39559851521,39559851569],
+  "priorFailedHistoricalActions": [39559785436,39558205851],
+  "problemFixed": "V457 GitHub Actions static assertion expected exactly 385 total regression tests, while current test suite exceeded that; use dynamic count with baseline minimum, pass=tests, fail=0.",
+  "localProofLimit": "An injected mock trusted API adapter cannot independently establish provenance, actual Supabase session, real LINE delivery, or commercial release.",
+  "commercialBlockersUnchanged": [
+    "actual_supabase_auth_sessions",
+    "trusted_operator_and_worker_iam",
+    "postcommit_auth_generation_fence",
+    "real_line_delivery_ambiguity",
+    "external_immutable_evidence_store",
+    "independent_signing_key_custody",
+    "staging_end_to_end_integration"
+  ],
+  "never": ["deploy", "main_merge", "shared_database_sql", "production_line_dispatch", "release_unlock"]
+}
