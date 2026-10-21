@@ -1,0 +1,113 @@
+name: CAR02 V4.54 V453 Outbox Single Claim and Manual Review PG17 (NO_GO HOLD)
+# STRICTLY REVIEW ONLY. No live Supabase, Auth, Worker, LINE, notifications or deployment.
+# Source V453 event remains immutable pending; this is only a synthetic claim ledger.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-outbox-claim-r454.mjs'
+      - 'car02-outbox-claim-r454.test.mjs'
+      - 'car02-v454-disposable-pg17.sql'
+      - 'car02-v453-disposable-pg17.sql'
+      - '.github/workflows/car02-v454-v453-outbox-claim-pg17-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-v453-event-claim:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v454_disposable_only
+        ports:
+          - 55454:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v454_disposable_only
+    steps:
+      - name: Checkout review branch with no persistent GitHub token
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Execute 327 Node tests and verify release locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unexpected live secret: $key" >&2; exit 1; }
+          done
+          for file in car02-outbox-claim-r454.mjs car02-outbox-claim-r454.test.mjs car02-v454-disposable-pg17.sql car02-v453-disposable-pg17.sql car02-edge-entry-r52.ts; do
+            test -s "$file"
+          done
+          test "$(sha256sum car02-v453-disposable-pg17.sql | cut -d' ' -f1)" = '2c04737685ee335856a275c59ccd85169387c856102360a80091847a603a4b6d'
+          node --check car02-outbox-claim-r454.mjs
+          node --check car02-outbox-claim-r454.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v454-node.log"
+          grep -Fxq '# tests 327' "$RUNNER_TEMP/v454-node.log"
+          grep -Fxq '# pass 327' "$RUNNER_TEMP/v454-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v454-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V454_RELEASE_LOCK,CAR02_V454_CLAIM_SQL,CAR02_V454_QUARANTINE_SQL} from './car02-outbox-claim-r454.mjs';
+          assert.equal(CAR02_V454_RELEASE_LOCK,true);
+          assert.equal(CAR02_V454_CLAIM_SQL,'SELECT event_id,claim_token,state FROM v454_private.qa_claim_outbox($1::text,$2::uuid,$3::uuid)');
+          assert.equal(CAR02_V454_QUARANTINE_SQL,'SELECT quarantined FROM v454_private.qa_quarantine_claim($1::text,$2::uuid,$3::uuid,$4::uuid,$5::text)');
+          const edge=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(edge,/outbox-claim-r454|v454_private/);
+          for(const src of ['car02-atomic-job-outbox-r453.mjs','car02-job-idempotency-r452.mjs',
+            'car02-job-authorization-r451.mjs','car02-atomic-session-write-r450.mjs'])
+             assert.match(readFileSync(src,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          const source=readFileSync('car02-outbox-claim-r454.mjs','utf8');
+          assert.doesNotMatch(source,/fetch\(|LINE_CHANNEL_ACCESS_TOKEN|https:\/\/api\.line\.me/);
+          console.log('V454_NODE_327_ISOLATED_PASS_AND_RELEASE_LOCK_TRUE');
+          console.log('V454_NO_LINE_PROVIDER_DISPATCH_OR_REAL_IAM_NO_GO');
+          NODE
+      - name: Disposable PG17 integrates V453 immutable outbox and eight racing claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55454 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v454_disposable' >/dev/null
+          pg -d car02_v454_disposable -f /workspace/car02-v453-disposable-pg17.sql > "$RUNNER_TEMP/v454-v453-source.log"
+          grep -Fxq V453_PG17_ATOMIC_JOB_RECEIPT_OUTBOX_PASS "$RUNNER_TEMP/v454-v453-source.log"
+          pg -d car02_v454_disposable -f /workspace/car02-v454-disposable-pg17.sql | tee "$RUNNER_TEMP/v454-pg17.log"
+          for label in V454_PG17_DISPOSABLE_PRIVILEGE_GUARDS_PASS V454_PG17_SINGLE_CLAIM_TENANT_NONCE_AND_REVIEW_PASS V454_PG17_CLAIM_LEDGER_ONE_WAY_IMMUTABLE_PASS V454_PG17_INTEGRATED_V453_PENDING_SOURCE_PASS; do
+            grep -Fxq "$label" "$RUNNER_TEMP/v454-pg17.log"
+          done
+          # Eight independent workers compete to claim ONE V453 pending event.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v454_disposable -c "SELECT COALESCE((SELECT claim_token::text FROM v454_private.qa_claim_outbox('qa_shop_a','00000000-0000-0000-0000-000000004540','00000000-0000-0000-0000-00000000454$i')),'none')" > "$RUNNER_TEMP/v454-race-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          winner_count=0; denied_count=0; winner_id=''; winning_token=''
+          for i in 1 2 3 4 5 6 7 8; do
+            token=$(cat "$RUNNER_TEMP/v454-race-$i.out")
+            if test "$token" = 'none'; then denied_count=$((denied_count+1));
+            elif test "${#token}" -eq 36; then winner_count=$((winner_count+1));winner_id="$i";winning_token="$token";
+            else echo "V454_MALFORMED_CLAIM_${i}" >&2;exit 1;fi
+          done
+          test "$winner_count:$denied_count" = '1:7' || { echo "V454_DUPLICATE_CLAIM: $winner_count:$denied_count" >&2;exit 1; }
+          # Only the winning worker and server-issued claim token can quarantine.
+          true_result=$(pg -Atq -d car02_v454_disposable -c "SELECT quarantined FROM v454_private.qa_quarantine_claim('qa_shop_a','00000000-0000-0000-0000-000000004540','00000000-0000-0000-0000-00000000454$winner_id','$winning_token','provider_no_receipt')")
+          test "$true_result" = 't'
+          second=$(pg -Atq -d car02_v454_disposable -c "SELECT quarantined FROM v454_private.qa_quarantine_claim('qa_shop_a','00000000-0000-0000-0000-000000004540','00000000-0000-0000-0000-00000000454$winner_id','$winning_token','provider_no_receipt')")
+          test "$second" = 'f'
+          final=$(pg -Atq -d car02_v454_disposable -c "SELECT (SELECT count(*) FROM v454_private.qa_claims WHERE event_id='00000000-0000-0000-0000-000000004540')::text||':'||(SELECT state FROM v454_private.qa_claims WHERE event_id='00000000-0000-0000-0000-000000004540')||':'||(SELECT dispatch_state FROM v453_private.qa_outbox WHERE event_id='00000000-0000-0000-0000-000000004540')")
+          test "$final" = '1:manual_review:pending' || { echo "V454_SOURCE_MUTATED: $final" >&2;exit 1; }
+          echo V454_PG17_EIGHT_WORKERS_SINGLE_CLAIM_PASS
+          echo V454_PG17_QUARANTINE_NO_REQUEUE_SOURCE_PENDING_PASS
+          echo V454_EXTERNAL_PROVIDER_RECEIPT_AND_TRUSTED_WORKER_IAM_MISSING_NO_GO
+          echo V454_FINAL_RELEASE_NO_GO_HOLD_TRUE
