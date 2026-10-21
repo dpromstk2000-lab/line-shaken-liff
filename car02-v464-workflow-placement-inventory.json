@@ -1,0 +1,12 @@
+{
+  "version": "V4.64",
+  "purpose": "Require actual .github/workflows layout and prevent root-level false positive regression checks",
+  "reviewBranch": "car02-v434-review-only",
+  "mainShaExpected": "ad6e27c5fa866be9b010e349e9d164691d7a8988",
+  "previousFailedRuns": [39561967918,39561967745],
+  "previousFailure": "V463 test used ./car02-v457-...yml rather than ./.github/workflows/car02-v457-...yml; both 503/504",
+  "remediation": "Correct V463 test path and V463 workflow inline source check; validate against a faithful GitHub checkout tree",
+  "verificationScope": "offline tests and future GitHub Actions review-only; never production",
+  "release": "NO_GO_HOLD",
+  "liveProviderEvidence": "UNVERIFIED"
+}

@@ -104,7 +104,7 @@ test('read-only source exception never reveals details or claims success',async(
   await blocked(fixture({throwAt}),'trusted_source_read_failed');
 });
 test('repaired historical V457 workflow uses dynamic count and preserves PG17 checks',()=>{
- const y=readFileSync(new URL('./car02-v457-signed-evidence-manifest-pg17-qa.yml',import.meta.url),'utf8');
+ const y=readFileSync(new URL('./.github/workflows/car02-v457-signed-evidence-manifest-pg17-qa.yml',import.meta.url),'utf8');
  assert.match(y,/V4\.57R1/);
  assert.match(y,/tests=\$\(awk '\/\^# tests/);
  assert.match(y,/test "\$passed" = "\$tests"/);
