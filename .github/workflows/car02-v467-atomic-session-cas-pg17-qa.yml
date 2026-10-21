@@ -1,0 +1,96 @@
+name: CAR02 V4.67 Atomic Synthetic Auth Fence and CAS PG17 (NO_GO HOLD)
+# NO actual Supabase/LINE. Only disposable V466 fixtures and an isolated test job.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-atomic-session-cas-r467.mjs'
+      - 'car02-atomic-session-cas-r467.test.mjs'
+      - 'car02-v467-disposable-atomic-cas-pg17.sql'
+      - '.github/workflows/car02-v467-atomic-session-cas-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-atomic-cas-fence:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v467_disposable_only
+        ports:
+          - 55467:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v467_disposable_only
+    steps:
+      - name: Checkout isolated review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify original hard R52 lock and no production secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for secret in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!secret:-}" || { echo 'V467_LIVE_PROVIDER_ENV_DENIED' >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-atomic-session-cas-r467.mjs car02-atomic-session-cas-r467.test.mjs car02-v467-disposable-atomic-cas-pg17.sql car02-v466-disposable-session-fence-pg17.sql; do test -s "$f"; done
+          test -s .github/workflows/car02-v467-atomic-session-cas-pg17-qa.yml
+          test ! -e car02-v467-atomic-session-cas-pg17-qa.yml
+          echo V467_ORIGINAL_R52_LOCK_AND_DISPOSABLE_SOURCE_ONLY_PASS
+      - name: Node complete regression and mandatory rollback review
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-atomic-session-cas-r467.mjs
+          node --check car02-atomic-session-cas-r467.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v467-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v467-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v467-node.log")
+          test "$tests" -ge 591
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v467-node.log"
+          echo V467_ALL_NODE_591_AND_PREVIOUS_FENCE_REGRESSIONS_PASS
+      - name: Real PG17 V466 fixture, in-transaction guard and eight racing dryrun writers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55467 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v466_disposable' >/dev/null
+          pg -d car02_v466_disposable -f /workspace/car02-v466-disposable-session-fence-pg17.sql > "$RUNNER_TEMP/v467-base.log"
+          grep -Fxq 'V466_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v467-base.log"
+          pg -d car02_v466_disposable -f /workspace/car02-v467-disposable-atomic-cas-pg17.sql | tee "$RUNNER_TEMP/v467-pg.log"
+          for marker in V467_PG17_PRIVATE_SYNTHETIC_CAS_ROLE_DENY_PASS V467_PG17_VALID_AUTH_FENCE_SYNTHETIC_CAS_ROLLBACK_PASS V467_PG17_REVOKED_PRE_FENCE_CROSS_TENANT_UNKNOWN_JOB_DENIED_PASS V467_PG17_REVOKE_AND_UNACKED_FENCE_NEGATIVES_ZERO_WRITES_PASS V467_FINAL_RELEASE_NO_GO_HOLD_TRUE; do
+            grep -Fxq "$marker" "$RUNNER_TEMP/v467-pg.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v466_disposable -c "SELECT outcome FROM v467_private.qa_atomic_dryrun('qa_shop_a','00000000-0000-0000-0000-000000004661','00000000-0000-0000-0000-000000004662','00000000-0000-0000-0000-000000004670',0,1800000000)" > "$RUNNER_TEMP/v467-race-$i") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          wins=0; conflicts=0
+          for i in 1 2 3 4 5 6 7 8; do
+            result=$(cat "$RUNNER_TEMP/v467-race-$i")
+            if [ "$result" = 'synthetic_cas_advanced' ]; then wins=$((wins+1));
+            elif [ "$result" = 'version_conflict' ]; then conflicts=$((conflicts+1));
+            else echo "V467_UNEXPECTED_SYNTHETIC_CAS_RESULT: $result" >&2; exit 1; fi
+          done
+          test "$wins" -eq 1
+          test "$conflicts" -eq 7
+          test "$(pg -Atq -d car02_v466_disposable -c "SELECT version::text||':'||touched::text FROM v467_private.qa_jobs")" = '1:1'
+          test "$(pg -Atq -d car02_v466_disposable -c 'SELECT count(*) FROM v466_private.qa_sessions')" = '3'
+          echo V467_PG17_EIGHT_CONCURRENT_WRITERS_ONE_SYNTHETIC_CAS_PASS
+          echo V467_PG17_REVOCATION_FENCE_AND_NO_REAL_BUSINESS_API_PASS
+          echo V467_FINAL_RELEASE_NO_GO_HOLD_TRUE
