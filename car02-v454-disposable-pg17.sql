@@ -1,3 +1,4 @@
+-- DPRO CAR02 V4.54 R1: fixes PG17 PL/pgSQL OUT-column name ambiguity.
 -- DPRO CAR02 V4.54 — SYNTHETIC V453 outbox claim and manual review.
 -- MUST first load exact V453 disposable SQL into a throwaway PostgreSQL 17 DB.
 -- NO LINE send, delivery status, retry path, real worker IAM, or production connection.
@@ -61,7 +62,7 @@ BEGIN
  WHERE o.shop_code=p_shop AND o.event_id=p_event AND
        o.dispatch_state='pending' AND o.attempts=0 AND
        r.job_id=o.job_id AND r.new_version=o.new_version
- ON CONFLICT(shop_code,event_id) DO NOTHING
+ ON CONFLICT ON CONSTRAINT qa_claims_pkey DO NOTHING
  RETURNING qa_claims.event_id,qa_claims.claim_token,qa_claims.state;
 END $$;
 CREATE FUNCTION v454_private.qa_quarantine_claim(p_shop text,p_event uuid,p_worker uuid,
