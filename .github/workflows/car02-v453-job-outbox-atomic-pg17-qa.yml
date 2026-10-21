@@ -1,0 +1,127 @@
+name: CAR02 V4.53 Atomic Job Receipt and Pending Outbox Disposable PG17 (NO_GO HOLD)
+# REVIEW ONLY. No production Supabase, real sessions, live Worker or LINE dispatch.
+# A queued pending outbox event is NOT confirmation of message delivery.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-atomic-job-outbox-r453.mjs'
+      - 'car02-atomic-job-outbox-r453.test.mjs'
+      - 'car02-v453-disposable-pg17.sql'
+      - '.github/workflows/car02-v453-job-outbox-atomic-pg17-qa.yml'
+      - 'car02-job-idempotency-r452.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-atomic-job-outbox:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v453_disposable_only
+        ports:
+          - 55453:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v453_disposable_only
+    steps:
+      - name: Checkout isolated review branch, no persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test all 308 isolated Node cases and original release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!name:-}" || { echo "Unexpected production env $name" >&2; exit 1; }
+          done
+          for f in car02-atomic-job-outbox-r453.mjs car02-atomic-job-outbox-r453.test.mjs car02-v453-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-atomic-job-outbox-r453.mjs
+          node --check car02-atomic-job-outbox-r453.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v453-node.log"
+          grep -Fxq '# tests 308' "$RUNNER_TEMP/v453-node.log"
+          grep -Fxq '# pass 308' "$RUNNER_TEMP/v453-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v453-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V453_RELEASE_LOCK,CAR02_V453_ATOMIC_SQL} from './car02-atomic-job-outbox-r453.mjs';
+          assert.equal(CAR02_V453_RELEASE_LOCK,true);
+          assert.equal(CAR02_V453_ATOMIC_SQL,
+           'SELECT applied,new_version,event_id,dispatch_state FROM v453_private.qa_touch_and_queue($1::text,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid)');
+          const original=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(original,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(original,/atomic-job-outbox-r453|v453_private/);
+          const mods={434:'staff-generation',435:'staff-authority',436:'transaction-gate',437:'tenant-cas-gate',438:'idempotency',439:'outbox',440:'outbox-recovery',441:'manual-review-ledger',442:'review-integrity',443:'review-witness',444:'witness-anchor',445:'independent-witness',446:'session-cutover',447:'supabase-session-boundary',448:'postcommit-fence',449:'cutover-reconcile',450:'atomic-session-write',451:'job-authorization',452:'job-idempotency'};
+          for(const [n,file] of Object.entries(mods))
+            assert.match(readFileSync(`car02-${file}-r${n}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          console.log('V453_NODE_308_AND_HARD_RELEASE_LOCK_PASS');
+          console.log('V453_NO_REAL_SUPABASE_PROVIDER_AUTH_OR_LINE_DISPATCH_NO_GO');
+          NODE
+      - name: Disposable PostgreSQL17 three-write atomicity, rollback, and sixteen client races
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55453 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v453_disposable' >/dev/null
+          pg -d car02_v453_disposable -f /workspace/car02-v453-disposable-pg17.sql | tee "$RUNNER_TEMP/v453-pg17.log"
+          for marker in V453_PG17_PRIVATE_ROLE_DENY_PASS V453_PG17_ATOMIC_JOB_RECEIPT_OUTBOX_PASS V453_PG17_DUPLICATE_QUEUE_PREVENTED_PASS V453_PG17_OUTBOX_FAILURE_ROLLS_BACK_ALL_THREE_PASS V453_PG17_REVOKED_STAFF_CANNOT_REPLAY_PASS V453_PG17_OLD_SESSION_POLICY_AND_TENANT_DENIED_PASS V453_PG17_OUTBOX_AND_RECEIPT_APPEND_ONLY_PASS; do
+            grep -Fxq "$marker" "$RUNNER_TEMP/v453-pg17.log"
+          done
+          # Eight independently committed writers REUSE the same operation UUID.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v453_disposable -c "SELECT applied::text||':'||new_version::text||':'||dispatch_state FROM v453_private.qa_touch_and_queue('qa_shop_a','00000000-0000-0000-0000-000000004513','00000000-0000-0000-0000-000000004556','00000000-0000-0000-0000-000000004540',1,'00000000-0000-0000-0000-000000004540')" > "$RUNNER_TEMP/v453-same-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          won=0;duplicate=0
+          for i in 1 2 3 4 5 6 7 8; do
+            if grep -Fxq 'true:2:pending' "$RUNNER_TEMP/v453-same-$i.out" || grep -Fxq 't:2:pending' "$RUNNER_TEMP/v453-same-$i.out"; then won=$((won+1));
+            elif grep -Fxq 'false:2:pending' "$RUNNER_TEMP/v453-same-$i.out" || grep -Fxq 'f:2:pending' "$RUNNER_TEMP/v453-same-$i.out"; then duplicate=$((duplicate+1));
+            else cat "$RUNNER_TEMP/v453-same-$i.out"; exit 1; fi
+          done
+          test "$won:$duplicate" = '1:7' || { echo "V453_DUPLICATE_OUTBOX: $won:$duplicate" >&2; exit 1; }
+          # Eight DISTINCT IDs with the same expected job state version.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (
+              if pg -Atq -d car02_v453_disposable -c "SELECT applied::text||':'||new_version::text FROM v453_private.qa_touch_and_queue('qa_shop_a','00000000-0000-0000-0000-000000004513','00000000-0000-0000-0000-000000004556','00000000-0000-0000-0000-000000004541',1,'00000000-0000-0000-0000-00000000454$i')" > "$RUNNER_TEMP/v453-diff-$i.out" 2> "$RUNNER_TEMP/v453-diff-$i.err"; then
+                echo WIN > "$RUNNER_TEMP/v453-diff-$i.status"
+              elif grep -Fq 'V453_JOB_VERSION_CONFLICT' "$RUNNER_TEMP/v453-diff-$i.err"; then
+                echo DENY > "$RUNNER_TEMP/v453-diff-$i.status"
+              else
+                cat "$RUNNER_TEMP/v453-diff-$i.err" >&2
+                echo BAD > "$RUNNER_TEMP/v453-diff-$i.status"
+              fi
+            ) &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          won=0;denied=0
+          for i in 1 2 3 4 5 6 7 8; do
+            state=$(cat "$RUNNER_TEMP/v453-diff-$i.status")
+            if test "$state" = WIN; then
+              grep -Fxq 'true:2' "$RUNNER_TEMP/v453-diff-$i.out" || grep -Fxq 't:2' "$RUNNER_TEMP/v453-diff-$i.out"
+              won=$((won+1))
+            elif test "$state" = DENY; then denied=$((denied+1));
+            else echo "V453_BAD_CLIENT_$i" >&2;exit 1; fi
+          done
+          test "$won:$denied" = '1:7' || { echo "V453_VERSION_RACE_FAILED: $won:$denied" >&2; exit 1; }
+          # The only queue output is PENDING. No sender and no 'delivered' state.
+          state=$(pg -Atq -d car02_v453_disposable -c "SELECT (SELECT state_version FROM v453_private.qa_jobs WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004540')::text||':'||(SELECT state_version FROM v453_private.qa_jobs WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004541')::text||':'||(SELECT count(*) FROM v453_private.qa_receipts)::text||':'||(SELECT count(*) FROM v453_private.qa_outbox)::text||':'||(SELECT count(*) FROM v453_private.qa_outbox WHERE dispatch_state<>'pending')::text||':'||(SELECT state_version FROM v453_private.qa_jobs WHERE shop_code='qa_shop_b' AND id='00000000-0000-0000-0000-000000004538')::text")
+          test "$state" = '2:2:3:3:0:1' || { echo "V453_NONATOMIC_OR_DELIVERY_CLAIM: $state" >&2; exit 1; }
+          echo V453_PG17_EIGHT_REPLAYS_ONE_QUEUE_SEVEN_DUPLICATE_PASS
+          echo V453_PG17_EIGHT_DISTINCT_WRITERS_ONE_QUEUE_PASS
+          echo V453_PG17_ALL_THREE_WRITES_ATOMIC_TENANT_PROTECTED_PASS
+          echo V453_FINAL_RELEASE_NO_GO_HOLD_TRUE
