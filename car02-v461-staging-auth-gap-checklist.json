@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 461,
+  "project": "DPRO_CAR02",
+  "branch": "car02-v434-review-only",
+  "releaseDecision": "NO_GO",
+  "evidenceStatus": "UNVERIFIED",
+  "sources": {
+    "car02-auth-providers-r46.mjs": {
+      "gitBlobSha": "d90404a880c06b809c30685654029a938913ec09",
+      "evidence": "review_branch_source_only"
+    },
+    "car02-unified-runtime-r50.mjs": {
+      "gitBlobSha": "76e4e8cae27599f27e3d887118148718c32ebb80",
+      "evidence": "review_branch_source_only"
+    },
+    "car02-edge-boundary-r51.mjs": {
+      "gitBlobSha": "6614f2ed1933aa787576cb8074cb7d4bc704efa0",
+      "evidence": "review_branch_source_only"
+    },
+    "car02-edge-entry-r52.ts": {
+      "gitBlobSha": "f0e31fb9f9d98524519d01dffd3489893d3d3302",
+      "evidence": "review_branch_source_only"
+    }
+  },
+  "stagingProbeOrder": [
+    {
+      "control": "actual_supabase_auth_sessions",
+      "evidenceState": "unverified",
+      "humanAcceptance": "In a disposable nonproduction Supabase project, verify Auth provider session provenance and accessible read-only session metadata after actual JWT validation; never assume auth.sessions schema or permissions."
+    },
+    {
+      "control": "trusted_operator_and_worker_iam",
+      "evidenceState": "unverified",
+      "humanAcceptance": "Validate owner, staff, worker and shop binding using independently authorized test accounts and server-only adapters; reject wrong-shop, revoked and client-supplied roles."
+    },
+    {
+      "control": "postcommit_auth_generation_fence",
+      "evidenceState": "unverified",
+      "humanAcceptance": "Verify a new real provider session after acknowledged commit and reject all prior sessions after cutover; confirm timestamp ordering and old-token invalidation."
+    },
+    {
+      "control": "real_line_delivery_ambiguity",
+      "evidenceState": "unverified",
+      "humanAcceptance": "Use only an approved isolated LINE test channel to inspect timeout and uncertain-send responses, record provider acknowledgement details, and never infer delivery."
+    },
+    {
+      "control": "external_immutable_evidence_store",
+      "evidenceState": "unverified",
+      "humanAcceptance": "With an independently administered external test storage account, show append-only retention, independent verification and recovery without application DB admin control."
+    },
+    {
+      "control": "independent_signing_key_custody",
+      "evidenceState": "unverified",
+      "humanAcceptance": "Demonstrate off-application signing key custody, key rotation and revocation with pinned public keys and a separately stored monotonic witness cursor."
+    },
+    {
+      "control": "staging_end_to_end_integration",
+      "evidenceState": "unverified",
+      "humanAcceptance": "Execute supervised staging-only user and job flows through a verified provider session, role checks, atomic outbox and manual ambiguity review, with no customer traffic."
+    }
+  ],
+  "sourceFinding": "R46 /auth/v1/user validation returns {verified:true,sub:user.id,exp:claims.exp} without independently verified provider session identifier. Authentication can be valid as a user but is insufficient as proof of a live provider session for atomic business writes.",
+  "nextOperatorAction": "No user action until explicit isolated Supabase project and authorization boundaries are prepared; never paste service-role credentials in GitHub or chat."
+}
