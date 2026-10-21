@@ -1,0 +1,92 @@
+name: CAR02 V4.59 Commercial Release Safety Gate and Disposable PG17 (NO_GO HOLD)
+# This CI tests that fake provider / WORM / IAM assertions never lift R52 HOLD.
+# Synthetic green CI is NOT commercial readiness. No real secrets or deployments.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-release-readiness-r459.mjs'
+      - 'car02-release-readiness-r459.test.mjs'
+      - 'car02-v459-disposable-pg17.sql'
+      - '.github/workflows/car02-v459-release-readiness-no-go-pg17-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-release-no-go-gate:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v459_disposable_only
+        ports:
+          - 55459:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v459_disposable_only
+    steps:
+      - name: Checkout isolated branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify 425 Node tests, immutable R52 lock, source isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo "Unexpected live provider env: $k" >&2; exit 1; }
+          done
+          for f in car02-release-readiness-r459.mjs car02-release-readiness-r459.test.mjs car02-v459-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          test "$(sha256sum car02-edge-entry-r52.ts | cut -d' ' -f1)" = 'bd414928a1eabe28500aa194a840bd3b734c3fcc9ca1a9ef0c2b0a19b88820a5'
+          node --check car02-release-readiness-r459.mjs
+          node --check car02-release-readiness-r459.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v459-node.log"
+          grep -Fxq '# tests 425' "$RUNNER_TEMP/v459-node.log"
+          grep -Fxq '# pass 425' "$RUNNER_TEMP/v459-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v459-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V459_RELEASE_LOCK,CAR02_V459_MANDATORY_CONTROLS} from './car02-release-readiness-r459.mjs';
+          assert.equal(CAR02_V459_RELEASE_LOCK,true);
+          assert.equal(CAR02_V459_MANDATORY_CONTROLS.length,7);
+          const src=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(src,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(src,/release-readiness-r459|v459_private/);
+          for(const n of ['car02-independent-witness-r458.mjs','car02-review-evidence-seal-r457.mjs'])
+            assert.match(readFileSync(n,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          console.log('V459_ALL_425_NODE_TESTS_AND_IMMUTABLE_RELEASE_LOCK_PASS');
+          console.log('V459_SEVEN_REAL_COMMERCIAL_PROVIDER_INTEGRATIONS_NOT_PROVEN_NO_GO');
+          NODE
+      - name: Disposable PG17 seven blocker inventory and eight read-only snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55459 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v459_disposable' >/dev/null
+          pg -d car02_v459_disposable -f /workspace/car02-v459-disposable-pg17.sql | tee "$RUNNER_TEMP/v459-pg.log"
+          for label in V459_PG17_PRIVATE_AUDIT_ROLES_DENIED_PASS V459_PG17_ALL_SEVEN_COMMERCIAL_BLOCKERS_PENDING_PASS V459_PG17_IMMUTABLE_SYNTHETIC_EVIDENCE_GUARD_PASS V459_PG17_TENANT_SCOPED_READ_ONLY_REPORT_PASS; do
+            grep -Fxq "$label" "$RUNNER_TEMP/v459-pg.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v459_disposable -c "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT count(*) FROM v459_private.qa_release_controls('qa_shop_a'); ROLLBACK;" > "$RUNNER_TEMP/v459-read-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          for i in 1 2 3 4 5 6 7 8; do
+            grep -Fxq '7' "$RUNNER_TEMP/v459-read-$i.out" || { cat "$RUNNER_TEMP/v459-read-$i.out"; exit 1; }
+          done
+          final=$(pg -Atq -d car02_v459_disposable -c "SELECT count(*)::text||':'||sum(CASE WHEN evidence_source='synthetic_fixture' AND review_state='pending' THEN 1 ELSE 0 END)::text FROM v459_private.qa_control_ledger")
+          test "$final" = '14:14' || { echo "V459_FAKE_RELEASE_PROOF_FOUND: $final" >&2; exit 1; }
+          echo V459_PG17_EIGHT_READ_ONLY_CLIENTS_SEVEN_PENDING_EACH_PASS
+          echo V459_PG17_ZERO_REAL_PROVIDER_EVIDENCE_FINAL_NO_GO_PASS
+          echo V459_FINAL_RELEASE_NO_GO_HOLD_TRUE
