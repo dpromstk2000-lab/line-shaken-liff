@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 460,
+  "project": "DPRO_CAR02",
+  "branch": "car02-v434-review-only",
+  "mainSha": "ad6e27c5fa866be9b010e349e9d164691d7a8988",
+  "pinnedR52GitBlobSha": "f0e31fb9f9d98524519d01dffd3489893d3d3302",
+  "releaseDecision": "NO_GO",
+  "evidenceStatus": "UNVERIFIED",
+  "controls": [
+    {
+      "code": "actual_supabase_auth_sessions",
+      "evidenceState": "unverified",
+      "acceptedProof": "Read-only scoped verified provider session metadata and session_id provenance demonstrated with a nonproduction project and documented privacy boundary."
+    },
+    {
+      "code": "trusted_operator_and_worker_iam",
+      "evidenceState": "unverified",
+      "acceptedProof": "Independent server-side validation of staff, owner and dispatcher identities, routing and tenant boundaries in restricted staging."
+    },
+    {
+      "code": "postcommit_auth_generation_fence",
+      "evidenceState": "unverified",
+      "acceptedProof": "Real provider reauth after an acknowledged commit, old-session rejection and timestamp/order tests in isolated staging."
+    },
+    {
+      "code": "real_line_delivery_ambiguity",
+      "evidenceState": "unverified",
+      "acceptedProof": "Provider API delivery status and timeout/retry ambiguity response evidence from an authorized test channel, never real customer sends."
+    },
+    {
+      "code": "external_immutable_evidence_store",
+      "evidenceState": "unverified",
+      "acceptedProof": "Proof that append-only evidence is persisted outside the application trust and database administrative domains with recovery testing."
+    },
+    {
+      "code": "independent_signing_key_custody",
+      "evidenceState": "unverified",
+      "acceptedProof": "External key lifecycle, public-key pinning, rotation, revocation and monotonic witness sequence controlled by separate authority."
+    },
+    {
+      "code": "staging_end_to_end_integration",
+      "evidenceState": "unverified",
+      "acceptedProof": "Isolated system-to-system acceptance involving test user, test order, postcommit session, staff IAM, outbox, and no-real-customer notification."
+    }
+  ]
+}
