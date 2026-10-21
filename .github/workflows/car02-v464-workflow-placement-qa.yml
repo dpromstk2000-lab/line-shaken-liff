@@ -1,0 +1,54 @@
+name: CAR02 V4.64 Review Workflow Placement and Dynamic Regression (NO_GO HOLD)
+# Only exact car02-v434-review-only isolated branch; no deployments, secrets, SQL or LINE.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-workflow-layout-r464.mjs'
+      - 'car02-workflow-layout-r464.test.mjs'
+      - 'car02-v464-workflow-placement-inventory.json'
+      - '.github/workflows/car02-v464-workflow-placement-qa.yml'
+      - '.github/workflows/car02-v463-review-ci-provenance-qa.yml'
+      - '.github/workflows/car02-v457-signed-evidence-manifest-pg17-qa.yml'
+      - 'car02-review-ci-provenance-r463.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-workflow-layout:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout review branch only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require actual R52 release lock and no provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!key:-}" || { echo "CAR02_PROVIDER_ENV_UNSAFE: $key" >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for file in car02-v457-signed-evidence-manifest-pg17-qa.yml car02-v463-review-ci-provenance-qa.yml car02-v464-workflow-placement-qa.yml; do
+            test -s ".github/workflows/$file"
+            test ! -e "$file"
+          done
+          echo V464_ACTUAL_GITHUB_WORKFLOW_PATHS_R52_LOCK_PASS
+      - name: Run all isolated regression cases with dynamic totals
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-workflow-layout-r464.mjs
+          node --check car02-workflow-layout-r464.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v464-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v464-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v464-node.log")
+          test "$tests" -ge 521
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v464-node.log"
+          echo V464_WORKFLOW_PARITY_AND_ALL_REGRESSIONS_PASS
+          echo V464_FINAL_RELEASE_NO_GO_HOLD_TRUE

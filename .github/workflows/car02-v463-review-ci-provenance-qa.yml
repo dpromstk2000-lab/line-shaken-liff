@@ -1,4 +1,4 @@
-name: CAR02 V4.63 Current HEAD CI Provenance and Old V457 Dynamic QA (NO_GO HOLD)
+name: CAR02 V4.63R1 Current HEAD CI Provenance and Old V457 Dynamic QA (NO_GO HOLD)
 # GitHub review branch only; no network, external provider, SQL, Supabase or LINE access.
 # Current branch CI is a QA result, never a commercial release approval.
 on:
@@ -58,7 +58,7 @@ jobs:
           assert.equal(x.mainCommitUnchanged,CAR02_V463_MAIN_SHA);
           assert.equal(x.releaseDecision,'NO_GO_HOLD');
           assert.equal(x.commercialBlockersUnchanged.length,7);
-          assert.match(readFileSync('car02-v457-signed-evidence-manifest-pg17-qa.yml','utf8'),
+          assert.match(readFileSync('.github/workflows/car02-v457-signed-evidence-manifest-pg17-qa.yml','utf8'),
             /test "\$passed" = "\$tests"/);
           const live=readFileSync('car02-edge-entry-r52.ts','utf8');
           assert.match(live,/const\s+CAR02_RELEASE_LOCK\s*=\s*true/);

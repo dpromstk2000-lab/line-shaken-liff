@@ -1,6 +1,7 @@
 name: CAR02 V4.57R1 Signed Evidence Manifest PG17 Dynamic Regression (NO_GO HOLD)
 # REVIEW ONLY: synthetic PG17 records, ephemeral Ed25519 signers, NO external WORM.
 # NO live Supabase, LINE send/delivery, Worker, real IAM or production deployment.
+# Corrected V463R1 regression now searches .github/workflows, matching GitHub layout.
 on:
   push:
     branches: [car02-v434-review-only]
