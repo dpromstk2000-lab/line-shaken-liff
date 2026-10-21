@@ -1,0 +1,153 @@
+name: CAR02 V4.58 Independent Witness Cursor and Dual-Signature PG17 (NO_GO HOLD)
+# Isolated synthetic witness cursor: SAME disposable PG server, NOT independent custody.
+# Signed credentials ephemeral in memory. No shared DB, Worker, LINE, Supabase, deploy.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-independent-witness-r458.mjs'
+      - 'car02-independent-witness-r458.test.mjs'
+      - 'car02-v458-disposable-pg17.sql'
+      - '.github/workflows/car02-v458-independent-witness-cursor-pg17-qa.yml'
+      - 'car02-review-evidence-seal-r457.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-dual-signature-cursor:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v458_disposable_only
+        ports:
+          - 55458:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v458_disposable_only
+    steps:
+      - name: Checkout isolated branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Execute 406 Node tests and enforce release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Forbidden live secret: $key" >&2; exit 1; }
+          done
+          for f in car02-independent-witness-r458.mjs car02-independent-witness-r458.test.mjs car02-v458-disposable-pg17.sql car02-review-evidence-seal-r457.mjs car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-independent-witness-r458.mjs
+          node --check car02-independent-witness-r458.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v458-node.log"
+          grep -Fxq '# tests 406' "$RUNNER_TEMP/v458-node.log"
+          grep -Fxq '# pass 406' "$RUNNER_TEMP/v458-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v458-node.log"
+          test "$(sha256sum car02-v453-disposable-pg17.sql | cut -d' ' -f1)" = '2c04737685ee335856a275c59ccd85169387c856102360a80091847a603a4b6d'
+          test "$(sha256sum car02-v454-disposable-pg17.sql | cut -d' ' -f1)" = 'bfee93d0bc0f98d63009c175bbdcdc29b88fb4217db02b81559f99fb7766f138'
+          test "$(sha256sum car02-v455-disposable-pg17.sql | cut -d' ' -f1)" = 'c4f1af8e46ce2976d428f0d452584f7a045ed6e362da68eb49108c4731009815'
+          test "$(sha256sum car02-v456-disposable-pg17.sql | cut -d' ' -f1)" = '7101bde58826a75aa79fefdac51106dd8ba8d15fe2312df747e866627205c008'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V458_RELEASE_LOCK} from './car02-independent-witness-r458.mjs';
+          import {CAR02_V457_RELEASE_LOCK} from './car02-review-evidence-seal-r457.mjs';
+          assert.equal(CAR02_V458_RELEASE_LOCK,true);
+          assert.equal(CAR02_V457_RELEASE_LOCK,true);
+          const live=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(live,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(live,/independent-witness-r458|v458_private/);
+          console.log('V458_NODE_406_ALL_RELEASE_LOCKS_AND_BASELINE_SQL_PASS');
+          console.log('V458_REAL_INDEPENDENT_STORAGE_PROVIDER_AND_KEY_CUSTODY_MISSING_NO_GO');
+          NODE
+      - name: Disposable PG17 monotonic append and 8-writer CAS; dual Ed25519 proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55458 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v458_disposable' >/dev/null
+          pg -d car02_v458_disposable -f /workspace/car02-v458-disposable-pg17.sql | tee "$RUNNER_TEMP/v458-pg17.log"
+          for mark in V458_PG17_PRIVATE_WITNESS_ROLE_DENY_PASS V458_PG17_ATOMIC_FIRST_CHECKPOINT_AND_TENANT_ISOLATION_PASS V458_PG17_OLD_CURSOR_AND_FORGED_PREVIOUS_DIGEST_DENIED_PASS V458_PG17_APPEND_ONLY_ANCHOR_EDIT_DELETE_DENIED_PASS; do
+            grep -Fxq "$mark" "$RUNNER_TEMP/v458-pg17.log"
+          done
+          # Eight different events compete for the ONE same cursor sequence = 1.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (
+              if pg -Atq -d car02_v458_disposable -c "SELECT anchor_sequence FROM v458_private.qa_append_witness('qa_shop_a','00000000-0000-0000-0000-00000000459$i',1,repeat('b',64),repeat('a',64),repeat('d',64))" > "$RUNNER_TEMP/v458-race-$i.out" 2> "$RUNNER_TEMP/v458-race-$i.err"; then
+                echo ACCEPTED > "$RUNNER_TEMP/v458-race-$i.state"
+              elif grep -Fq 'V458_STALE_OR_FORGED_CURSOR' "$RUNNER_TEMP/v458-race-$i.err"; then
+                echo DENIED > "$RUNNER_TEMP/v458-race-$i.state"
+              else
+                cat "$RUNNER_TEMP/v458-race-$i.err" >&2
+                echo ERROR > "$RUNNER_TEMP/v458-race-$i.state"
+              fi
+            ) &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          accepted=0;denied=0
+          for i in 1 2 3 4 5 6 7 8; do
+            state=$(cat "$RUNNER_TEMP/v458-race-$i.state")
+            if test "$state" = ACCEPTED; then
+              grep -Fxq '2' "$RUNNER_TEMP/v458-race-$i.out"
+              accepted=$((accepted+1))
+            elif test "$state" = DENIED; then denied=$((denied+1));
+            else exit 1; fi
+          done
+          test "$accepted:$denied" = '1:7'
+          before=$(pg -Atq -d car02_v458_disposable -c "SELECT latest_sequence::text||'|'||latest_digest FROM v458_private.qa_cursors WHERE shop_code='qa_shop_a'")
+          test "$before" = "2|$(printf 'd%.0s' {1..64})"
+          echo V458_PG17_EIGHT_WITNESSES_ONE_MONOTONIC_APPEND_PASS
+          # Real Ed25519 signatures over synthetic evidence; independent cursor is
+          # read back from the disposable PG17 fixture after write. NEVER WORM.
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {generateKeyPairSync} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {createCar02OfflineReviewEvidenceSealR457} from './car02-review-evidence-seal-r457.mjs';
+          import {createCar02OfflineWitnessVerifierR458,signCar02OfflineCheckpointR458} from './car02-independent-witness-r458.mjs';
+          const shop='qa_shop_a',event='00000000-0000-0000-0000-000000004533',now=2000000000000;
+          const pg=sql=>execFileSync('docker',['run','--rm','--network','host','-e',`PGPASSWORD=${process.env.PGPASSWORD}`,
+           'postgres:17','psql','-X','-Atq','-v','ON_ERROR_STOP=1','-h','127.0.0.1','-p','55458',
+           '-U','postgres','-d','car02_v458_disposable','-c',sql],{encoding:'utf8'}).trim();
+          const publisher=generateKeyPairSync('ed25519'),witness=generateKeyPairSync('ed25519');
+          const signer=createCar02OfflineReviewEvidenceSealR457({privateKey:publisher.privateKey,
+            keyId:'offline_publisher',keyEpoch:3,nowMs:()=>now,
+            authorizeAuditor:async()=>({verified:true,mode:'isolated_qa',role:'auditor',shopCode:shop}),
+            readSnapshot:async()=>({rows:[{event_id:event,integrity_state:'consistent_closed',
+              review_stage:'closed_without_delivery_assertion',audit_steps:2,evidence_sha256:'a'.repeat(64)}]})});
+          const envelope=await signer.seal({eventId:event,sequence:7,previousDigest:'b'.repeat(64)});
+          const checkpoint=signCar02OfflineCheckpointR458({envelope,privateKey:witness.privateKey,
+            witnessKeyId:'offline_witness',witnessKeyEpoch:2,witnessSequence:3,
+            previousWitnessDigest:'d'.repeat(64),witnessedAtMs:now+1});
+          assert.equal(pg(`SELECT anchor_sequence FROM v458_private.qa_append_witness('${shop}','${event}',2,repeat('d',64),'${envelope.envelopeDigest}','${checkpoint.checkpointDigest}')`),'3');
+          const trustedRead=async()=>{
+            const latest=pg(`SELECT c.latest_sequence::text||'|'||c.latest_digest||'|'||a.previous_digest FROM v458_private.qa_cursors c JOIN v458_private.qa_witness_anchors a ON a.shop_code=c.shop_code AND a.anchor_sequence=c.latest_sequence WHERE c.shop_code='${shop}'`);
+            const [seq,digest,prev]=latest.split('|');
+            return {checkpoint,cursor:{sequence:Number(seq),digest,previousDigest:prev}};
+          };
+          const verifier=createCar02OfflineWitnessVerifierR458({trustedRead,
+            pinnedEvidencePublicKey:publisher.publicKey,pinnedWitnessPublicKey:witness.publicKey,
+            expectedEvidenceKeyId:'offline_publisher',minEvidenceKeyEpoch:3,
+            expectedWitnessKeyId:'offline_witness',minWitnessKeyEpoch:2,nowMs:()=>now+2});
+          assert.equal((await verifier.verifyEvidence({shopCode:shop,eventId:event,envelope})).status,'witnessed_review_only');
+          assert.equal(pg(`SELECT anchor_sequence FROM v458_private.qa_append_witness('${shop}','00000000-0000-0000-0000-000000004599',3,'${checkpoint.checkpointDigest}',repeat('e',64),repeat('f',64))`),'4');
+          await assert.rejects(verifier.verifyEvidence({shopCode:shop,eventId:event,envelope}),e=>e.code==='CAR02_WITNESS_UNVERIFIED');
+          console.log('V458_PG17_DB_PINNED_DUAL_ED25519_AND_ADVANCED_CURSOR_REPLAY_DENIED_PASS');
+          NODE
+          final=$(pg -Atq -d car02_v458_disposable -c "SELECT c.latest_sequence::text||':'||(SELECT count(*) FROM v458_private.qa_witness_anchors a WHERE a.shop_code=c.shop_code)::text FROM v458_private.qa_cursors c WHERE shop_code='qa_shop_a'")
+          test "$final" = '4:4'
+          other=$(pg -Atq -d car02_v458_disposable -c "SELECT latest_sequence FROM v458_private.qa_cursors WHERE shop_code='qa_shop_b'")
+          test "$other" = 0
+          echo V458_PG17_ATOMIC_SEQUENCE_AND_CROSS_TENANT_PROTECTED_PASS
+          echo V458_FINAL_RELEASE_NO_GO_HOLD_TRUE
