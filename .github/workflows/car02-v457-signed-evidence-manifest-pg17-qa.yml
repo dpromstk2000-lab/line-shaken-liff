@@ -1,4 +1,4 @@
-name: CAR02 V4.57 Signed Cross-Ledger Evidence Manifest PG17 (NO_GO HOLD)
+name: CAR02 V4.57R1 Signed Evidence Manifest PG17 Dynamic Regression (NO_GO HOLD)
 # REVIEW ONLY: synthetic PG17 records, ephemeral Ed25519 signers, NO external WORM.
 # NO live Supabase, LINE send/delivery, Worker, real IAM or production deployment.
 on:
@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Run 385 Node tests and check all original release locks
+      - name: Dynamic Node regression gate and original release locks
         shell: bash
         run: |
           set -euo pipefail
@@ -48,8 +48,10 @@ jobs:
           node --check car02-review-evidence-seal-r457.mjs
           node --check car02-review-evidence-seal-r457.test.mjs
           node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v457-node.log"
-          grep -Fxq '# tests 385' "$RUNNER_TEMP/v457-node.log"
-          grep -Fxq '# pass 385' "$RUNNER_TEMP/v457-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v457-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v457-node.log")
+          test "$tests" -ge 385
+          test "$passed" = "$tests"
           grep -Fxq '# fail 0' "$RUNNER_TEMP/v457-node.log"
           test "$(sha256sum car02-v453-disposable-pg17.sql | cut -d' ' -f1)" = '2c04737685ee335856a275c59ccd85169387c856102360a80091847a603a4b6d'
           test "$(sha256sum car02-v454-disposable-pg17.sql | cut -d' ' -f1)" = 'bfee93d0bc0f98d63009c175bbdcdc29b88fb4217db02b81559f99fb7766f138'
@@ -67,7 +69,7 @@ jobs:
           for(const [v,file] of [[453,'atomic-job-outbox'],[454,'outbox-claim'],[455,'manual-review-dual-control'],[456,'review-consistency']]){
             assert.match(readFileSync(`car02-${file}-r${v}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
           }
-          console.log('V457_NODE_385_AND_FOUR_BASELINE_SQL_HASHES_PASS');
+          console.log('V457R1_DYNAMIC_NODE_REGRESSION_AND_FOUR_BASELINE_SQL_HASHES_PASS');
           console.log('V457_REAL_EXTERNAL_WORM_KEY_CUSTODY_AND_IAM_NOT_VERIFIED_NO_GO');
           NODE
       - name: Disposable PG17 full-chain digest, tamper, eight readers, Node real Ed25519 verification
