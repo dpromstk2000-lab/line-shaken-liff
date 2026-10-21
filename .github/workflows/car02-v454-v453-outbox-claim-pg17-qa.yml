@@ -1,4 +1,5 @@
-name: CAR02 V4.54 V453 Outbox Single Claim and Manual Review PG17 (NO_GO HOLD)
+name: CAR02 V4.54R1 V453 Outbox Single Claim and Manual Review PG17 (NO_GO HOLD)
+# V454R1: deterministic 327-test suite to avoid unrelated new-version tests; fix PL/pgSQL ON CONFLICT scope.
 # STRICTLY REVIEW ONLY. No live Supabase, Auth, Worker, LINE, notifications or deployment.
 # Source V453 event remains immutable pending; this is only a synthetic claim ledger.
 on:
@@ -51,7 +52,14 @@ jobs:
           test "$(sha256sum car02-v453-disposable-pg17.sql | cut -d' ' -f1)" = '2c04737685ee335856a275c59ccd85169387c856102360a80091847a603a4b6d'
           node --check car02-outbox-claim-r454.mjs
           node --check car02-outbox-claim-r454.test.mjs
-          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v454-node.log"
+          node --test \
+            car02-atomic-job-outbox-r453.test.mjs car02-atomic-session-write-r450.test.mjs car02-cutover-reconcile-r449.test.mjs \
+            car02-idempotency-r438.test.mjs car02-independent-witness-r445.test.mjs car02-job-authorization-r451.test.mjs \
+            car02-job-idempotency-r452.test.mjs car02-manual-review-ledger-r441.test.mjs car02-outbox-claim-r454.test.mjs \
+            car02-outbox-r439.test.mjs car02-outbox-recovery-r440.test.mjs car02-postcommit-fence-r448.test.mjs \
+            car02-review-integrity-r442.test.mjs car02-review-witness-r443.test.mjs car02-session-cutover-r446.test.mjs \
+            car02-staff-authority-r435.test.mjs car02-staff-generation-r434.test.mjs car02-supabase-session-boundary-r447.test.mjs \
+            car02-tenant-cas-gate-r437.test.mjs car02-transaction-gate-r436.test.mjs car02-witness-anchor-r444.test.mjs | tee "$RUNNER_TEMP/v454-node.log"
           grep -Fxq '# tests 327' "$RUNNER_TEMP/v454-node.log"
           grep -Fxq '# pass 327' "$RUNNER_TEMP/v454-node.log"
           grep -Fxq '# fail 0' "$RUNNER_TEMP/v454-node.log"
