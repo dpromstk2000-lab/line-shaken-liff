@@ -1,0 +1,85 @@
+name: CAR02 V4.66 Synthetic Session Revocation and Generation Fence PG17 (NO_GO HOLD)
+# Isolated QA ONLY; fake sessions and membership rows; NO real Supabase/LINE.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-session-fence-observation-r466.mjs'
+      - 'car02-session-fence-observation-r466.test.mjs'
+      - 'car02-v466-disposable-session-fence-pg17.sql'
+      - '.github/workflows/car02-v466-session-generation-fence-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-session-generation-fence:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v466_disposable_only
+        ports:
+          - 55466:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v466_disposable_only
+    steps:
+      - name: Checkout isolated review without persisting token
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify actual R52 hard lock, repository layout, zero external credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for secret in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!secret:-}" || { echo "V466_REJECT_EXTERNAL_PROVIDER_ENV" >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for p in car02-session-fence-observation-r466.mjs car02-session-fence-observation-r466.test.mjs car02-v466-disposable-session-fence-pg17.sql; do test -s "$p"; done
+          test -s .github/workflows/car02-v466-session-generation-fence-pg17-qa.yml
+          test ! -e car02-v466-session-generation-fence-pg17-qa.yml
+          echo V466_ACTUAL_R52_LOCK_REVIEW_ONLY_NO_PROVIDER_SECRETS_PASS
+      - name: Run complete dynamic Node regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-session-fence-observation-r466.mjs
+          node --check car02-session-fence-observation-r466.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v466-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v466-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v466-node.log")
+          test "$tests" -ge 569
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v466-node.log"
+          echo V466_ALL_NODE_FAIL_CLOSED_TESTS_PASS
+      - name: Disposable PG17 synthetic session membership revocation and fence tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55466 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v466_disposable' >/dev/null
+          pg -d car02_v466_disposable -f /workspace/car02-v466-disposable-session-fence-pg17.sql | tee "$RUNNER_TEMP/v466-pg.log"
+          for marker in V466_PG17_PRIVATE_SESSION_MEMBERSHIP_ACK_ROLE_DENY_PASS V466_PG17_FAKE_SESSION_GENERATION_OBSERVATION_NO_AUTHORIZATION_PASS V466_PG17_REVOKED_WRONG_SUBJECT_AND_EXPIRED_SESSIONS_DENIED_PASS V466_PG17_CROSS_TENANT_AND_PRE_FENCE_SESSION_DENIED_PASS V466_PG17_DISABLED_MEMBER_UNACKED_GENERATION_ROLLBACK_PASS V466_FINAL_RELEASE_NO_GO_HOLD_TRUE; do
+            grep -Fxq "$marker" "$RUNNER_TEMP/v466-pg.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v466_disposable -c "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT proof_state FROM v466_private.qa_fence_observe('qa_shop_a','00000000-0000-0000-0000-000000004661','00000000-0000-0000-0000-000000004662',1800000000); ROLLBACK;" > "$RUNNER_TEMP/v466-read-$i") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          for i in 1 2 3 4 5 6 7 8; do grep -Fxq 'eligible_for_review_only' "$RUNNER_TEMP/v466-read-$i"; done
+          test "$(pg -Atq -d car02_v466_disposable -c 'SELECT count(*) FROM v466_private.qa_sessions')" = '3'
+          test "$(pg -Atq -d car02_v466_disposable -c 'SELECT count(*) FROM v466_private.qa_memberships')" = '1'
+          echo V466_PG17_EIGHT_READ_ONLY_SNAPSHOTS_NO_MUTATIONS_PASS
+          echo V466_FINAL_DISPOSABLE_SYNTHETIC_NOT_REAL_SUPABASE_NO_GO_HOLD_TRUE
