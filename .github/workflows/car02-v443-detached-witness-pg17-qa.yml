@@ -1,0 +1,112 @@
+name: CAR02 V4.43 Detached Witness Checkpoint Disposable PG17 (NO_GO HOLD)
+# REVIEW ONLY. Separate ephemeral Ed25519 key verifies a witnessed DB hash-chain head.
+# NO external immutable storage, stable trust root, production DB, Worker, LINE or live Auth.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-review-witness-r443.mjs'
+      - 'car02-review-witness-r443.test.mjs'
+      - '.github/workflows/car02-v443-detached-witness-pg17-qa.yml'
+      - 'car02-review-integrity-r442.mjs'
+      - 'car02-v442-disposable-pg17.sql'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  detached-synthetic-witness:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v443_disposable_only
+        ports:
+          - 55443:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v443_disposable_only
+    steps:
+      - name: Checkout review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run all 127 isolated tests and preserve release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CAR02_DATABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!name:-}" || { echo "Unexpected production env: $name" >&2; exit 1; }
+          done
+          test "$(sha256sum car02-v442-disposable-pg17.sql | cut -d' ' -f1)" = '832dcd3ae1ec365dc30874081d8ddf78cb083b2aec5a1ba118b6891a9088291e'
+          node --check car02-review-witness-r443.mjs
+          node --check car02-review-witness-r443.test.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs car02-outbox-recovery-r440.test.mjs car02-manual-review-ledger-r441.test.mjs car02-review-integrity-r442.test.mjs car02-review-witness-r443.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V443_RELEASE_LOCK} from './car02-review-witness-r443.mjs';
+          assert.equal(CAR02_V443_RELEASE_LOCK,true);
+          const edge=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(edge,/car02-review-witness-r443/);
+          for(const f of ['car02-staff-generation-r434.mjs','car02-staff-authority-r435.mjs','car02-transaction-gate-r436.mjs','car02-tenant-cas-gate-r437.mjs','car02-idempotency-r438.mjs','car02-outbox-r439.mjs','car02-outbox-recovery-r440.mjs','car02-manual-review-ledger-r441.mjs','car02-review-integrity-r442.mjs']){
+            assert.match(readFileSync(f,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V443_OFFLINE_127_TESTS_AND_RELEASE_LOCK_PASS');
+          console.log('V443_EXTERNAL_IMMUTABLE_ARCHIVE_AND_REAL_AUTH_NOT_IMPLEMENTED_NO_GO');
+          NODE
+      - name: Read real disposable PG17 V442 chain and independently witness the head
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55443 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v443_disposable' >/dev/null
+          pg -d car02_v443_disposable -f /workspace/car02-v442-disposable-pg17.sql > "$RUNNER_TEMP/v443-pg.log"
+          for required in V442_PG17_PRIVILEGES_FAIL_CLOSED_PASS V442_PG17_APPEND_REPLAY_AND_CHAIN_PASS V442_PG17_EVIDENCE_TENANT_AND_DELIVERED_DENY_PASS V442_PG17_APPEND_ONLY_AND_NO_DELIVERY_PASS; do
+            grep -Fq "$required" "$RUNNER_TEMP/v443-pg.log"
+          done
+          pg -Atq -d car02_v443_disposable -c "SELECT snapshot FROM public.v442_qa_read_chain('qa_shop_a','00000000-0000-0000-0000-000000004421')" > "$RUNNER_TEMP/v443-real-pg17-snapshot.json"
+          test -s "$RUNNER_TEMP/v443-real-pg17-snapshot.json"
+          node --input-type=module - "$RUNNER_TEMP/v443-real-pg17-snapshot.json" <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {generateKeyPairSync} from 'node:crypto';
+          import {car02ReviewChainHashR442} from './car02-review-integrity-r442.mjs';
+          import {inspectCar02ReviewSnapshotR443,signCar02OfflineWitnessR443,verifyCar02OfflineWitnessR443} from './car02-review-witness-r443.mjs';
+          const snapshot=JSON.parse(readFileSync(process.argv[2],'utf8'));
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+          const scope={expectedShop:'qa_shop_a',expectedEventId:'00000000-0000-0000-0000-000000004421'};
+          const inspected=inspectCar02ReviewSnapshotR443(snapshot);
+          assert.equal(inspected.count,2);
+          const attestation=signCar02OfflineWitnessR443({snapshot,privateKey,issuedAtMs:2_000_000_000_000});
+          const verify=(s,a=attestation,extra={})=>verifyCar02OfflineWitnessR443({snapshot:s,attestation:a,verificationKey:publicKey,...scope,...extra});
+          assert.equal(verify(snapshot).status,'witnessed');
+          const original=structuredClone(snapshot);
+          const recomputed=structuredClone(snapshot);
+          recomputed.entries[0].evidenceSha256='f'.repeat(64);
+          let previous='0'.repeat(64);
+          for (let i=0;i<recomputed.entries.length;i++){
+            const x=recomputed.entries[i];x.previousHash=previous;
+            x.entryHash=car02ReviewChainHashR442({shop:recomputed.shopCode,eventId:recomputed.eventId,seq:i+1,
+              reviewerSub:x.reviewerSub,evidenceSha256:x.evidenceSha256,disposition:x.disposition,previousHash:previous});
+            previous=x.entryHash;
+          }
+          assert.equal(inspectCar02ReviewSnapshotR443(recomputed).count,2);
+          assert.throws(()=>verify(recomputed),/CAR02_WITNESS_REJECTED/);
+          assert.throws(()=>verify({...original,entries:[original.entries[0]]}),/CAR02_WITNESS_REJECTED/);
+          assert.throws(()=>verify(original,attestation,{expectedShop:'qa_shop_b'}),/CAR02_WITNESS_REJECTED/);
+          const tampered={...attestation,checkpoint:{...attestation.checkpoint,headHash:'f'.repeat(64)}};
+          assert.throws(()=>verify(original,tampered),/CAR02_WITNESS_REJECTED/);
+          console.log('V443_PG17_READBACK_SIGNED_CHECKPOINT_MATCH_PASS');
+          console.log('V443_PG17_REHASHED_HISTORY_ROLLBACK_TAMPER_DENIED_PASS');
+          console.log('V443_EPHEMERAL_KEY_NOT_EXTERNAL_IMMUTABLE_WITNESS_NO_GO');
+          NODE
+          echo V443_FINAL_RELEASE_NO_GO_HOLD_TRUE
