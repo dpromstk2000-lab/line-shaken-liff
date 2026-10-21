@@ -1,0 +1,65 @@
+name: CAR02 V4.60 Actual R52 Source Parity and Seven Real Integration Blockers (NO_GO HOLD)
+# This is a source-provenance and release-guard audit. It cannot certify actual providers.
+# REVIEW BRANCH ONLY; NO PG17 needed because this changes no database code.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-source-provenance-r460.mjs'
+      - 'car02-source-provenance-r460.test.mjs'
+      - 'car02-v460-real-integration-gaps.json'
+      - '.github/workflows/car02-v460-source-provenance-integrations-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-github-source-no-go-gate:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify exact real R52 source rather than an offline stub
+        shell: bash
+        run: |
+          set -euo pipefail
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo "V460_REFUSE_LIVE_PROVIDER_ENV: $k" >&2; exit 1; }
+          done
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(sha256sum car02-edge-entry-r52.ts | cut -d' ' -f1)" = '1de573f08532123d873f6baee227672c2bd398f3d9eb6f61ed088c660bccc69f'
+          test "$(wc -c < car02-edge-entry-r52.ts | tr -d ' ')" = '2221'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          grep -Fq "if(CAR02_RELEASE_LOCK)throw Error('CAR02_NOT_RELEASED')" car02-edge-entry-r52.ts
+          echo V460_REMOTE_R52_FULL_SOURCE_PIN_MATCH_PASS
+      - name: All 447 Node tests including live-source parity, NO_GO control manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in car02-source-provenance-r460.mjs car02-source-provenance-r460.test.mjs car02-v460-real-integration-gaps.json car02-release-readiness-r459.mjs; do test -s "$f"; done
+          node --check car02-source-provenance-r460.mjs
+          node --check car02-source-provenance-r460.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v460-node.log"
+          grep -Fxq '# tests 447' "$RUNNER_TEMP/v460-node.log"
+          grep -Fxq '# pass 447' "$RUNNER_TEMP/v460-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v460-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {inspectCar02SourceProvenanceR460} from './car02-source-provenance-r460.mjs';
+          const s=readFileSync('car02-edge-entry-r52.ts','utf8');
+          const manifest=JSON.parse(readFileSync('car02-v460-real-integration-gaps.json','utf8'));
+          const result=inspectCar02SourceProvenanceR460({r52Text:s,branch:'car02-v434-review-only',
+            mainSha:'ad6e27c5fa866be9b010e349e9d164691d7a8988',manifest});
+          assert.deepEqual([result.status,result.releasePermitted,result.sourceParityVerified,result.remainingControls.length],
+            ['no_go',false,true,7]);
+          assert.ok(result.remainingControls.every(x=>manifest.controls.find(y=>y.code===x)?.evidenceState==='unverified'));
+          console.log('V460_ORIGINAL_R52_REVIEW_GATE_AND_SEVEN_REAL_GAPS_PASS');
+          console.log('V460_REAL_AUTH_LINE_IAM_WORM_KEY_CUSTODY_AND_STAGING_UNVERIFIED_NO_GO');
+          NODE
+          echo V460_FINAL_RELEASE_NO_GO_HOLD_TRUE

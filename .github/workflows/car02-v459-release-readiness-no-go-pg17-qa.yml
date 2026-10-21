@@ -1,4 +1,4 @@
-name: CAR02 V4.59 Commercial Release Safety Gate and Disposable PG17 (NO_GO HOLD)
+name: CAR02 V4.59R1 Commercial Release Safety Gate and Disposable PG17 (NO_GO HOLD)
 # This CI tests that fake provider / WORM / IAM assertions never lift R52 HOLD.
 # Synthetic green CI is NOT commercial readiness. No real secrets or deployments.
 on:
@@ -45,13 +45,18 @@ jobs:
             test -z "${!k:-}" || { echo "Unexpected live provider env: $k" >&2; exit 1; }
           done
           for f in car02-release-readiness-r459.mjs car02-release-readiness-r459.test.mjs car02-v459-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
-          test "$(sha256sum car02-edge-entry-r52.ts | cut -d' ' -f1)" = 'bd414928a1eabe28500aa194a840bd3b734c3fcc9ca1a9ef0c2b0a19b88820a5'
+          # PIN THE ACTUAL REMOTE R52 BLOB (2221 bytes), not an offline stub.
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(sha256sum car02-edge-entry-r52.ts | cut -d' ' -f1)" = '1de573f08532123d873f6baee227672c2bd398f3d9eb6f61ed088c660bccc69f'
+          test "$(wc -c < car02-edge-entry-r52.ts | tr -d ' ')" = '2221' 
           node --check car02-release-readiness-r459.mjs
           node --check car02-release-readiness-r459.test.mjs
           node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v459-node.log"
-          grep -Fxq '# tests 425' "$RUNNER_TEMP/v459-node.log"
-          grep -Fxq '# pass 425' "$RUNNER_TEMP/v459-node.log"
+          # V4.60+ may add tests to the same review tree: require >=425, with ALL passing.
           grep -Fxq '# fail 0' "$RUNNER_TEMP/v459-node.log"
+          t=$(awk '$1=="#"&&$2=="tests"{print $3}' "$RUNNER_TEMP/v459-node.log")
+          p=$(awk '$1=="#"&&$2=="pass"{print $3}' "$RUNNER_TEMP/v459-node.log")
+          test -n "$t" && test "$t" = "$p" && test "$t" -ge 425
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import {readFileSync} from 'node:fs';
@@ -63,7 +68,7 @@ jobs:
           assert.doesNotMatch(src,/release-readiness-r459|v459_private/);
           for(const n of ['car02-independent-witness-r458.mjs','car02-review-evidence-seal-r457.mjs'])
             assert.match(readFileSync(n,'utf8'),/RELEASE_LOCK\s*=\s*true/);
-          console.log('V459_ALL_425_NODE_TESTS_AND_IMMUTABLE_RELEASE_LOCK_PASS');
+          console.log('V459R1_ALL_NODE_TESTS_AND_ACTUAL_R52_SOURCE_SHA_PASS');
           console.log('V459_SEVEN_REAL_COMMERCIAL_PROVIDER_INTEGRATIONS_NOT_PROVEN_NO_GO');
           NODE
       - name: Disposable PG17 seven blocker inventory and eight read-only snapshots
