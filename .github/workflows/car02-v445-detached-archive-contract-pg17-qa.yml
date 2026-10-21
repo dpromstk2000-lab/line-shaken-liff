@@ -1,0 +1,106 @@
+name: CAR02 V4.45 Independent Witness Adapter Contract and Disposable PG17 (NO_GO HOLD)
+# Strictly isolated review branch: two disposable DBs in ONE temporary PG17 container.
+# They are NOT independent security domains, not external immutable storage or WORM.
+# JS verifies synthetic Ed25519 witnesses; QA SQL DOES NOT verify signatures.
+# NO production Supabase, Worker, LINE, R44/R46/R50/R52 wiring, migrations, or secrets.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-independent-witness-r445.mjs'
+      - 'car02-independent-witness-r445.test.mjs'
+      - 'car02-v445-disposable-pg17.sql'
+      - '.github/workflows/car02-v445-detached-archive-contract-pg17-qa.yml'
+      - 'car02-review-witness-r443.mjs'
+      - 'car02-witness-anchor-r444.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-detached-archive-contract:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v445_disposable_only
+        ports:
+          - 55445:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v445_disposable_only
+    steps:
+      - name: Read-only checkout without persisted GitHub credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run all 161 offline tests and original hard-release guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CAR02_DATABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!name:-}" || { echo "Unexpected live credential $name" >&2; exit 1; }
+          done
+          for file in car02-independent-witness-r445.mjs car02-independent-witness-r445.test.mjs car02-v445-disposable-pg17.sql; do test -s "$file"; done
+          node --check car02-independent-witness-r445.mjs
+          node --check car02-independent-witness-r445.test.mjs
+          node --test car02-staff-generation-r434.test.mjs car02-staff-authority-r435.test.mjs car02-transaction-gate-r436.test.mjs car02-tenant-cas-gate-r437.test.mjs car02-idempotency-r438.test.mjs car02-outbox-r439.test.mjs car02-outbox-recovery-r440.test.mjs car02-manual-review-ledger-r441.test.mjs car02-review-integrity-r442.test.mjs car02-review-witness-r443.test.mjs car02-witness-anchor-r444.test.mjs car02-independent-witness-r445.test.mjs
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V445_RELEASE_LOCK} from './car02-independent-witness-r445.mjs';
+          assert.equal(CAR02_V445_RELEASE_LOCK,true);
+          const edge=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(edge,/car02-independent-witness-r445|v445_qa_/);
+          for(const source of ['car02-staff-generation-r434.mjs','car02-staff-authority-r435.mjs','car02-transaction-gate-r436.mjs','car02-tenant-cas-gate-r437.mjs','car02-idempotency-r438.mjs','car02-outbox-r439.mjs','car02-outbox-recovery-r440.mjs','car02-manual-review-ledger-r441.mjs','car02-review-integrity-r442.mjs','car02-review-witness-r443.mjs','car02-witness-anchor-r444.mjs']){
+            assert.match(readFileSync(source,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V445_OFFLINE_161_TESTS_AND_HARD_RELEASE_LOCK_PASS');
+          console.log('V445_REAL_EXTERNAL_WORM_AND_PROVIDER_AUTH_NOT_IMPLEMENTED_NO_GO');
+          NODE
+      - name: Disposable PostgreSQL 17 two-database separation and concurrent witness CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55445 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v445_disposable_audit' >/dev/null
+          pg -d postgres -c 'CREATE DATABASE car02_v445_disposable_witness' >/dev/null
+          pg -d car02_v445_disposable_audit -c "CREATE TABLE public.v445_qa_audit_head(shop_code text PRIMARY KEY, head_hash text NOT NULL); INSERT INTO public.v445_qa_audit_head VALUES('qa_shop_a',repeat('a',64));" >/dev/null
+          pg -d car02_v445_disposable_witness -f /workspace/car02-v445-disposable-pg17.sql | tee "$RUNNER_TEMP/v445-pg.log"
+          for mark in V445_PG17_PUBLIC_ROLES_DENIED_PASS V445_PG17_MONOTONIC_REVISION_AND_ROTATION_PASS V445_PG17_WITNESS_HISTORY_APPEND_ONLY_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v445-pg.log"
+          done
+          # Eight independent connections attempt to commit the SAME first witness revision.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v445_disposable_witness -c "SELECT public.v445_qa_cas('qa_shop_a','00000000-0000-0000-0000-000000004452',0,1,repeat('c',64),1,2000000000000,repeat('x',86))" > "$RUNNER_TEMP/v445-race-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          accepted=0;rejected=0
+          for i in 1 2 3 4 5 6 7 8; do
+            if grep -Fxq 't' "$RUNNER_TEMP/v445-race-$i.out"; then accepted=$((accepted+1));
+            elif grep -Fxq 'f' "$RUNNER_TEMP/v445-race-$i.out"; then rejected=$((rejected+1));
+            else cat "$RUNNER_TEMP/v445-race-$i.out"; exit 1; fi
+          done
+          test "$accepted:$rejected" = '1:7' || { echo "V445_CAS_RACE_FAILED:$accepted:$rejected" >&2;exit 1; }
+          echo V445_PG17_EIGHT_SESSIONS_ONE_ANCHOR_PASS
+          # Tamper with audit DB; mock witness DB's stored checkpoint MUST not change.
+          audit_before=$(pg -Atq -d car02_v445_disposable_audit -c "SELECT head_hash FROM public.v445_qa_audit_head WHERE shop_code='qa_shop_a'")
+          witness_before=$(pg -Atq -d car02_v445_disposable_witness -c "SELECT head_hash FROM public.v445_qa_witness_current WHERE event_id='00000000-0000-0000-0000-000000004451'")
+          pg -d car02_v445_disposable_audit -c "UPDATE public.v445_qa_audit_head SET head_hash=repeat('f',64) WHERE shop_code='qa_shop_a'" >/dev/null
+          audit_after=$(pg -Atq -d car02_v445_disposable_audit -c "SELECT head_hash FROM public.v445_qa_audit_head WHERE shop_code='qa_shop_a'")
+          witness_after=$(pg -Atq -d car02_v445_disposable_witness -c "SELECT head_hash FROM public.v445_qa_witness_current WHERE event_id='00000000-0000-0000-0000-000000004451'")
+          test "$audit_before" != "$audit_after"
+          test "$witness_before" = "$witness_after"
+          test "$witness_after" = "$(printf 'b%.0s' {1..64})"
+          echo V445_PG17_DISPOSABLE_DB_SEPARATION_AND_TAMPER_OBSERVABILITY_PASS
+          echo V445_FINAL_RELEASE_NO_GO_HOLD_TRUE
