@@ -1,0 +1,113 @@
+name: CAR02 V4.51 Role-Assignment Atomic Job CAS Disposable PG17 (NO_GO HOLD)
+# Strictly isolated review branch. Provider JWT and auth.sessions are synthetic.
+# NEVER deploy, merge to main, send LINE or touch production Supabase/Worker.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-job-authorization-r451.mjs'
+      - 'car02-job-authorization-r451.test.mjs'
+      - 'car02-v451-disposable-pg17.sql'
+      - '.github/workflows/car02-v451-role-assignment-atomic-pg17-qa.yml'
+      - 'car02-atomic-session-write-r450.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-job-role-assignment:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v451_disposable_only
+        ports:
+          - 55451:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v451_disposable_only
+    steps:
+      - name: Checkout isolated branch without persistent token
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run 267 isolated Node tests and check hard release locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "UNEXPECTED_LIVE_SECRET: $key" >&2; exit 1; }
+          done
+          for f in car02-job-authorization-r451.mjs car02-job-authorization-r451.test.mjs car02-v451-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-job-authorization-r451.mjs
+          node --check car02-job-authorization-r451.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v451-node.log"
+          grep -Fxq '# tests 267' "$RUNNER_TEMP/v451-node.log"
+          grep -Fxq '# pass 267' "$RUNNER_TEMP/v451-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v451-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V451_RELEASE_LOCK,CAR02_V451_ATOMIC_SQL} from './car02-job-authorization-r451.mjs';
+          assert.equal(CAR02_V451_RELEASE_LOCK,true);
+          assert.equal(CAR02_V451_ATOMIC_SQL,'SELECT applied,new_version FROM v451_private.qa_role_bound_job_cas($1::text,$2::uuid,$3::uuid,$4::uuid,$5::integer)');
+          const edge=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(edge,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(edge,/job-authorization-r451|v451_private/);
+          const mods={434:'staff-generation',435:'staff-authority',436:'transaction-gate',437:'tenant-cas-gate',438:'idempotency',439:'outbox',440:'outbox-recovery',441:'manual-review-ledger',442:'review-integrity',443:'review-witness',444:'witness-anchor',445:'independent-witness',446:'session-cutover',447:'supabase-session-boundary',448:'postcommit-fence',449:'cutover-reconcile',450:'atomic-session-write'};
+          for(const [ver,name] of Object.entries(mods)) assert.match(readFileSync(`car02-${name}-r${ver}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          const source=readFileSync('car02-job-authorization-r451.mjs','utf8');
+          assert.doesNotMatch(source,/CAR02_RELEASE_LOCK\s*=\s*false/);
+          console.log('V451_NODE_267_AND_ALL_RELEASE_LOCKS_PASS');
+          console.log('V451_REAL_SUPABASE_SESSIONS_AND_PROVIDER_PROOF_MISSING_NO_GO');
+          NODE
+      - name: Disposable PG17 least privilege, role downgrade, rollback and eight competing writers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55451 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v451_disposable' >/dev/null
+          pg -d car02_v451_disposable -f /workspace/car02-v451-disposable-pg17.sql | tee "$RUNNER_TEMP/v451-pg17.log"
+          for mark in V451_PG17_PRIVATE_ROLE_DENY_PASS V451_PG17_ASSIGNED_STAFF_OWNER_AND_TENANT_PASS V451_PG17_ASSIGNMENT_LOCK_ARCHIVE_REPLAY_AND_OLD_SESSION_DENY_PASS V451_PG17_ROLE_DOWNGRADE_IMMEDIATE_DENY_PASS V451_PG17_ROLLBACK_NO_PARTIAL_WRITE_PASS V451_PG17_TERMINATED_SESSION_REJECTED_PASS; do
+            grep -Fq "$mark" "$RUNNER_TEMP/v451-pg17.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (
+              if pg -Atq -d car02_v451_disposable -c "SELECT applied::text||':'||new_version::text FROM v451_private.qa_role_bound_job_cas('qa_shop_a','00000000-0000-0000-0000-000000004513','00000000-0000-0000-0000-000000004514','00000000-0000-0000-0000-000000004523',1)" > "$RUNNER_TEMP/v451-race-$i.out" 2> "$RUNNER_TEMP/v451-race-$i.err"; then
+                echo ACCEPTED > "$RUNNER_TEMP/v451-race-$i.status"
+              elif grep -Fq 'V451_JOB_POLICY_OR_CAS_DENIED' "$RUNNER_TEMP/v451-race-$i.err"; then
+                echo DENIED > "$RUNNER_TEMP/v451-race-$i.status"
+              else
+                cat "$RUNNER_TEMP/v451-race-$i.err" >&2
+                echo BAD > "$RUNNER_TEMP/v451-race-$i.status"
+              fi
+            ) &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          accepted=0; denied=0
+          for i in 1 2 3 4 5 6 7 8; do
+            status=$(cat "$RUNNER_TEMP/v451-race-$i.status")
+            if test "$status" = ACCEPTED; then
+              grep -Fxq 'true:2' "$RUNNER_TEMP/v451-race-$i.out" || grep -Fxq 't:2' "$RUNNER_TEMP/v451-race-$i.out"
+              accepted=$((accepted+1))
+            elif test "$status" = DENIED; then
+              denied=$((denied+1))
+            else
+              echo "V451_BAD_WORKER_$i" >&2; exit 1
+            fi
+          done
+          test "$accepted:$denied" = '1:7' || { echo "V451_PARALLEL_VERSION_WRONG: $accepted:$denied" >&2;exit 1; }
+          final=$(pg -Atq -d car02_v451_disposable -c "SELECT (SELECT state_version FROM v451_private.qa_jobs WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004523')::text||':'||(SELECT state_version FROM v451_private.qa_jobs WHERE shop_code='qa_shop_b' AND id='00000000-0000-0000-0000-000000004518')::text")
+          test "$final" = '2:1' || { echo "V451_CROSS_TENANT_OR_DOUBLE_WRITE: $final" >&2; exit 1; }
+          echo V451_PG17_EIGHT_WRITERS_EXACTLY_ONE_ROLE_AUTHORIZED_PASS
+          echo V451_PG17_OTHER_TENANT_UNMODIFIED_PASS
+          echo V451_FINAL_RELEASE_NO_GO_HOLD_TRUE
