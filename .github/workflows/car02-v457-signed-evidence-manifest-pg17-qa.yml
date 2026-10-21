@@ -1,0 +1,122 @@
+name: CAR02 V4.57 Signed Cross-Ledger Evidence Manifest PG17 (NO_GO HOLD)
+# REVIEW ONLY: synthetic PG17 records, ephemeral Ed25519 signers, NO external WORM.
+# NO live Supabase, LINE send/delivery, Worker, real IAM or production deployment.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-review-evidence-seal-r457.mjs'
+      - 'car02-review-evidence-seal-r457.test.mjs'
+      - 'car02-v457-disposable-pg17.sql'
+      - '.github/workflows/car02-v457-signed-evidence-manifest-pg17-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-signed-evidence:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v457_disposable_only
+        ports:
+          - 55457:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v457_disposable_only
+    steps:
+      - name: Checkout restricted review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run 385 Node tests and check all original release locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unexpected production credential $key" >&2; exit 1; }
+          done
+          for f in car02-review-evidence-seal-r457.mjs car02-review-evidence-seal-r457.test.mjs car02-v457-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-review-evidence-seal-r457.mjs
+          node --check car02-review-evidence-seal-r457.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v457-node.log"
+          grep -Fxq '# tests 385' "$RUNNER_TEMP/v457-node.log"
+          grep -Fxq '# pass 385' "$RUNNER_TEMP/v457-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v457-node.log"
+          test "$(sha256sum car02-v453-disposable-pg17.sql | cut -d' ' -f1)" = '2c04737685ee335856a275c59ccd85169387c856102360a80091847a603a4b6d'
+          test "$(sha256sum car02-v454-disposable-pg17.sql | cut -d' ' -f1)" = 'bfee93d0bc0f98d63009c175bbdcdc29b88fb4217db02b81559f99fb7766f138'
+          test "$(sha256sum car02-v455-disposable-pg17.sql | cut -d' ' -f1)" = 'c4f1af8e46ce2976d428f0d452584f7a045ed6e362da68eb49108c4731009815'
+          test "$(sha256sum car02-v456-disposable-pg17.sql | cut -d' ' -f1)" = '7101bde58826a75aa79fefdac51106dd8ba8d15fe2312df747e866627205c008'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V457_RELEASE_LOCK,CAR02_V457_READ_SQL} from './car02-review-evidence-seal-r457.mjs';
+          assert.equal(CAR02_V457_RELEASE_LOCK,true);
+          assert.equal(CAR02_V457_READ_SQL,'SELECT event_id,integrity_state,review_stage,audit_steps,evidence_sha256 FROM v457_private.qa_review_evidence($1::text,$2::uuid)');
+          const live=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(live,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(live,/review-evidence-seal-r457|v457_private/);
+          for(const [v,file] of [[453,'atomic-job-outbox'],[454,'outbox-claim'],[455,'manual-review-dual-control'],[456,'review-consistency']]){
+            assert.match(readFileSync(`car02-${file}-r${v}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          }
+          console.log('V457_NODE_385_AND_FOUR_BASELINE_SQL_HASHES_PASS');
+          console.log('V457_REAL_EXTERNAL_WORM_KEY_CUSTODY_AND_IAM_NOT_VERIFIED_NO_GO');
+          NODE
+      - name: Disposable PG17 full-chain digest, tamper, eight readers, Node real Ed25519 verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55457 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v457_disposable' >/dev/null
+          for version in 453 454 455 456 457; do
+            pg -d car02_v457_disposable -f "/workspace/car02-v${version}-disposable-pg17.sql" | tee "$RUNNER_TEMP/v457-load-$version.log"
+          done
+          for mark in V457_PG17_PRIVATE_EVIDENCE_EXPORT_ROLE_DENY_PASS V457_PG17_CONSISTENT_SOURCE_STABLE_DIGEST_PASS V457_PG17_OTHER_SHOP_AND_PARTIAL_REVIEW_DENIED_PASS V457_PG17_CHANGED_BUT_CONSISTENT_SOURCE_DIGEST_DIFFERS_PASS V457_PG17_ALTERED_FIXTURE_ROLLBACK_RESTORED_PASS; do
+            grep -Fxq "$mark" "$RUNNER_TEMP/v457-load-457.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v457_disposable -c "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT evidence_sha256||'|'||integrity_state||'|'||audit_steps::text FROM v457_private.qa_review_evidence('qa_shop_a','00000000-0000-0000-0000-000000004533'); ROLLBACK;" > "$RUNNER_TEMP/v457-reader-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          source=$(pg -Atq -d car02_v457_disposable -c "SELECT evidence_sha256 FROM v457_private.qa_review_evidence('qa_shop_a','00000000-0000-0000-0000-000000004533')")
+          test "${#source}" -eq 64
+          for i in 1 2 3 4 5 6 7 8; do
+            grep -Fxq "$source|consistent_closed|2" "$RUNNER_TEMP/v457-reader-$i.out"
+          done
+          V457_DATABASE_DIGEST="$source" node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {generateKeyPairSync} from 'node:crypto';
+          import {createCar02OfflineReviewEvidenceSealR457,verifyCar02OfflineReviewEvidenceR457,CAR02_V457_READ_SQL} from './car02-review-evidence-seal-r457.mjs';
+          const digest=process.env.V457_DATABASE_DIGEST;
+          assert.match(digest,/^[a-f0-9]{64}$/);
+          const event='00000000-0000-0000-0000-000000004533';
+          const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+          const signer=createCar02OfflineReviewEvidenceSealR457({
+            privateKey,keyId:'synthetic_epoch_1',keyEpoch:1,nowMs:()=>2000000000000,
+            authorizeAuditor:async()=>({verified:true,mode:'isolated_qa',role:'auditor',shopCode:'qa_shop_a'}),
+            readSnapshot:async({sql,params})=>{
+              assert.equal(sql,CAR02_V457_READ_SQL);
+              assert.deepEqual(params,['qa_shop_a',event]);
+              return {rows:[{event_id:event,integrity_state:'consistent_closed',review_stage:'closed_without_delivery_assertion',audit_steps:2,evidence_sha256:digest}]};
+            }
+          });
+          const envelope=await signer.seal({eventId:event,sequence:1});
+          const verifyArgs={envelope,expectedShopCode:'qa_shop_a',expectedEventId:event,pinnedPublicKey:publicKey,expectedKeyId:'synthetic_epoch_1',minimumKeyEpoch:1,expectedSequence:1,expectedPreviousDigest:'0'.repeat(64),nowMs:2000000001000};
+          assert.equal(verifyCar02OfflineReviewEvidenceR457(verifyArgs).status,'verified_review_only');
+          assert.throws(()=>verifyCar02OfflineReviewEvidenceR457({...verifyArgs,envelope:{...envelope,payload:{...envelope.payload,evidenceSha256:'f'.repeat(64)}}}),/CAR02_EVIDENCE_UNVERIFIED/);
+          assert.throws(()=>verifyCar02OfflineReviewEvidenceR457({...verifyArgs,expectedSequence:2}),/CAR02_EVIDENCE_UNVERIFIED/);
+          console.log('V457_POSTGRES_DIGEST_NODE_ED25519_SIGN_VERIFY_PASS');
+          console.log('V457_PINNED_EPOCH_REPLAY_AND_TAMPER_DENIED_PASS');
+          NODE
+          echo V457_PG17_EIGHT_READERS_IDENTICAL_FULL_LEDGER_DIGEST_PASS
+          echo V457_FINAL_RELEASE_NO_GO_HOLD_TRUE
