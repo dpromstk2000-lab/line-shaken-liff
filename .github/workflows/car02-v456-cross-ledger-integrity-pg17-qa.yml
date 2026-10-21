@@ -1,0 +1,99 @@
+name: CAR02 V4.56 Read-Only Cross-Ledger Review Consistency PG17 (NO_GO HOLD)
+# ONLY isolated review branch. Disposable synthetic PostgreSQL 17 and Node tests.
+# This is NOT external/WORM proof, live IAM, LINE send/delivery, or production release.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-review-consistency-r456.mjs'
+      - 'car02-review-consistency-r456.test.mjs'
+      - 'car02-v456-disposable-pg17.sql'
+      - '.github/workflows/car02-v456-cross-ledger-integrity-pg17-qa.yml'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-only-cross-ledger:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v456_disposable_only
+        ports:
+          - 55456:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v456_disposable_only
+    steps:
+      - name: Checkout isolated review branch without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check 365 Node tests and locked production source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!key:-}" || { echo "Unsafe live environment: $key" >&2; exit 1; }
+          done
+          for f in car02-review-consistency-r456.mjs car02-review-consistency-r456.test.mjs car02-v456-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-review-consistency-r456.mjs
+          node --check car02-review-consistency-r456.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v456-node.log"
+          grep -Fxq '# tests 365' "$RUNNER_TEMP/v456-node.log"
+          grep -Fxq '# pass 365' "$RUNNER_TEMP/v456-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v456-node.log"
+          test "$(sha256sum car02-v453-disposable-pg17.sql | cut -d' ' -f1)" = '2c04737685ee335856a275c59ccd85169387c856102360a80091847a603a4b6d'
+          test "$(sha256sum car02-v454-disposable-pg17.sql | cut -d' ' -f1)" = 'bfee93d0bc0f98d63009c175bbdcdc29b88fb4217db02b81559f99fb7766f138'
+          test "$(sha256sum car02-v455-disposable-pg17.sql | cut -d' ' -f1)" = 'c4f1af8e46ce2976d428f0d452584f7a045ed6e362da68eb49108c4731009815'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V456_RELEASE_LOCK,CAR02_V456_READ_SQL} from './car02-review-consistency-r456.mjs';
+          assert.equal(CAR02_V456_RELEASE_LOCK,true);
+          assert.equal(CAR02_V456_READ_SQL,'SELECT integrity_state,event_id,review_stage,audit_steps FROM v456_private.qa_review_consistency($1::text,$2::uuid)');
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(entry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true/);
+          assert.doesNotMatch(entry,/review-consistency-r456|v456_private/);
+          assert.match(readFileSync('car02-review-consistency-r456.mjs','utf8'),/READ ONLY/);
+          for(const [n,f] of [[453,'atomic-job-outbox'],[454,'outbox-claim'],[455,'manual-review-dual-control']])
+            assert.match(readFileSync(`car02-${f}-r${n}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          console.log('V456_NODE_365_RELEASE_LOCKS_AND_SOURCE_SHA_PASS');
+          console.log('V456_REAL_WORM_PROVIDER_IAM_AND_DELIVERY_NOT_IMPLEMENTED_NO_GO');
+          NODE
+      - name: Disposable PG17 full chain, synthetic tamper and 8 independent read-only snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55456 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v456_disposable' >/dev/null
+          for v in 453 454 455 456; do
+            pg -d car02_v456_disposable -f "/workspace/car02-v${v}-disposable-pg17.sql" | tee "$RUNNER_TEMP/v456-dependency-$v.log"
+          done
+          for marker in V456_PG17_AUDIT_PRIVATE_ROLE_DENY_PASS V456_PG17_FOUR_LEDGER_TWO_REVIEWERS_CONSISTENT_PASS V456_PG17_PARTIAL_REVIEW_NOT_A_CLOSED_CASE_PASS V456_PG17_TAMPERED_REVIEW_AUDIT_DETECTED_AND_ROLLED_BACK_PASS V456_PG17_TAMPERED_CASE_DETECTED_AND_ROLLED_BACK_PASS V456_PG17_ORIGINAL_OUTBOX_STILL_PENDING_NO_DELIVERY_ASSERTION_PASS; do
+            grep -Fxq "$marker" "$RUNNER_TEMP/v456-dependency-456.log"
+          done
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v456_disposable -c "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT integrity_state||'|'||review_stage||'|'||audit_steps::text FROM v456_private.qa_review_consistency('qa_shop_a','00000000-0000-0000-0000-000000004533'); ROLLBACK;" > "$RUNNER_TEMP/v456-reader-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          for i in 1 2 3 4 5 6 7 8; do
+            grep -Fxq 'consistent_closed|closed_without_delivery_assertion|2' "$RUNNER_TEMP/v456-reader-$i.out"
+          done
+          other=$(pg -Atq -d car02_v456_disposable -c "SELECT count(*) FROM v456_private.qa_review_consistency('qa_shop_b','00000000-0000-0000-0000-000000004533')")
+          test "$other" = '0'
+          claim=$(pg -Atq -d car02_v456_disposable -c "SELECT dispatch_state||':'||attempts::text FROM v453_private.qa_outbox WHERE shop_code='qa_shop_a' AND event_id='00000000-0000-0000-0000-000000004533'")
+          test "$claim" = 'pending:0'
+          echo V456_PG17_EIGHT_CONSISTENT_READ_ONLY_SNAPSHOTS_PASS
+          echo V456_PG17_CROSS_TENANT_DENIED_AND_SOURCE_PENDING_PASS
+          echo V456_FINAL_RELEASE_NO_GO_HOLD_TRUE
