@@ -1,0 +1,126 @@
+name: CAR02 V4.52 Role-Bound Atomic Receipt and Replay PG17 (NO_GO HOLD)
+# Disposable 100% synthetic staff sessions and jobs. NEVER deploy or use shared Supabase.
+# CI is not evidence that real Supabase auth.sessions are trustworthy/accessible.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-job-idempotency-r452.mjs'
+      - 'car02-job-idempotency-r452.test.mjs'
+      - 'car02-v452-disposable-pg17.sql'
+      - '.github/workflows/car02-v452-role-receipt-pg17-qa.yml'
+      - 'car02-job-authorization-r451.mjs'
+      - 'car02-edge-entry-r52.ts'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-role-receipt-qa:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v452_disposable_only
+        ports:
+          - 55452:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v452_disposable_only
+    steps:
+      - name: Checkout review-only branch without stored credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test 287 isolated Node cases and hard-release locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN; do
+            test -z "${!name:-}" || { echo "Unexpected live secret $name" >&2; exit 1; }
+          done
+          for f in car02-job-idempotency-r452.mjs car02-job-idempotency-r452.test.mjs car02-v452-disposable-pg17.sql car02-edge-entry-r52.ts; do test -s "$f"; done
+          node --check car02-job-idempotency-r452.mjs
+          node --check car02-job-idempotency-r452.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v452-node.log"
+          grep -Fxq '# tests 287' "$RUNNER_TEMP/v452-node.log"
+          grep -Fxq '# pass 287' "$RUNNER_TEMP/v452-node.log"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v452-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V452_RELEASE_LOCK,CAR02_V452_TOUCH_SQL} from './car02-job-idempotency-r452.mjs';
+          assert.equal(CAR02_V452_RELEASE_LOCK,true);
+          assert.equal(CAR02_V452_TOUCH_SQL,
+            'SELECT applied,new_version FROM v452_private.qa_receipted_job_cas($1::text,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid)');
+          const entry=readFileSync('car02-edge-entry-r52.ts','utf8');
+          assert.match(entry,/const\s+CAR02_RELEASE_LOCK\s*=\s*true\s*;/);
+          assert.doesNotMatch(entry,/car02-job-idempotency-r452|v452_private/);
+          const mods={434:'staff-generation',435:'staff-authority',436:'transaction-gate',437:'tenant-cas-gate',438:'idempotency',439:'outbox',440:'outbox-recovery',441:'manual-review-ledger',442:'review-integrity',443:'review-witness',444:'witness-anchor',445:'independent-witness',446:'session-cutover',447:'supabase-session-boundary',448:'postcommit-fence',449:'cutover-reconcile',450:'atomic-session-write',451:'job-authorization'};
+          for(const [ver,name] of Object.entries(mods))
+            assert.match(readFileSync(`car02-${name}-r${ver}.mjs`,'utf8'),/RELEASE_LOCK\s*=\s*true/);
+          console.log('V452_ALL_287_TESTS_RELEASE_LOCKS_PASS');
+          console.log('V452_REAL_AUTH_PROVIDER_AND_COMMIT_PROOF_MISSING_NO_GO');
+          NODE
+      - name: Disposable PG17 durable receipts, rollback, privilege denies and 16 competing writers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55452 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v452_disposable' >/dev/null
+          pg -d car02_v452_disposable -f /workspace/car02-v452-disposable-pg17.sql | tee "$RUNNER_TEMP/v452-pg.log"
+          for marker in V452_PG17_PRIVATE_SCHEMA_UNPRIVILEGED_DENY_PASS V452_PG17_ATOMIC_RECEIPT_AND_DUPLICATE_NO_WRITE_PASS V452_PG17_ROLE_LOCK_ARCHIVE_STALE_SESSION_DENIED_PASS V452_PG17_ROLLBACK_REMOVES_JOB_AND_RECEIPT_PASS V452_PG17_RECEIPT_UPDATE_DELETE_REJECTED_PASS; do
+            grep -Fxq "$marker" "$RUNNER_TEMP/v452-pg.log"
+          done
+          # Same operation ID: exactly one applied, seven durable duplicates.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (pg -Atq -d car02_v452_disposable -c "SELECT applied::text||':'||new_version::text FROM v452_private.qa_receipted_job_cas('qa_shop_a','00000000-0000-0000-0000-000000004513','00000000-0000-0000-0000-000000004514','00000000-0000-0000-0000-000000004528',1,'00000000-0000-0000-0000-000000004528')" > "$RUNNER_TEMP/v452-same-$i.out") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          applied=0;duplicate=0
+          for i in 1 2 3 4 5 6 7 8; do
+            if grep -Fxq 'true:2' "$RUNNER_TEMP/v452-same-$i.out" || grep -Fxq 't:2' "$RUNNER_TEMP/v452-same-$i.out"; then applied=$((applied+1));
+            elif grep -Fxq 'false:2' "$RUNNER_TEMP/v452-same-$i.out" || grep -Fxq 'f:2' "$RUNNER_TEMP/v452-same-$i.out"; then duplicate=$((duplicate+1));
+            else cat "$RUNNER_TEMP/v452-same-$i.out"; exit 1; fi
+          done
+          test "$applied:$duplicate" = '1:7' || { echo "V452_DUPLICATE_REAPPLIED: $applied:$duplicate" >&2; exit 1; }
+          # Different operation IDs with same expected row version: exactly ONE accepted.
+          pids=()
+          for i in 1 2 3 4 5 6 7 8; do
+            (
+              if pg -Atq -d car02_v452_disposable -c "SELECT applied::text||':'||new_version::text FROM v452_private.qa_receipted_job_cas('qa_shop_a','00000000-0000-0000-0000-000000004513','00000000-0000-0000-0000-000000004514','00000000-0000-0000-0000-000000004529',1,'00000000-0000-0000-0000-00000000453$i')" > "$RUNNER_TEMP/v452-distinct-$i.out" 2> "$RUNNER_TEMP/v452-distinct-$i.err"; then
+                echo APPLIED > "$RUNNER_TEMP/v452-distinct-$i.status"
+              elif grep -Fq 'V452_JOB_VERSION_CONFLICT' "$RUNNER_TEMP/v452-distinct-$i.err"; then
+                echo DENIED > "$RUNNER_TEMP/v452-distinct-$i.status"
+              else
+                cat "$RUNNER_TEMP/v452-distinct-$i.err" >&2
+                echo BAD > "$RUNNER_TEMP/v452-distinct-$i.status"
+              fi
+            ) &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          applied=0;denied=0
+          for i in 1 2 3 4 5 6 7 8; do
+            state=$(cat "$RUNNER_TEMP/v452-distinct-$i.status")
+            if test "$state" = APPLIED; then
+              grep -Fxq 'true:2' "$RUNNER_TEMP/v452-distinct-$i.out" || grep -Fxq 't:2' "$RUNNER_TEMP/v452-distinct-$i.out"
+              applied=$((applied+1))
+            elif test "$state" = DENIED; then denied=$((denied+1));
+            else echo "V452_BAD_WORKER_$i" >&2;exit 1; fi
+          done
+          test "$applied:$denied" = '1:7' || { echo "V452_CAS_DOUBLE_UPDATE: $applied:$denied" >&2;exit 1; }
+          final=$(pg -Atq -d car02_v452_disposable -c "SELECT (SELECT state_version FROM v452_private.qa_jobs WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004528')::text||':'||(SELECT state_version FROM v452_private.qa_jobs WHERE shop_code='qa_shop_a' AND id='00000000-0000-0000-0000-000000004529')::text||':'||(SELECT count(*) FROM v452_private.qa_job_receipts)::text||':'||(SELECT state_version FROM v452_private.qa_jobs WHERE shop_code='qa_shop_b' AND id='00000000-0000-0000-0000-000000004518')::text")
+          test "$final" = '2:2:3:1' || { echo "V452_INCONSISTENT_RECEIPT_OR_TENANT: $final" >&2; exit 1; }
+          echo V452_PG17_EIGHT_REPLAYS_ONE_APPLIED_SEVEN_DUPLICATE_PASS
+          echo V452_PG17_EIGHT_DISTINCT_REQUESTS_SINGLE_CAS_WINNER_PASS
+          echo V452_PG17_AUDIT_COUNT_ATOMIC_OTHER_TENANT_UNCHANGED_PASS
+          echo V452_FINAL_RELEASE_NO_GO_HOLD_TRUE
