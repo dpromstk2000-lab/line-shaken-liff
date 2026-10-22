@@ -1,0 +1,105 @@
+{
+  "version": "V4.80",
+  "repository": "dpromstk2000-lab/line-shaken-liff",
+  "branch": "car02-v434-review-only",
+  "actualRunPins": [
+    {
+      "version": "V4.70",
+      "runId": 39700954544,
+      "headSha": "c80b6155e021da3ef6e27c96c9dba16f514d0999",
+      "workflowName": "CAR02 V4.70 LINE Retry Key and Acceptance Review Disposable PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v470-line-retry-review-pg17-qa.yml",
+      "historicallyObservedNodeTests": 657
+    },
+    {
+      "version": "V4.71",
+      "runId": 39702274067,
+      "headSha": "2c001a3a6b47c3c92378ea32c0847f26e2400058",
+      "workflowName": "CAR02 V4.71 Raw LINE Webhook Signature and Replay PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v471-line-webhook-signature-pg17-qa.yml",
+      "historicallyObservedNodeTests": 683
+    },
+    {
+      "version": "V4.72",
+      "runId": 39703805289,
+      "headSha": "12818ccd5a04fd0cdf1f520f14e77bdaadd8ae9e",
+      "workflowName": "CAR02 V4.72 Verified Webhook Disposable Inbox PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v472-webhook-inbox-atomic-pg17-qa.yml",
+      "historicallyObservedNodeTests": 712
+    },
+    {
+      "version": "V4.73",
+      "runId": 39705116469,
+      "headSha": "911a991f0290113b10816ec77dba3285b8af38bc",
+      "workflowName": "CAR02 V4.73 Disposable Webhook Inbox Worker Lease PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v473-inbox-worker-lease-pg17-qa.yml",
+      "historicallyObservedNodeTests": 741
+    },
+    {
+      "version": "V4.74",
+      "runId": 39706304070,
+      "headSha": "10120a1d5a8c0b715b9e415307f39c5444546a5c",
+      "workflowName": "CAR02 V4.74 Disposable Webhook Quarantine Review PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v474-inbox-quarantine-pg17-qa.yml",
+      "historicallyObservedNodeTests": 783
+    },
+    {
+      "version": "V4.75",
+      "runId": 39707312563,
+      "headSha": "5a580d76c393ea6333a4ab95ba938da2bf02b876",
+      "workflowName": "CAR02 V4.75 Disposable Dual Quarantine Review PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v475-quarantine-dual-review-pg17-qa.yml",
+      "historicallyObservedNodeTests": 816
+    },
+    {
+      "version": "V4.76",
+      "runId": 39708691820,
+      "headSha": "06528f1c5533895bfa40d01e655b1ea57b854782",
+      "workflowName": "CAR02 V4.76 Mock Review Revision Invalidation Fence PG17 (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v476-review-revision-fence-pg17-qa.yml",
+      "historicallyObservedNodeTests": 849
+    },
+    {
+      "version": "V4.77",
+      "runId": 39709650964,
+      "headSha": "bcf591f3a9d7378d81d63031d6b798ab817fb18f",
+      "workflowName": "CAR02 V4.77 Seven Commercial Reality Gaps and Actual V476 Provenance (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v477-commercial-readiness-gap-qa.yml",
+      "historicallyObservedNodeTests": 882
+    },
+    {
+      "version": "V4.78",
+      "runId": 39713246494,
+      "headSha": "487e194b1c610f14dffce5ee84f665d67eb70838",
+      "workflowName": "CAR02 V4.78 Isolated Staging Boundary Preflight and Actual V477 Provenance (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v478-isolated-staging-preflight-qa.yml",
+      "historicallyObservedNodeTests": 916
+    },
+    {
+      "version": "V4.79",
+      "runId": 39714412265,
+      "headSha": "a545028a0a4656fc67756e58a997c988a0505844",
+      "workflowName": "CAR02 V4.79 Offline Staging Evidence Chain Tamper QA (NO_GO HOLD)",
+      "workflowPath": ".github/workflows/car02-v479-staging-evidence-chain-qa.yml",
+      "historicallyObservedNodeTests": 975
+    }
+  ],
+  "baselineV479Run": 39714412265,
+  "baselineV479Commit": "a545028a0a4656fc67756e58a997c988a0505844",
+  "baselineV479NodeTests": 975,
+  "expectedMinFullNodeTests": 1022,
+  "releasePermitted": false,
+  "productionWritesAuthorized": false,
+  "realProviderProofCount": 0,
+  "ownerApproved": false,
+  "actualGithubRunLookupRequiredInCI": true,
+  "githubReadOnlyPermissions": [
+    "contents:read",
+    "actions:read"
+  ],
+  "proofLimits": [
+    "Verified GitHub Actions metadata confirms source/CI provenance only, not provider-side authenticity",
+    "Previously observed node test counts are labels from prior logged runs and are not reproved by run metadata alone",
+    "No real Supabase/LINE/booking/IAM/signer/WORM/owner approval"
+  ]
+}
