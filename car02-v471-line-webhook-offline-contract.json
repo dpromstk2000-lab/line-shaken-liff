@@ -1,0 +1,33 @@
+{
+  "version": "V4.71",
+  "reviewBranch": "car02-v434-review-only",
+  "hardReleaseLock": true,
+  "releasePermitted": false,
+  "usesRealLine": false,
+  "webhookProcessed": false,
+  "eventAcknowledged": false,
+  "lineDeliveryProven": false,
+  "source": [
+    "https://developers.line.biz/en/docs/messaging-api/verify-webhook-signature/",
+    "https://developers.line.biz/en/docs/messaging-api/receiving-messages/"
+  ],
+  "controls": [
+    "Check HMAC-SHA256 against raw original webhook bytes before JSON parsing",
+    "Require destination to match independently supplied tenant channel",
+    "Require ULID webhookEventId and treat deliveryContext.isRedelivery as non-material",
+    "Detect a same-ID but different event digest as a conflict",
+    "Do not trust webhook arrival ordering",
+    "Store unique event ID atomically in separately authorized future production infrastructure",
+    "No webhook event is a delivery confirmation for an outgoing API request",
+    "Synthetic success does not establish operational authorization or allow deployment"
+  ],
+  "unverifiedCommercialConditions": [
+    "real LINE channel secret custody and signature verification in server ingress",
+    "webhook acknowledgement durability and tenant-scoped replay ledger",
+    "actual Supabase Auth sessions and independent IAM",
+    "postcommit business-write fence",
+    "immutable external evidence repository",
+    "independent signing and witness key custody",
+    "staging end-to-end approval with real test-only identities"
+  ]
+}
