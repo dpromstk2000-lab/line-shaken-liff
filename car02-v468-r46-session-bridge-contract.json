@@ -1,0 +1,25 @@
+{
+  "version": "V4.68",
+  "reviewBranch": "car02-v434-review-only",
+  "releasePermitted": false,
+  "hardReleaseLock": "car02-edge-entry-r52.ts:CAR02_RELEASE_LOCK=true",
+  "r46PinnedGitBlob": "d90404a880c06b809c30685654029a938913ec09",
+  "r52PinnedGitBlob": "f0e31fb9f9d98524519d01dffd3489893d3d3302",
+  "entrypoint": "createCar02OfflineSupabaseSessionBridgeR468",
+  "fixtures": {
+    "r46HttpGetUser": "offline fetch mock; not provider signature validation",
+    "jwtSessionId": "decoded, never trusted alone",
+    "sessionReader": "isolated_mock_session_store; not real auth.sessions",
+    "membershipReader": "isolated_mock_membership; not production ACL",
+    "sideEffects": "none",
+    "alwaysReturns": "NO_GO"
+  },
+  "nextRealWorldGate": [
+    "Obtain separate owner approval for an isolated staging Supabase project",
+    "Use no production customer data or real provider tokens in the review branch",
+    "Define a server-only source of current, revocable provider session binding",
+    "Confirm how session_id claims map to Supabase Auth's current valid sessions",
+    "Re-read membership and post-commit generation inside a locked business transaction",
+    "Keep R52 hard lock and no deployment until every independent signoff is complete"
+  ]
+}
