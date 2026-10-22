@@ -1,0 +1,19 @@
+{
+  "version": "V4.70",
+  "branch": "car02-v434-review-only",
+  "releasePermitted": false,
+  "usesLiveLine": false,
+  "realDeliveryProven": false,
+  "reviewOnly": true,
+  "supportedApiTypes": ["push", "multicast", "narrowcast", "broadcast"],
+  "retryWindowMs": 86400000,
+  "states": {
+    "2xx": "accepted_by_api_not_delivery_confirmation",
+    "409": "retry_key_already_accepted_not_delivery_confirmation",
+    "400-499 except 409": "reject_no_blind_retry",
+    "500-599 or timeout within 24h": "same_key_same_payload_independent_manual_review_only",
+    "500-599 or timeout at or after 24h": "expired_key_manual_review_do_not_reuse"
+  },
+  "source": "https://developers.line.biz/ja/docs/messaging-api/retrying-api-request/",
+  "unverifiedCommercialConditions": ["actual_line_channel_configuration", "live_delivery_reconciliation", "auth_session_and_iam", "production_postcommit_fence", "immutable_external_evidence", "independent_signing_key_custody", "real_staging_e2e_approval"]
+}
