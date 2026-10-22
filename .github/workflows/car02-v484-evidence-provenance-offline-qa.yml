@@ -1,0 +1,101 @@
+name: CAR02 V4.84 Offline Commercial Proof Provenance QA Only (NO_GO HOLD)
+# READ ONLY: never authenticates a real provider, creates projects or deploys.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-evidence-provenance-gate-r484.mjs'
+      - 'car02-evidence-provenance-gate-r484.test.mjs'
+      - 'car02-v484-evidence-provenance-contract.json'
+      - 'CAR02_V484_EVIDENCE_PROVENANCE_OFFLINE.md'
+      - '.github/workflows/car02-v484-evidence-provenance-offline-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-evidence-provenance-gate:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review-only branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Assert protected originals and refuse provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V484_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-staging-capacity-gate-r483.mjs)" = 'b92d917906f2930455e35ed3d46e5e18990c6436'
+          test "$(git hash-object car02-v483-staging-capacity-contract.json)" = '8094b2f134b3eb7d5c47342ec4dc48f1bae076db'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-evidence-provenance-gate-r484.mjs car02-evidence-provenance-gate-r484.test.mjs car02-v484-evidence-provenance-contract.json CAR02_V484_EVIDENCE_PROVENANCE_OFFLINE.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v484-evidence-provenance-offline-qa.yml
+          echo V484_ORIGINALS_PINNED_RELEASE_LOCKED_NO_PROVIDER_SECRETS_PASS
+      - name: Run all Node tests and require at least 1191/1191 PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-evidence-provenance-gate-r484.mjs
+          node --check car02-evidence-provenance-gate-r484.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v484-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v484-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v484-node.log")
+          test "$tests" -ge 1191
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v484-node.log"
+          echo V484_ALL_1191_PLUS_NODE_TESTS_PASS
+      - name: Require all seven proof classes remain unverified
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V484_RELEASE_LOCK,CAR02_V484_REQUIRED_PROOFS,
+            CAR02_V484_BASELINE_RUN,CAR02_V484_BRANCH,evaluateCar02EvidenceIntakeR484
+          } from './car02-evidence-provenance-gate-r484.mjs';
+          const contract=JSON.parse(readFileSync('car02-v484-evidence-provenance-contract.json','utf8'));
+          assert.equal(contract.systemCode,'CAR02');
+          assert.equal(contract.version,'V4.84');
+          assert.equal(contract.branch,CAR02_V484_BRANCH);
+          assert.equal(contract.baselineV483Run,CAR02_V484_BASELINE_RUN);
+          assert.equal(contract.baselineV483Commit,'a9e78470b0fba12b7d7ce388db90fc203dba9b5e');
+          assert.equal(contract.baselineV483NodeTests,1143);
+          assert.equal(contract.expectedNewNodeTests,48);
+          assert.equal(contract.expectedMinimumNodeTests,1191);
+          assert.equal(CAR02_V484_RELEASE_LOCK,true);
+          assert.equal(CAR02_V484_REQUIRED_PROOFS.length,7);
+          for(const key of ['independentVerificationPerformed','verifiedCommercialProviderProofs'])
+            assert.equal(contract[key],key==='verifiedCommercialProviderProofs'?0:false);
+          for(const key of ['providerCredentialsRequired','providerConnectionAllowed',
+            'projectCreationAllowed','existingProjectReuseAllowed','billingChangeAllowed',
+            'databaseMutationAllowed','workerDeployAllowed','lineDispatchAllowed','commercialReleaseAllowed'])
+            assert.equal(contract[key],false,key);
+          assert.equal(contract.commercialDecision,'NO_GO_HOLD');
+          assert.equal(contract.releaseLock,true);
+          const proofs=CAR02_V484_REQUIRED_PROOFS.map((item,index)=>({
+            proofKey:item.key,providerFamily:item.providerFamily,
+            sourceClass:'external_metadata',environment:'dedicated_car02_staging',
+            artifactSha256:String(index+1).repeat(64),capturedAt:'2026-10-21T12:00:00Z'
+          }));
+          const result=evaluateCar02EvidenceIntakeR484({
+            systemCode:'CAR02',branch:CAR02_V484_BRANCH,baselineV483Run:CAR02_V484_BASELINE_RUN,
+            releaseLock:true,commercialDecision:'NO_GO_HOLD',proofs
+          },{asOf:'2026-10-22T12:00:00Z'});
+          assert.equal(result.completeUnverifiedMetadata,true);
+          assert.equal(result.commercialProviderProofsVerified,0);
+          assert.equal(result.independentVerificationPerformed,false);
+          assert.equal(result.commercialReleaseAllowed,false);
+          assert.equal(result.decision,'HOLD');
+          assert.equal(result.proofMatrix.length,7);
+          assert.ok(result.proofMatrix.every(row=>row.independentlyVerified===false));
+          console.log('V484_SEVEN_UNTRUSTED_METADATA_STILL_ZERO_PROVIDER_PROOFS_PASS');
+          console.log('V484_NO_SUPABASE_LINE_WORKER_PROVIDER_ACCESS_PASS');
+          console.log('V484_FINAL_COMMERCIAL_NO_GO_HOLD_TRUE');
+          NODE
