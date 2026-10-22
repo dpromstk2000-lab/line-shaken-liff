@@ -1,0 +1,18 @@
+{
+  "version":"V4.74",
+  "mode":"disposable_synthetic_inbox_quarantine_only",
+  "reviewBranch":"car02-v434-review-only",
+  "prerequisite":"V473 synthetic worker lease and V472 pending receipt, not actual LINE ingress",
+  "allowedQuarantineReasons":["integrity_mismatch","poison_event","manual_hold","max_retry_review"],
+  "tested":["trusted isolated worker identity","fixed shop binding","verified current lease token hash and epoch","bounded time","reason enum prohibits freeform personal data","immutable quarantine reason on duplicate","atomic terminal review state","rollback","private schema role deny","8 concurrent duplicate quarantines one winner"],
+  "unverifiedCommercialConditions":["actual Supabase Auth sessions","production operator and worker IAM","post-commit business transaction generation fence","real LINE send and delivery ambiguity","external immutable evidence custody","independent signing key custody","staging end-to-end integration"],
+  "releasePermitted":false,
+  "realWebhookAcknowledged":false,
+  "jobDispatched":false,
+  "lineDeliveryProven":false,
+  "realSupabaseUsed":false,
+  "realBusinessWrites":false,
+  "liveProviderCredentialsUsed":false,
+  "eventActuallyProcessed":false,
+  "hardReleaseLock":"car02-edge-entry-r52.ts:CAR02_RELEASE_LOCK=true"
+}
