@@ -1,0 +1,103 @@
+name: CAR02 V4.78 Isolated Staging Boundary Preflight and Actual V477 Provenance (NO_GO HOLD)
+# REVIEW-ONLY synthetic fixtures. Does NOT inspect real Supabase projects or authorize project creation.
+# Does NOT use real credentials, LINE, customer data, Worker, staging creation, releases or DB access.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-staging-boundary-preflight-r478.mjs'
+      - 'car02-staging-boundary-preflight-r478.test.mjs'
+      - 'car02-v478-isolated-staging-readiness-contract.json'
+      - 'CAR02_V478_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/car02-v478-isolated-staging-preflight-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-staging-preflight-no-go:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review branch without credential persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Assert R52 and V477 pinned sources, no real credentials, exact file layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V478_LIVE_CREDENTIALS_DENIED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-commercial-gap-audit-r477.mjs)" = '8daa4cf58ae872e9cdc09e56383ac2007a3992bf'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-staging-boundary-preflight-r478.mjs car02-staging-boundary-preflight-r478.test.mjs car02-v478-isolated-staging-readiness-contract.json CAR02_V478_STAGING_ACCEPTANCE.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v478-isolated-staging-preflight-qa.yml
+          test ! -e car02-v478-isolated-staging-preflight-qa.yml
+          echo V478_R52_V477_ACTUAL_SOURCE_PINS_NO_LIVE_ENV_PASS
+      - name: Run all 916 or more Node regression tests with no failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-staging-boundary-preflight-r478.mjs
+          node --check car02-staging-boundary-preflight-r478.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v478-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v478-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v478-node.log")
+          test "$tests" -ge 916
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v478-node.log"
+          echo V478_ALL_NODE_916_PLUS_REGRESSION_PASS
+      - name: Keep all seven real provider proofs and staging owner authorization unverified
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V477_PROOF_KEYS} from './car02-commercial-gap-audit-r477.mjs';
+          import {CAR02_V478_RELEASE_LOCK,CAR02_V478_PROOF_KEYS,
+            createCar02OfflineStagingBoundaryPreflightR478} from './car02-staging-boundary-preflight-r478.mjs';
+          const c=JSON.parse(readFileSync('car02-v478-isolated-staging-readiness-contract.json','utf8'));
+          assert.equal(CAR02_V478_RELEASE_LOCK,true);
+          assert.deepEqual(CAR02_V478_PROOF_KEYS,CAR02_V477_PROOF_KEYS);
+          assert.deepEqual(c.proofKeys,CAR02_V478_PROOF_KEYS);
+          assert.equal(c.baselineV477Run,39709650964);
+          assert.equal(c.baselineV477Commit,'bcf591f3a9d7378d81d63031d6b798ab817fb18f');
+          assert.equal(c.baselineNodeTests,882);
+          for(const key of ['releasePermitted','realStagingProjectVerified','realSupabaseSessionVerified',
+            'realOwnerApprovalVerified','realCustomerDataAccessed','realProviderCredentialsUsed'])
+              assert.equal(c[key],false);
+          assert.equal(c.mockOnly,true);
+          assert.equal(c.stagingSafetyRequirements.length,7);
+          assert.match(readFileSync('CAR02_V478_STAGING_ACCEPTANCE.md','utf8'),/NO_GO\/HOLD/);
+          const stag='stagingsystemref0001',prod='prodconnectedref0001',shop='qa_shop_a';
+          const sample=createCar02OfflineStagingBoundaryPreflightR478({expectedShopCode:shop,
+            authorizeAuditor:async()=>({verified:true,role:'staging_boundary_auditor',mode:'isolated_qa',shopCode:shop}),
+            inspectIsolation:async()=>({verified:true,environment:'offline_mock_only',testOnly:true,providerCallsEnabled:false}),
+            readProjectInventory:async()=>({source:'offline_fixture_inventory',reviewBranch:'car02-v434-review-only',
+              stagingProjectRef:stag,protectedProjectRefs:[prod],environment:'offline_mock_only',isolated:true,
+              testOnly:true,customerRows:0,providerCredentialsPresent:false,providerCallsEnabled:false}),
+            readProofClaims:async()=>CAR02_V478_PROOF_KEYS.map(key=>({key,state:'unverified',evidenceClass:'none'})),
+            readOwnerGate:async()=>({source:'offline_owner_fixture',projectRef:stag,approved:false,
+              verifiedIdentity:false,authorizationToCreate:false})});
+          const result=await sample.inspect({request:{shopCode:'qa_shop_b',releasePermitted:true}});
+          assert.equal(result.status,'no_go');assert.equal(result.releasePermitted,false);
+          assert.equal(result.realProofsVerified,0);assert.equal(result.missingRealProofs.length,7);
+          const collision=createCar02OfflineStagingBoundaryPreflightR478({expectedShopCode:shop,
+            authorizeAuditor:async()=>({verified:true,role:'staging_boundary_auditor',mode:'isolated_qa',shopCode:shop}),
+            inspectIsolation:async()=>({verified:true,environment:'offline_mock_only',testOnly:true,providerCallsEnabled:false}),
+            readProjectInventory:async()=>({source:'offline_fixture_inventory',reviewBranch:'car02-v434-review-only',
+              stagingProjectRef:prod,protectedProjectRefs:[prod],environment:'offline_mock_only',isolated:true,
+              testOnly:true,customerRows:0,providerCredentialsPresent:false,providerCallsEnabled:false}),
+            readProofClaims:async()=>{throw Error('collision must stop before proof read')},
+            readOwnerGate:async()=>{throw Error('collision must stop before owner read')}});
+          const denied=await collision.inspect();assert.equal(denied.reason,'protected_project_collision');
+          assert.equal(denied.releasePermitted,false);
+          console.log('V478_OFFLINE_PROJECT_REF_COLLISION_AND_ZERO_CUSTOMER_DATA_PASS');
+          console.log('V478_OWNER_APPROVAL_AND_SEVEN_REAL_PROOFS_UNVERIFIED_NO_GO_PASS');
+          NODE
+          echo V478_FINAL_RELEASE_NO_GO_HOLD_TRUE
