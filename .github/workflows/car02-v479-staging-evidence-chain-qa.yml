@@ -1,0 +1,91 @@
+name: CAR02 V4.79 Offline Staging Evidence Chain Tamper QA (NO_GO HOLD)
+# REVIEW ONLY. No real owner authorization, WORM, provider tokens, actual Supabase,
+# LINE, database, Worker deployment or business writes. Synthetic hashes are NOT signatures.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-staging-evidence-chain-r479.mjs'
+      - 'car02-staging-evidence-chain-r479.test.mjs'
+      - 'car02-v479-staging-evidence-chain-contract.json'
+      - 'CAR02_V479_REAL_STAGING_NEXT_STEPS.md'
+      - '.github/workflows/car02-v479-staging-evidence-chain-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-evidence-chain-no-go:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout restricted review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Refuse live provider credentials and pin genuine R52 V477 V478 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for secret in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!secret:-}" || { echo 'V479_REJECT_LIVE_PROVIDER_SECRETS' >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-commercial-gap-audit-r477.mjs)" = '8daa4cf58ae872e9cdc09e56383ac2007a3992bf'
+          test "$(git hash-object car02-staging-boundary-preflight-r478.mjs)" = 'a8fd17937bc1e274ff571c8eb1691327c7cc505a'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-staging-evidence-chain-r479.mjs car02-staging-evidence-chain-r479.test.mjs car02-v479-staging-evidence-chain-contract.json CAR02_V479_REAL_STAGING_NEXT_STEPS.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v479-staging-evidence-chain-qa.yml
+          test ! -e car02-v479-staging-evidence-chain-qa.yml
+          echo V479_ACTUAL_R52_R477_R478_IMMUTABLE_SOURCE_PINS_PASS
+      - name: Run all 975 plus regression tests with zero failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-staging-evidence-chain-r479.mjs
+          node --check car02-staging-evidence-chain-r479.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v479-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v479-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v479-node.log")
+          test "$tests" -ge 975
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v479-node.log"
+          echo V479_ALL_NODE_975_PLUS_TESTS_PASS
+      - name: Verify seven synthetic hash receipts never become seven real proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V478_RELEASE_LOCK} from './car02-staging-boundary-preflight-r478.mjs';
+          import {CAR02_V479_RELEASE_LOCK,CAR02_V479_PROOFS,CAR02_V479_BASELINE,
+           createCar02OfflineReceiptDigestR479,createCar02OfflineStagingEvidenceChainAuditorR479}
+            from './car02-staging-evidence-chain-r479.mjs';
+          const manifest=JSON.parse(readFileSync('car02-v479-staging-evidence-chain-contract.json','utf8'));
+          assert.equal(CAR02_V478_RELEASE_LOCK,true);assert.equal(CAR02_V479_RELEASE_LOCK,true);
+          assert.equal(manifest.releasePermitted,false);assert.equal(manifest.realProofsVerified,0);
+          assert.equal(manifest.realOwnerApproved,false);assert.equal(manifest.mockOnly,true);
+          assert.equal(manifest.baselineV478CI,39713246494);
+          assert.equal(manifest.baselineV478Commit,CAR02_V479_BASELINE);
+          let previousDigest='0'.repeat(64),now=1800000000000;
+          const receipts=CAR02_V479_PROOFS.map((key,index)=>{
+            const recordedAtMs=now-11000+index*1000;
+            const digest=createCar02OfflineReceiptDigestR479({shopCode:'qa_shop_a',
+             baseline:CAR02_V479_BASELINE,proofKey:key,index,recordedAtMs,previousDigest});
+            const receipt={key,index,recordedAtMs,previousDigest,digest,state:'unverified',evidenceClass:'offline_fixture'};
+            previousDigest=digest;return receipt;});
+          const auditor=createCar02OfflineStagingEvidenceChainAuditorR479({expectedShopCode:'qa_shop_a',
+            authorizeAuditor:async()=>({verified:true,role:'staging_evidence_auditor',mode:'isolated_qa',shopCode:'qa_shop_a'}),
+            inspectIsolation:async()=>({verified:true,environment:'offline_mock_only',testOnly:true,providerCallsEnabled:false}),
+            readReceiptChain:async()=>({source:'offline_fixture_receipt_chain',shopCode:'qa_shop_a',
+              reviewBranch:'car02-v434-review-only',baselineSha:CAR02_V479_BASELINE,
+              capturedAtMs:now-1000,receipts}),nowMs:()=>now});
+          const report=await auditor.inspect({request:{shopCode:'different_shop',releasePermitted:true}});
+          assert.equal(report.status,'no_go');assert.equal(report.releasePermitted,false);
+          assert.equal(report.receiptsChecked,7);assert.equal(report.realProviderProofsVerified,0);
+          console.log('V479_SEVEN_SYNTHETIC_RECEIPTS_NOT_REAL_PROVIDER_OR_OWNER_PROOFS_PASS');
+          console.log('V479_UNVERIFIED_STAGING_NO_GO_HOLD_PASS');
+          NODE
+          echo V479_FINAL_RELEASE_NO_GO_HOLD_TRUE
