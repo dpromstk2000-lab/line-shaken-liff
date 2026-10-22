@@ -1,0 +1,117 @@
+name: CAR02 V4.82 Genuine V4.81 CI Verdict and Seven Steps Read Only (NO_GO HOLD)
+# This inspects GitHub metadata ONLY. It does not connect to real Supabase, LINE or a Worker.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-ci-run-verdict-audit-r482.mjs'
+      - 'car02-ci-run-verdict-audit-r482.test.mjs'
+      - 'car02-v482-ci-verdict-contract.json'
+      - 'CAR02_V482_CI_VERDICT_PROVENANCE.md'
+      - '.github/workflows/car02-v482-actual-ci-verdict-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-only-v481-run-verdict:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout review-only branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin original R52 and V481 and forbid production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V482_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-ci-job-step-audit-r481.mjs)" = '86307746048cda339315458d3dff455dcf65e075'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-ci-run-verdict-audit-r482.mjs car02-ci-run-verdict-audit-r482.test.mjs car02-v482-ci-verdict-contract.json CAR02_V482_CI_VERDICT_PROVENANCE.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v482-actual-ci-verdict-qa.yml
+          test ! -e car02-v482-actual-ci-verdict-qa.yml
+          echo V482_PINNED_R52_V481_ORIGINALS_AND_NO_PROVIDER_CREDENTIALS_PASS
+      - name: Run at least 1108 Node tests with zero failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-ci-run-verdict-audit-r482.mjs
+          node --check car02-ci-run-verdict-audit-r482.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v482-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v482-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v482-node.log")
+          test "$tests" -ge 1108
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v482-node.log"
+          echo V482_ALL_1108_PLUS_NODE_TESTS_PASS
+      - name: Read genuine V481 run and job metadata then keep commercial NO_GO
+        shell: bash
+        env:
+          CAR02_ACTIONS_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "${CAR02_ACTIONS_READ_TOKEN:-}"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V482_RELEASE_LOCK,CAR02_V482_RUN_PIN,CAR02_V482_REPOSITORY,
+           createCar02ReadOnlyVerdictAuditorR482} from './car02-ci-run-verdict-audit-r482.mjs';
+          const contract=JSON.parse(readFileSync('car02-v482-ci-verdict-contract.json','utf8'));
+          assert.equal(CAR02_V482_RELEASE_LOCK,true);
+          assert.equal(contract.systemCode,'CAR02');
+          assert.equal(contract.version,'V4.82');
+          assert.equal(contract.branch,'car02-v434-review-only');
+          assert.equal(contract.baselineV481Run,39722231225);
+          assert.equal(contract.baselineV481Commit,'135762874c46c984332581f145d6d833edf562b6');
+          assert.equal(contract.baselineV481NodeTests,1062);
+          assert.equal(contract.baselineV481Failed,0);
+          assert.equal(contract.expectedNewTests,46);
+          assert.equal(contract.expectedTotalNodeTests,1108);
+          assert.deepEqual(contract.runPin,CAR02_V482_RUN_PIN);
+          for(const key of ['releasePermitted','realOwnerApprovalVerified','businessWritesAuthorized','lineDispatchAllowed'])assert.equal(contract[key],false);
+          assert.equal(contract.realProviderProofsVerified,0);
+          const get=async path=>{
+            const response=await fetch(`https://api.github.com/repos/${CAR02_V482_REPOSITORY}/${path}`,{
+              method:'GET',
+              headers:{Authorization:`Bearer ${process.env.CAR02_ACTIONS_READ_TOKEN}`,
+                Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
+              signal:AbortSignal.timeout(15000)
+            });
+            assert.equal(response.status,200,'GitHub GET must return HTTP 200');
+            return response.json();
+          };
+          const auditor=createCar02ReadOnlyVerdictAuditorR482({
+            authorizeAuditor:async()=>({verified:true,role:'ci_verdict_auditor',mode:'isolated_qa',shopCode:'qa_shop_a'}),
+            inspectIsolation:async()=>({verified:true,environment:'read_only_github_ci',testOnly:true,providerCallsEnabled:false}),
+            readRun:async({repository,runId})=>{
+              assert.equal(repository,CAR02_V482_REPOSITORY);
+              assert.equal(runId,CAR02_V482_RUN_PIN.runId);
+              return get(`actions/runs/${runId}`);
+            },
+            readJobs:async({repository,runId})=>{
+              assert.equal(repository,CAR02_V482_REPOSITORY);
+              assert.equal(runId,CAR02_V482_RUN_PIN.runId);
+              return get(`actions/runs/${runId}/jobs?per_page=100`);
+            }
+          });
+          const result=await auditor.inspect();
+          assert.equal(result.reason,'real_v481_ci_run_and_seven_steps_verified_still_no_go');
+          assert.equal(result.verifiedV481GithubRun,1);
+          assert.equal(result.verifiedV481GithubJob,1);
+          assert.equal(result.verifiedV481JobSteps,7);
+          assert.equal(result.realProviderProofsVerified,0);
+          assert.equal(result.releasePermitted,false);
+          assert.equal(result.businessWritesAuthorized,false);
+          assert.equal(result.lineDispatchAllowed,false);
+          console.log('V482_ACTUAL_V481_RUN_HEAD_AND_WORKFLOW_PIN_PASS');
+          console.log('V482_ACTUAL_V481_JOB_SEVEN_STEPS_PASS');
+          console.log('V482_GITHUB_CI_IS_NOT_REAL_PROVIDER_OR_OWNER_EVIDENCE_PASS');
+          NODE
+          echo V482_FINAL_COMMERCIAL_NO_GO_HOLD_TRUE
