@@ -1,0 +1,111 @@
+name: CAR02 V4.87 Read-Only Calendar UI Preview QA (NO_GO HOLD)
+# Review only: no deploy, provider connections, database write, LINE or billing.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-booking-month-grid-r487.mjs'
+      - 'car02-booking-month-grid-r487.test.mjs'
+      - 'car02-booking-calendar-preview-r487.mjs'
+      - 'CAR02_V487_BOOKING_CALENDAR_READONLY_PREVIEW.html'
+      - 'car02-v487-calendar-ui-contract.json'
+      - 'CAR02_V487_CALENDAR_UI_OFFLINE.md'
+      - '.github/workflows/car02-v487-booking-calendar-ui-offline-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-calendar-ui:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated review branch, no credentials retained
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin V4.86 and R52 original sources, forbid provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V487_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-booking-day-view-r486.mjs)" = '56217a205c4606e4c4bf63480243fa7f4529807b'
+          test "$(git hash-object car02-booking-day-view-r486.test.mjs)" = '17e0116578fc25abdd8f6663c9670ca3e9f11415'
+          test "$(git hash-object car02-v486-day-view-contract.json)" = '7c57d157ba0395c43b7c0eb0e2fa4e83db9032f6'
+          test "$(git hash-object CAR02_V486_BOOKING_DAY_VIEW_OFFLINE.md)" = 'cfed34d24b031363c0d879809a92773f0252f1c4'
+          test "$(git hash-object .github/workflows/car02-v486-booking-day-view-offline-qa.yml)" = '1ffd822a2350671191d1870eeba330af436c5925'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-booking-month-grid-r487.mjs car02-booking-month-grid-r487.test.mjs car02-booking-calendar-preview-r487.mjs CAR02_V487_BOOKING_CALENDAR_READONLY_PREVIEW.html car02-v487-calendar-ui-contract.json CAR02_V487_CALENDAR_UI_OFFLINE.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v487-booking-calendar-ui-offline-qa.yml
+          echo V487_R52_AND_V486_PINNED_NO_SECRETS_RELEASE_LOCK_TRUE
+      - name: Run all repository tests, require at least 1330 and zero failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-booking-month-grid-r487.mjs
+          node --check car02-booking-month-grid-r487.test.mjs
+          node --check car02-booking-calendar-preview-r487.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v487-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v487-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v487-node.log")
+          test "$tests" -ge 1330
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v487-node.log"
+          echo V487_ALL_1330_PLUS_NODE_TESTS_PASS
+      - name: Verify immutable UI source parity and absolute NO_GO/HOLD contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {buildCar02BookingDayViewR486} from './car02-booking-day-view-r486.mjs';
+          import {CAR02_V487_RELEASE_LOCK,CAR02_V487_BOOKING_HORIZON_DAYS,
+            buildCar02MonthGridR487} from './car02-booking-month-grid-r487.mjs';
+          import {createCar02SyntheticCalendarR487} from './car02-booking-calendar-preview-r487.mjs';
+          const c=JSON.parse(readFileSync('car02-v487-calendar-ui-contract.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');
+          assert.equal(c.version,'V4.87');
+          assert.equal(c.branch,'car02-v434-review-only');
+          assert.equal(c.baselineV486Run,39737344624);
+          assert.equal(c.baselineV486Commit,'30556894b25c00b70fac83fd2d65441c8d559316');
+          assert.equal(c.baselineV486NodeTests,1288);
+          assert.equal(c.expectedNewNodeTests,42);
+          assert.equal(c.expectedMinimumNodeTests,1330);
+          assert.equal(c.slotsPerDay,18);
+          assert.equal(c.slotMinutes,30);
+          assert.equal(c.responsivePreview,true);
+          assert.equal(c.serverDeploymentPerformed,false);
+          assert.equal(CAR02_V487_RELEASE_LOCK,true);
+          assert.equal(CAR02_V487_BOOKING_HORIZON_DAYS,60);
+          for(const key of ['providerCredentialsRequired','providerConnectionAllowed',
+            'projectCreationAllowed','billingChangeAllowed','databaseMutationAllowed',
+            'lineDispatchAllowed','bookingCreationAllowed','commercialReleaseAllowed',
+            'realBookingCapacityVerified','authenticatedStaffOrCustomerVerified',
+            'realOwnerHolidayInventoryVerified']) assert.equal(c[key],false,key);
+          assert.equal(c.verifiedCommercialProviderProofs,0);
+          assert.equal(c.requiredCommercialProviderProofs,7);
+          assert.equal(c.releaseLock,true);
+          assert.equal(c.commercialDecision,'NO_GO_HOLD');
+          const now=new Date('2026-10-22T01:10:00Z');
+          const calendar=createCar02SyntheticCalendarR487(now);
+          const grid=buildCar02MonthGridR487({year:2026,month:10,calendar,now});
+          assert.equal(grid.decision,'HOLD');
+          assert.equal(grid.bookingCreationAllowed,false);
+          assert.equal(grid.cells.length,35);
+          for(const cell of grid.cells.filter(x=>x.type==='day')) {
+            const day=buildCar02BookingDayViewR486({day:cell.day,calendar,now});
+            assert.equal(cell.candidateCount,day.candidateCount);
+            assert.equal(cell.selectableInOfflineUi,day.candidateCount>0);
+          }
+          const html=readFileSync('CAR02_V487_BOOKING_CALENDAR_READONLY_PREVIEW.html','utf8');
+          assert.ok(html.includes("connect-src 'none'"));
+          assert.ok(html.includes('noindex,nofollow'));
+          assert.ok(!/<form\b/i.test(html));
+          console.log('V487_MONTH_35_CELLS_V486_DAY_PARITY_PASS');
+          console.log('V487_NO_NETWORK_NO_BOOKING_NO_GO_HOLD_TRUE');
+          NODE
