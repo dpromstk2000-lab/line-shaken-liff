@@ -1,0 +1,22 @@
+{
+  "version": "V4.69",
+  "reviewBranch": "car02-v434-review-only",
+  "releasePermitted": false,
+  "reviewOnly": true,
+  "synthetic": true,
+  "r44PinnedGitBlob": "91c3ef3475c837828ae7640d9cab75bcc46e3ced",
+  "r46PinnedGitBlob": "d90404a880c06b809c30685654029a938913ec09",
+  "r468PinnedGitBlob": "3b48669519d795c3bb8966b3db0c091391cd48d7",
+  "r52PinnedGitBlob": "f0e31fb9f9d98524519d01dffd3489893d3d3302",
+  "execution": "Actual R44/R46/R468 source modules with injected local synthetic adapters only, no provider network",
+  "offlineReadFence": "two non-transactional observations; cannot authorize a business mutation",
+  "unverifiedProductionRequirements": [
+    "real Supabase Auth sessions with revocation semantics",
+    "trusted server-only staff membership with tenant boundary",
+    "transaction-scoped post-commit generation and revalidation",
+    "deployed, isolated staging end-to-end credentials and IAM review",
+    "production LINE send/delivery ambiguity handling and outbox reconciliation",
+    "external immutable evidence storage with independently controlled signing keys",
+    "explicit owner approval, release signoff and R52 gateway redesign"
+  ]
+}
