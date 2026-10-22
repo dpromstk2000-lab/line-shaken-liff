@@ -1,0 +1,104 @@
+name: CAR02 V4.72 Verified Webhook Disposable Inbox PG17 (NO_GO HOLD)
+# REVIEW-ONLY: no provider calls, real webhook ACK, Supabase, Worker, or LINE send.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-webhook-inbox-review-r472.mjs'
+      - 'car02-webhook-inbox-review-r472.test.mjs'
+      - 'car02-v472-disposable-webhook-inbox-pg17.sql'
+      - 'car02-v472-webhook-inbox-offline-contract.json'
+      - '.github/workflows/car02-v472-webhook-inbox-atomic-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-atomic-webhook-inbox:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v472_disposable_only
+        ports:
+          - 55472:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v472_disposable_only
+    steps:
+      - name: Checkout restricted review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Enforce R52 hard release lock, no provider secrets, correct layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo 'V472_LIVE_SECRETS_REFUSED' >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-webhook-inbox-review-r472.mjs car02-webhook-inbox-review-r472.test.mjs car02-v472-disposable-webhook-inbox-pg17.sql car02-v472-webhook-inbox-offline-contract.json car02-v471-disposable-line-webhook-pg17.sql; do test -s "$f"; done
+          test -s .github/workflows/car02-v472-webhook-inbox-atomic-pg17-qa.yml
+          test ! -e car02-v472-webhook-inbox-atomic-pg17-qa.yml
+          echo V472_ORIGINAL_R52_LOCK_BRANCH_AND_NO_PROVIDER_CREDS_PASS
+      - name: Run 712 or more Node tests and verify offline-only API contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-webhook-inbox-review-r472.mjs
+          node --check car02-webhook-inbox-review-r472.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v472-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v472-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v472-node.log")
+          test "$tests" -ge 712
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v472-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V472_RELEASE_LOCK} from './car02-webhook-inbox-review-r472.mjs';
+          const c=JSON.parse(readFileSync('car02-v472-webhook-inbox-offline-contract.json','utf8'));
+          assert.equal(CAR02_V472_RELEASE_LOCK,true);
+          for(const f of ['releasePermitted','realWebhookAcknowledged','realLineProviderVerified','lineMessageDeliveryProven','realSupabaseUsed','customerDataAccessed','realBusinessWrites','keyCustodyProven'])assert.equal(c[f],false);
+          console.log('V472_ALL_NODE_HMAC_INBOX_FAIL_CLOSED_REGRESSIONS_PASS');
+          NODE
+      - name: Disposable PG17 atomic claim and 8 concurrent event races
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -Atq -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55472 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v472_disposable' > /dev/null
+          pg -d car02_v472_disposable -f /workspace/car02-v471-disposable-line-webhook-pg17.sql > "$RUNNER_TEMP/v472-base.log"
+          grep -Fxq 'V471_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v472-base.log"
+          pg -d car02_v472_disposable -f /workspace/car02-v472-disposable-webhook-inbox-pg17.sql | tee "$RUNNER_TEMP/v472-pg.log"
+          for mark in V472_PG17_PRIVATE_INBOX_ROLE_DENIED_PASS V472_PG17_DUPLICATE_SAME_AND_CROSS_TENANT_DIFFERENT_REJECTED_PASS V472_PG17_TRANSACTION_ROLLBACK_AND_PENDING_NO_DELIVERY_PASS V472_FINAL_RELEASE_NO_GO_HOLD_TRUE; do
+            grep -Fxq "$mark" "$RUNNER_TEMP/v472-pg.log"
+          done
+          pids=()
+          for n in 1 2 3 4 5 6 7 8; do
+            (pg -d car02_v472_disposable -c "SELECT v472_private.qa_claim('qa_shop_a','01ARZ3NDEKTSV4RRFFQ69G5FAY',repeat('c',64),1800000000005)" > "$RUNNER_TEMP/v472-race-$n") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          wins=0;dups=0
+          for n in 1 2 3 4 5 6 7 8; do
+            v=$(cat "$RUNNER_TEMP/v472-race-$n")
+            if [ "$v" = 'claimed_pending' ]; then wins=$((wins+1));
+            elif [ "$v" = 'duplicate_pending' ]; then dups=$((dups+1));
+            else echo "V472_UNEXPECTED_CLAIM_RESULT: $v" >&2; exit 1; fi
+          done
+          test "$wins" -eq 1
+          test "$dups" -eq 7
+          test "$(pg -d car02_v472_disposable -c 'SELECT count(*) FROM v472_private.qa_inbox')" = '2'
+          test "$(pg -d car02_v472_disposable -c "SELECT count(*) FROM v472_private.qa_inbox WHERE receipt_state='pending'")" = '2'
+          echo V472_PG17_EIGHT_RACING_INBOX_CLAIMS_SINGLE_WINNER_PASS
+          echo V472_FINAL_RELEASE_NO_GO_HOLD_TRUE
