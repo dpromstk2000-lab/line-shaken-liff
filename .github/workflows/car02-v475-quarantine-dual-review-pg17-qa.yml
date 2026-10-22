@@ -1,0 +1,113 @@
+name: CAR02 V4.75 Disposable Dual Quarantine Review PG17 (NO_GO HOLD)
+# REVIEW-ONLY. No provider, real reviewers, business writes, customer data, or deployment.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-quarantine-dual-review-r475.mjs'
+      - 'car02-quarantine-dual-review-r475.test.mjs'
+      - 'car02-v475-disposable-quarantine-dual-review-pg17.sql'
+      - 'car02-v475-quarantine-dual-review-contract.json'
+      - '.github/workflows/car02-v475-quarantine-dual-review-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-dual-review:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v475_disposable_only
+        ports:
+          - 55475:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v475_disposable_only
+    steps:
+      - name: Checkout review-only commit without stored secrets
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check original R52 release lock and no production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for name in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!name:-}" || { echo V475_PRODUCTION_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-quarantine-dual-review-r475.mjs car02-quarantine-dual-review-r475.test.mjs car02-v475-disposable-quarantine-dual-review-pg17.sql car02-v475-quarantine-dual-review-contract.json car02-v474-disposable-inbox-quarantine-pg17.sql car02-v473-disposable-worker-lease-pg17.sql car02-v472-disposable-webhook-inbox-pg17.sql car02-v471-disposable-line-webhook-pg17.sql; do test -s "$f"; done
+          test -s .github/workflows/car02-v475-quarantine-dual-review-pg17-qa.yml
+          test ! -e car02-v475-quarantine-dual-review-pg17-qa.yml
+          echo V475_ACTUAL_R52_LOCK_AND_ISOLATED_LAYOUT_PASS
+      - name: Dynamic full Node regression and hard NO_GO review contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-quarantine-dual-review-r475.mjs
+          node --check car02-quarantine-dual-review-r475.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v475-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v475-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v475-node.log")
+          test "$tests" -ge 816
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v475-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V475_RELEASE_LOCK} from './car02-quarantine-dual-review-r475.mjs';
+          const c=JSON.parse(readFileSync('car02-v475-quarantine-dual-review-contract.json','utf8'));
+          assert.equal(CAR02_V475_RELEASE_LOCK,true);
+          for(const k of ['releasePermitted','quarantineLifted','realBusinessWrites','jobDispatched','lineDeliveryProven','realWebhookAcknowledged','actualDualHumanReviewProven','usesRealSupabase','usesRealLine','reviewersAreRealPeopleVerified'])assert.equal(c[k],false);
+          assert.equal(c.requiresIndependentReviewers,2);
+          assert.equal(c.unverifiedCommercialConditions.length,7);
+          console.log('V475_NODE_DUAL_INDEPENDENT_MOCK_REVIEW_NO_GO_PASS');
+          NODE
+      - name: Disposable PostgreSQL 17 independent reviewer and eight-way same-person contention
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -Atq -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55475 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v475_disposable' >/dev/null
+          pg -d car02_v475_disposable -f /workspace/car02-v471-disposable-line-webhook-pg17.sql > "$RUNNER_TEMP/v475-base471.log"
+          grep -Fxq 'V471_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v475-base471.log"
+          pg -d car02_v475_disposable -f /workspace/car02-v472-disposable-webhook-inbox-pg17.sql > "$RUNNER_TEMP/v475-base472.log"
+          grep -Fxq 'V472_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v475-base472.log"
+          pg -d car02_v475_disposable -f /workspace/car02-v473-disposable-worker-lease-pg17.sql > "$RUNNER_TEMP/v475-base473.log"
+          grep -Fxq 'V473_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v475-base473.log"
+          pg -d car02_v475_disposable -f /workspace/car02-v474-disposable-inbox-quarantine-pg17.sql > "$RUNNER_TEMP/v475-base474.log"
+          grep -Fxq 'V474_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v475-base474.log"
+          pg -d car02_v475_disposable -f /workspace/car02-v475-disposable-quarantine-dual-review-pg17.sql | tee "$RUNNER_TEMP/v475-pg.log"
+          for mark in V475_PG17_PRIVATE_REVIEW_ROLE_AND_FUNCTION_DENIED_PASS V475_PG17_CROSS_TENANT_DIGEST_AND_UNQUARANTINED_REFUSED_PASS V475_PG17_ROLLBACK_AND_NO_REAL_WRITES_PASS V475_PG17_ONE_PERSON_NO_RELEASE_AND_EVIDENCE_IMMUTABLE_PASS V475_FINAL_RELEASE_NO_GO_HOLD_TRUE; do
+            grep -Fxq "$mark" "$RUNNER_TEMP/v475-pg.log"
+          done
+          pids=()
+          for n in 1 2 3 4 5 6 7 8; do
+            (pg -d car02_v475_disposable -c "SELECT v475_private.qa_review('01ARZ3NDEKTSV4RRFFQ69G5FAY','qa_shop_a',repeat('b',64),repeat('f',64),'reviewer_a')" > "$RUNNER_TEMP/v475-race-$n") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          wins=0;duplicates=0
+          for n in 1 2 3 4 5 6 7 8; do
+            v=$(cat "$RUNNER_TEMP/v475-race-$n")
+            if [ "$v" = 'synthetic_review_recorded' ]; then wins=$((wins+1));
+            elif [ "$v" = 'already_recorded' ]; then duplicates=$((duplicates+1));
+            else echo "V475_UNEXPECTED_REVIEW_RACE_RESULT: $v" >&2; exit 1; fi
+          done
+          test "$wins" -eq 1
+          test "$duplicates" -eq 7
+          test "$(pg -d car02_v475_disposable -c 'SELECT count(*) FROM v475_private.qa_reviews')" = '2'
+          test "$(pg -d car02_v475_disposable -c "SELECT v475_private.qa_pair_status('01ARZ3NDEKTSV4RRFFQ69G5FAY','qa_shop_a',repeat('b',64),repeat('f',64))")" = 'two_independent_mock_reviews_still_no_go'
+          test "$(pg -d car02_v475_disposable -c "SELECT count(*) FROM v474_private.qa_quarantines WHERE review_state='quarantined_review_only'")" = '1'
+          echo V475_PG17_EIGHT_RACING_ATTESTATIONS_ONE_WINNER_TWO_DISTINCT_REVIEWERS_PASS
+          echo V475_FINAL_RELEASE_NO_GO_HOLD_TRUE
