@@ -1,0 +1,117 @@
+name: CAR02 V4.69 Actual R44 R46 R468 Offline Chain QA (NO_GO HOLD)
+# Review branch ONLY; original R52 release locked, no secrets, no DB or LINE.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-offline-auth-chain-r469.mjs'
+      - 'car02-offline-auth-chain-r469.test.mjs'
+      - 'car02-v469-offline-e2e-contract.json'
+      - '.github/workflows/car02-v469-r44-r46-auth-chain-offline-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-actual-source-integrated-chain:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout restricted review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check original R44 R46 R468 R52 pins and reject external credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for key in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!key:-}" || { echo 'V469_EXTERNAL_CREDENTIAL_DENIED' >&2; exit 1; }
+          done
+          test "$(git hash-object car02-identity-r44.mjs)" = '91c3ef3475c837828ae7640d9cab75bcc46e3ced'
+          test "$(git hash-object car02-auth-providers-r46.mjs)" = 'd90404a880c06b809c30685654029a938913ec09'
+          test "$(git hash-object car02-supabase-session-bridge-r468.mjs)" = '3b48669519d795c3bb8966b3db0c091391cd48d7'
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-offline-auth-chain-r469.mjs car02-offline-auth-chain-r469.test.mjs car02-v469-offline-e2e-contract.json; do test -s "$f"; done
+          test -s .github/workflows/car02-v469-r44-r46-auth-chain-offline-qa.yml
+          test ! -e car02-v469-r44-r46-auth-chain-offline-qa.yml
+          echo V469_ACTUAL_R44_R46_R468_R52_PINS_RELEASE_LOCK_PASS
+      - name: Execute 632 or more complete Node tests with zero failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-offline-auth-chain-r469.mjs
+          node --check car02-offline-auth-chain-r469.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v469-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v469-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v469-node.log")
+          test "$tests" -ge 632
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v469-node.log"
+          echo V469_ALL_NODE_REGRESSION_TESTS_PASS
+      - name: Exercise actual R44 R46 R468 injected offline adapters and never grant release
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {createCar02Authenticator} from './car02-identity-r44.mjs';
+          import {createSupabaseStaffTokenVerifierR46} from './car02-auth-providers-r46.mjs';
+          import {createCar02OfflineSupabaseSessionBridgeR468} from './car02-supabase-session-bridge-r468.mjs';
+          import {createCar02OfflineAuthChainR469,CAR02_V469_RELEASE_LOCK} from './car02-offline-auth-chain-r469.mjs';
+          const c=JSON.parse(readFileSync('car02-v469-offline-e2e-contract.json','utf8'));
+          assert.equal(c.releasePermitted,false);assert.equal(c.synthetic,true);assert.equal(CAR02_V469_RELEASE_LOCK,true);
+          const shop='qa_shop_a',sub='00000000-0000-0000-0000-000000004691';
+          const sid='00000000-0000-0000-0000-000000004692',now=1800000000,exp=now+1000;
+          const issuer='https://offline-qa.supabase.example/auth/v1';
+          const jwt=[Buffer.from('{"alg":"none"}').toString('base64url'),
+            Buffer.from(JSON.stringify({sub,session_id:sid,exp,iss:issuer,aud:'authenticated',role:'authenticated'})).toString('base64url'),
+            'offline_fake_signature_not_real'].join('.');
+          let calls=0;
+          const fakeFetch=async(url,opts)=>{calls++;assert.equal(url,issuer+'/user');
+            assert.equal(opts?.method,'GET');assert.equal(opts.headers?.Authorization,'Bearer '+jwt);
+            return {ok:true,json:async()=>({id:sub,aud:'authenticated',is_anonymous:false})};};
+          const verifyStaffJwt=createSupabaseStaffTokenVerifierR46({supabaseUrl:'https://offline-qa.supabase.example',
+            anonKey:'offline_public_example_key_123456789',fetchImpl:fakeFetch,nowSeconds:()=>now});
+          const authenticateR44=createCar02Authenticator({shopCode:shop,lineClientId:'offline_line_qa',
+            verifyLineIdToken:async()=>{throw Error('LINE intentionally disabled')},
+            resolveLineCustomer:async()=>{throw Error('LINE intentionally disabled')},
+            verifyStaffJwt,resolveStaffAccess:async({userSub,shopCode})=>({active:true,shopCode,userSub,role:'staff'}),
+            nowSeconds:()=>now});
+          const bridge=createCar02OfflineSupabaseSessionBridgeR468({
+            authorizeReviewer:async()=>({verified:true,role:'session_bridge_auditor',mode:'isolated_qa',shopCode:shop}),
+            inspectIsolation:async()=>({verified:true,environment:'isolated_mock_only',testOnly:true}),
+            verifyStaffJwt,readSession:async()=>({source:'isolated_mock_session_store',active:true,
+              userSub:sub,sessionId:sid,expiresAtSec:exp,createdAtMs:1799000000000,generation:3}),
+            readMembership:async()=>({source:'isolated_mock_membership',active:true,
+              shopCode:shop,userSub:sub,role:'staff',generation:3,acknowledgedGeneration:3,
+              postcommitFenceAtMs:1798000000000}),nowSeconds:()=>now});
+          let revoked=false;
+          const chain=createCar02OfflineAuthChainR469({
+            authorizeReviewer:async()=>({verified:true,role:'chain_auditor',mode:'isolated_qa',shopCode:shop}),
+            inspectIsolation:async()=>({verified:true,environment:'offline_mock_only',testOnly:true}),
+            authenticateR44,inspectR468:({request})=>bridge.inspect({request}),
+            readFenceSnapshot:async()=>({source:'offline_disposable_session_fence',shopCode:shop,
+              userSub:sub,sessionId:sid,staffRole:'staff',generation:3,fenceDigest:'c'.repeat(64),
+              active:!revoked,observedAtMs:1798000000000}),nowSeconds:()=>now});
+          const request=new Request('https://offline.invalid/qa',{headers:{Authorization:'Bearer '+jwt}});
+          const verified=await chain.inspect({request});
+          assert.deepEqual([verified.reason,verified.checksObserved,verified.releasePermitted,verified.writeAuthorized],
+            ['offline_identity_session_chain_consistent_still_no_go',4,false,false]);
+          assert.equal(calls,2);
+          revoked=true;
+          const refused=await chain.inspect({request});
+          assert.equal(refused.releasePermitted,false);assert.notEqual(refused.reason,verified.reason);
+          const injected=new Request('https://offline.invalid/qa',{headers:{Authorization:'Bearer '+jwt,
+            'x-line-id-token':'mock_line_token'}});
+          const denied=await chain.inspect({request:injected});
+          assert.equal(denied.reason,'line_credential_not_staff');
+          assert.equal(denied.releasePermitted,false);
+          assert.match(readFileSync('car02-edge-entry-r52.ts','utf8'),/CAR02_RELEASE_LOCK=true/);
+          console.log('V469_ACTUAL_R44_R46_R468_MOCK_INTEGRATION_NO_GO_PASS');
+          console.log('V469_REVOCATION_AND_LINE_CREDENTIAL_REFUSED_NO_REAL_PROVIDER_PASS');
+          NODE
+          echo V469_FINAL_RELEASE_NO_GO_HOLD_TRUE
