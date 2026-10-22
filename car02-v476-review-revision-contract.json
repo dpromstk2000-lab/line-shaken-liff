@@ -1,0 +1,26 @@
+{
+  "version": "V4.76",
+  "reviewBranch": "car02-v434-review-only",
+  "releasePermitted": false,
+  "quarantineLifted": false,
+  "realBusinessWrites": false,
+  "jobDispatched": false,
+  "realWebhookAcknowledged": false,
+  "lineDeliveryProven": false,
+  "realSupabaseUsed": false,
+  "actualDualHumanReviewProven": false,
+  "realReviewerRevocationProven": false,
+  "hardReleaseLock": "R52:CAR02_RELEASE_LOCK=true",
+  "reviewSource": "V4.75 offline mock dual-review status",
+  "revisionFence": "read synthetic authoritative revision before and after dual review; reject changes and invalidation",
+  "syntheticPg17": "rotation of a mock revision under a database row lock; old approvals never authorize writes",
+  "unverifiedCommercialConditions": [
+    "Actual Supabase Auth session revocation and server-side binding",
+    "Actual production IAM and independent reviewer identities",
+    "Real transaction-time booking authorization and write review",
+    "Real LINE webhook ingress, retry and delivery provenance",
+    "External immutable or WORM audit evidence custody",
+    "Production-grade signing key and secrets isolation",
+    "Isolated live-provider staging acceptance and separate written GO decision"
+  ]
+}
