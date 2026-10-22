@@ -1,0 +1,33 @@
+{
+  "version": "V4.78",
+  "reviewBranch": "car02-v434-review-only",
+  "baselineV477Run": 39709650964,
+  "baselineV477Commit": "bcf591f3a9d7378d81d63031d6b798ab817fb18f",
+  "baselineNodeTests": 882,
+  "releasePermitted": false,
+  "realStagingProjectVerified": false,
+  "realSupabaseSessionVerified": false,
+  "realOwnerApprovalVerified": false,
+  "realCustomerDataAccessed": false,
+  "realProviderCredentialsUsed": false,
+  "mockOnly": true,
+  "proofKeys": [
+    "provider_session_revocation",
+    "staff_and_reviewer_identity",
+    "transaction_final_auth_fence",
+    "line_webhook_send_and_delivery",
+    "independent_immutable_evidence",
+    "independent_key_custody",
+    "owner_approved_isolated_staging_acceptance"
+  ],
+  "stagingSafetyRequirements": [
+    "Owner written approval for NEW dedicated CAR02 staging project",
+    "Project reference must differ from all existing production or shared project references",
+    "No customer data or production auth accounts copied into staging",
+    "No production service_role, LINE channel token, Worker secret or callback configured",
+    "Staging data sets use synthetic subject and shop identifiers only",
+    "Independent IAM and actual session revocation requirements to be tested after approval",
+    "Keep separate human GO approval; no output from offline fixture grants release"
+  ],
+  "assessment": "OFFLINE_STAGING_PREFLIGHT_FIXTURES_ONLY_NO_GO"
+}
