@@ -1,0 +1,130 @@
+{
+  "system": "DPRO_CAR02",
+  "version": "V4.81",
+  "date": "2026-10-22",
+  "reviewBranch": "car02-v434-review-only",
+  "baselineV480Run": 39716324419,
+  "baselineV480Commit": "b14a016cc9207e20227be1359d4114f8c5b1e4cc",
+  "baselineNodeTests": 1022,
+  "expectedNewNodeTests": 40,
+  "expectedMinRegressionTests": 1062,
+  "jobPins": [
+    {
+      "version": "V4.70",
+      "runId": 39700954544,
+      "jobId": 119569773505,
+      "jobName": "disposable-line-retry-review",
+      "lockStep": "Enforce original R52 release lock and no live provider keys",
+      "nodeStep": "Entire Node regression plus official LINE retry behavior mock",
+      "safetyStep": "Disposable PostgreSQL17 retry key cross-tenant and expiry QA",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.71",
+      "runId": 39702274067,
+      "jobId": 119574063363,
+      "jobName": "disposable-raw-webhook-replay",
+      "lockStep": "Confirm actual R52 lock, no provider secrets, and expected file layout",
+      "nodeStep": "Execute all 683 or more Node regression tests including official LINE HMAC example",
+      "safetyStep": "Disposable PG17 cross-tenant replay collision and 8 simultaneous registrations",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.72",
+      "runId": 39703805289,
+      "jobId": 119578978972,
+      "jobName": "disposable-atomic-webhook-inbox",
+      "lockStep": "Enforce R52 hard release lock, no provider secrets, correct layout",
+      "nodeStep": "Run 712 or more Node tests and verify offline-only API contract",
+      "safetyStep": "Disposable PG17 atomic claim and 8 concurrent event races",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.73",
+      "runId": 39705116469,
+      "jobId": 119583230934,
+      "jobName": "disposable-synthetic-webhook-worker-lease",
+      "lockStep": "Verify actual R52 hard lock, no live secrets, expected layout",
+      "nodeStep": "Run all 741 or more Node tests and hard NO_GO contract",
+      "safetyStep": "Disposable PG17 private worker lease expiry, fencing, eight racing owners",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.74",
+      "runId": 39706304070,
+      "jobId": 119587032766,
+      "jobName": "disposable-synthetic-webhook-quarantine",
+      "lockStep": "Assert no production secrets, R52 immutable lock and correct paths",
+      "nodeStep": "Run complete minimum 783 Node regression tests and hard NO_GO contract",
+      "safetyStep": "Disposable PG17 quarantine fencing, rollback and eight concurrent idem claims",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.75",
+      "runId": 39707312563,
+      "jobId": 119590266787,
+      "jobName": "disposable-dual-review",
+      "lockStep": "Check original R52 release lock and no production credentials",
+      "nodeStep": "Dynamic full Node regression and hard NO_GO review contract",
+      "safetyStep": "Disposable PostgreSQL 17 independent reviewer and eight-way same-person contention",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.76",
+      "runId": 39708691820,
+      "jobId": 119594625001,
+      "jobName": "disposable-mock-review-invalidation",
+      "lockStep": "Refuse provider credentials and confirm actual R52 R475 unmodified source",
+      "nodeStep": "Run full dynamic Node regression and deny any release or real reviewer inference",
+      "safetyStep": "Disposable PostgreSQL17 review invalidation and eight simultaneous revision races",
+      "disposablePG17": true
+    },
+    {
+      "version": "V4.77",
+      "runId": 39709650964,
+      "jobId": 119597667272,
+      "jobName": "offline-commercial-gaps-never-go",
+      "lockStep": "Check original R52 and R476 immutable pins; no real credentials",
+      "nodeStep": "Complete dynamic Node regression 882 or more tests no failures",
+      "safetyStep": "Seven independent real service proofs must remain unverified",
+      "disposablePG17": false
+    },
+    {
+      "version": "V4.78",
+      "runId": 39713246494,
+      "jobId": 119609268790,
+      "jobName": "isolated-staging-preflight-no-go",
+      "lockStep": "Assert R52 and V477 pinned sources, no real credentials, exact file layout",
+      "nodeStep": "Run all 916 or more Node regression tests with no failures",
+      "safetyStep": "Keep all seven real provider proofs and staging owner authorization unverified",
+      "disposablePG17": false
+    },
+    {
+      "version": "V4.79",
+      "runId": 39714412265,
+      "jobId": 119612998799,
+      "jobName": "synthetic-evidence-chain-no-go",
+      "lockStep": "Refuse live provider credentials and pin genuine R52 V477 V478 sources",
+      "nodeStep": "Run all 975 plus regression tests with zero failures",
+      "safetyStep": "Verify seven synthetic hash receipts never become seven real proofs",
+      "disposablePG17": false
+    }
+  ],
+  "expectedJobCount": 10,
+  "expectedEssentialSteps": 30,
+  "expectedDisposablePg17Runs": 7,
+  "releasePermitted": false,
+  "realProviderProofsVerified": 0,
+  "realStagingValidated": false,
+  "ownerApproved": false,
+  "realBusinessWrites": false,
+  "mockOnly": false,
+  "actualGithubJobMetadataReadOnly": true,
+  "commercialRealityGaps": 7,
+  "limitations": [
+    "GitHub metadata is NOT immutable offsite WORM evidence",
+    "Job step conclusions are NOT proof of real Supabase/LINE behavior",
+    "No real customer data accessed",
+    "No real provider credentials or deployment"
+  ]
+}
