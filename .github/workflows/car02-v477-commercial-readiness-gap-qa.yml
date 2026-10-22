@@ -1,0 +1,87 @@
+name: CAR02 V4.77 Seven Commercial Reality Gaps and Actual V476 Provenance (NO_GO HOLD)
+# REVIEW ONLY: no real Supabase/LINE, no WORM, real reviewer or owner signoff.
+# This runs 882+ regression tests; V476 PG17 verified in its own completed CI.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-commercial-gap-audit-r477.mjs'
+      - 'car02-commercial-gap-audit-r477.test.mjs'
+      - 'car02-v477-commercial-readiness-gap-contract.json'
+      - '.github/workflows/car02-v477-commercial-readiness-gap-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-commercial-gaps-never-go:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review branch without persisting credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check original R52 and R476 immutable pins; no real credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for name in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!name:-}" || { echo V477_LIVE_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-review-revision-fence-r476.mjs)" = '10bcbdf1605e5c28884d8f9d88a39662f951dac6'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-commercial-gap-audit-r477.mjs car02-commercial-gap-audit-r477.test.mjs car02-v477-commercial-readiness-gap-contract.json; do test -s "$f"; done
+          test -s .github/workflows/car02-v477-commercial-readiness-gap-qa.yml
+          test ! -e car02-v477-commercial-readiness-gap-qa.yml
+          echo V477_R52_R476_PINNED_REAL_FILES_NO_PROVIDER_CREDENTIALS_PASS
+      - name: Complete dynamic Node regression 882 or more tests no failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-commercial-gap-audit-r477.mjs
+          node --check car02-commercial-gap-audit-r477.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v477-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v477-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v477-node.log")
+          test "$tests" -ge 882
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v477-node.log"
+          echo V477_ALL_NODE_882_PLUS_TESTS_PASS
+      - name: Seven independent real service proofs must remain unverified
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V477_RELEASE_LOCK,CAR02_V477_PROOF_KEYS,
+            CAR02_V477_BASELINE_COMMIT,CAR02_V477_BASELINE_CI_RUN,
+            createCar02OfflineCommercialGapAssessorR477} from './car02-commercial-gap-audit-r477.mjs';
+          const c=JSON.parse(readFileSync('car02-v477-commercial-readiness-gap-contract.json','utf8'));
+          assert.equal(CAR02_V477_RELEASE_LOCK,true);
+          assert.equal(c.releasePermitted,false);
+          assert.equal(c.baselineV476Commit,CAR02_V477_BASELINE_COMMIT);
+          assert.equal(c.baselineV476CI,CAR02_V477_BASELINE_CI_RUN);
+          assert.deepEqual(c.proofKeys,CAR02_V477_PROOF_KEYS);
+          for(const key of ['realSupabaseAuthVerified','realWorkerIAMVerified','realBookingTransactionVerified',
+           'realLineDeliveryVerified','realIndependentWORMVerified','realKeyCustodyVerified',
+           'realStagingOwnerApproved'])assert.equal(c[key],false);
+          const a=createCar02OfflineCommercialGapAssessorR477({expectedShopCode:'qa_shop_a',
+           authorizeAuditor:async()=>({verified:true,role:'commercial_gap_auditor',mode:'isolated_qa',shopCode:'qa_shop_a'}),
+           inspectIsolation:async()=>({verified:true,testOnly:true,environment:'offline_mock_only'}),
+           readBaselineCI:async()=>({source:'isolated_mock_ci_metadata',reviewBranch:'car02-v434-review-only',
+            headSha:CAR02_V477_BASELINE_COMMIT,runId:CAR02_V477_BASELINE_CI_RUN,conclusion:'success',
+            nodeTests:849,nodeFailed:0,releaseLock:true}),
+           readProofClaims:async()=>CAR02_V477_PROOF_KEYS.map(key=>({key,state:'unverified',evidenceClass:'none'}))});
+          const result=await a.inspect();
+          assert.equal(result.reason,'seven_real_commercial_proofs_still_unverified');
+          assert.equal(result.releasePermitted,false);
+          assert.equal(result.verifiedProofCount,0);
+          assert.equal(result.unverifiedProofs.length,7);
+          console.log('V477_SEVEN_REAL_COMMERCIAL_PROOFS_UNVERIFIED_NO_GO_PASS');
+          console.log('V477_PRIOR_V476_ISOLATED_CI_IS_NOT_REAL_PROVIDER_EVIDENCE_PASS');
+          NODE
+          echo V477_FINAL_RELEASE_NO_GO_HOLD_TRUE
