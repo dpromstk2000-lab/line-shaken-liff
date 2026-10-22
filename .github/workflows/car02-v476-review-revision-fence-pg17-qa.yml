@@ -1,0 +1,119 @@
+name: CAR02 V4.76 Mock Review Revision Invalidation Fence PG17 (NO_GO HOLD)
+# REVIEW ONLY: disposable PostgreSQL17, offline mock personnel and revision, never actual authorization.
+# No real LINE, Supabase, Worker, booking updates, provider credentials, or deployment.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-review-revision-fence-r476.mjs'
+      - 'car02-review-revision-fence-r476.test.mjs'
+      - 'car02-v476-disposable-review-revision-pg17.sql'
+      - 'car02-v476-review-revision-contract.json'
+      - '.github/workflows/car02-v476-review-revision-fence-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-mock-review-invalidation:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v476_disposable_only
+        ports:
+          - 55476:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v476_disposable_only
+    steps:
+      - name: Checkout restricted review commit without persisting credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Refuse provider credentials and confirm actual R52 R475 unmodified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for name in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!name:-}" || { echo V476_LIVE_CREDENTIAL_DENIED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-quarantine-dual-review-r475.mjs)" = 'f46b706a169eae4c1a34ba8ca9eb156d2589dffc'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-review-revision-fence-r476.mjs car02-review-revision-fence-r476.test.mjs car02-v476-disposable-review-revision-pg17.sql car02-v476-review-revision-contract.json car02-v475-disposable-quarantine-dual-review-pg17.sql car02-v474-disposable-inbox-quarantine-pg17.sql car02-v473-disposable-worker-lease-pg17.sql car02-v472-disposable-webhook-inbox-pg17.sql car02-v471-disposable-line-webhook-pg17.sql; do test -s "$f"; done
+          test -s .github/workflows/car02-v476-review-revision-fence-pg17-qa.yml
+          test ! -e car02-v476-review-revision-fence-pg17-qa.yml
+          echo V476_REAL_R52_R475_BLOB_PINS_NO_SECRETS_REVIEW_ONLY_PASS
+      - name: Run full dynamic Node regression and deny any release or real reviewer inference
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-review-revision-fence-r476.mjs
+          node --check car02-review-revision-fence-r476.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v476-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v476-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v476-node.log")
+          test "$tests" -ge 849
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v476-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V476_RELEASE_LOCK} from './car02-review-revision-fence-r476.mjs';
+          import {CAR02_V475_RELEASE_LOCK} from './car02-quarantine-dual-review-r475.mjs';
+          const c=JSON.parse(readFileSync('car02-v476-review-revision-contract.json','utf8'));
+          assert.equal(CAR02_V476_RELEASE_LOCK,true);assert.equal(CAR02_V475_RELEASE_LOCK,true);
+          for(const k of ['releasePermitted','quarantineLifted','realBusinessWrites','jobDispatched','realWebhookAcknowledged','lineDeliveryProven','realSupabaseUsed','actualDualHumanReviewProven','realReviewerRevocationProven'])assert.equal(c[k],false);
+          assert.equal(c.unverifiedCommercialConditions.length,7);
+          console.log('V476_NODE_REVISION_CHANGE_FAIL_CLOSED_NO_RELEASE_PASS');
+          NODE
+      - name: Disposable PostgreSQL17 review invalidation and eight simultaneous revision races
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -Atq -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55476 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v476_disposable' >/dev/null
+          for ver in 471 472 473 474 475; do
+            case "$ver" in
+              471) file=car02-v471-disposable-line-webhook-pg17.sql ;;
+              472) file=car02-v472-disposable-webhook-inbox-pg17.sql ;;
+              473) file=car02-v473-disposable-worker-lease-pg17.sql ;;
+              474) file=car02-v474-disposable-inbox-quarantine-pg17.sql ;;
+              475) file=car02-v475-disposable-quarantine-dual-review-pg17.sql ;;
+            esac
+            pg -d car02_v476_disposable -f "/workspace/$file" > "$RUNNER_TEMP/v476-base-$ver.log"
+            grep -Fxq "V${ver}_FINAL_RELEASE_NO_GO_HOLD_TRUE" "$RUNNER_TEMP/v476-base-$ver.log"
+          done
+          pg -d car02_v476_disposable -f /workspace/car02-v476-disposable-review-revision-pg17.sql | tee "$RUNNER_TEMP/v476-pg.log"
+          for mark in V476_PG17_PRIVATE_REVISION_FENCE_ROLE_DENY_PASS V476_PG17_TWO_MOCK_REVIEWS_STILL_NO_GO_PASS V476_PG17_CROSS_TENANT_EVIDENCE_CLOCK_AND_REVISION_DENIED_PASS V476_PG17_REVISION_ROLLBACK_RESTORES_REVIEW_ONLY_PASS V476_FINAL_RELEASE_NO_GO_HOLD_TRUE; do
+            grep -Fxq "$mark" "$RUNNER_TEMP/v476-pg.log"
+          done
+          pids=()
+          for n in 1 2 3 4 5 6 7 8; do
+            (pg -d car02_v476_disposable -c "SELECT v476_private.qa_invalidate('qa_shop_a','01ARZ3NDEKTSV4RRFFQ69G5FAY',repeat('b',64),repeat('f',64),1,'evidence_superseded',1800000000100)" > "$RUNNER_TEMP/v476-race-$n") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          wins=0;stale=0
+          for n in 1 2 3 4 5 6 7 8; do
+            v=$(cat "$RUNNER_TEMP/v476-race-$n")
+            if [ "$v" = 'mock_revision_invalidated' ]; then wins=$((wins+1));
+            elif [ "$v" = 'stale_revision' ]; then stale=$((stale+1));
+            else echo "V476_UNEXPECTED_REVISION_RACE: $v" >&2; exit 1; fi
+          done
+          test "$wins" -eq 1
+          test "$stale" -eq 7
+          test "$(pg -d car02_v476_disposable -c "SELECT revision::text||':'||invalidated::text FROM v476_private.qa_revision_fence WHERE event_id='01ARZ3NDEKTSV4RRFFQ69G5FAY'")" = '2:true'
+          test "$(pg -d car02_v476_disposable -c 'SELECT count(*) FROM v476_private.qa_revision_events')" = '1'
+          test "$(pg -d car02_v476_disposable -c "SELECT v476_private.qa_pair_state('qa_shop_a','01ARZ3NDEKTSV4RRFFQ69G5FAY',repeat('b',64),repeat('f',64))")" = 'revision_invalidated_no_go'
+          test "$(pg -d car02_v476_disposable -c "SELECT v475_private.qa_pair_status('01ARZ3NDEKTSV4RRFFQ69G5FAY','qa_shop_a',repeat('b',64),repeat('f',64))")" = 'two_independent_mock_reviews_still_no_go'
+          echo V476_PG17_EIGHT_RACING_REVISIONS_ONE_INVALIDATION_STALE_PAIR_DENIED_PASS
+          echo V476_FINAL_RELEASE_NO_GO_HOLD_TRUE
