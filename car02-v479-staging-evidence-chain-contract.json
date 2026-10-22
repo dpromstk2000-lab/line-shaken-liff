@@ -1,0 +1,26 @@
+{
+  "version": "V4.79",
+  "reviewBranch": "car02-v434-review-only",
+  "baselineV478Commit": "487e194b1c610f14dffce5ee84f665d67eb70838",
+  "baselineV478CI": 39713246494,
+  "baselineNodeTests": 916,
+  "releasePermitted": false,
+  "mockOnly": true,
+  "realStagingVerified": false,
+  "realOwnerApproved": false,
+  "realProviderVerified": false,
+  "realBusinessWrites": false,
+  "usesProductionCredentials": false,
+  "usesCustomerData": false,
+  "receiptEvidenceClass": "offline_fixture",
+  "realProofsVerified": 0,
+  "requiredRealProofs": 7,
+  "limitations": [
+    "SHA-256 is only a synthetic integrity checksum, not digital signature nor WORM",
+    "No Supabase Auth session verified",
+    "No LINE webhook or delivery proof",
+    "No real person authorized or signed",
+    "No production schema or data accessed",
+    "No owner-approved isolated staging project exists in this test"
+  ]
+}
