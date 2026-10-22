@@ -1,0 +1,112 @@
+name: CAR02 V4.74 Disposable Webhook Quarantine Review PG17 (NO_GO HOLD)
+# REVIEW ONLY; mock event IDs and worker identities, disposable PG17 only.
+# No real webhooks, LINE provider, Supabase, business writes, or deployments.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-inbox-quarantine-review-r474.mjs'
+      - 'car02-inbox-quarantine-review-r474.test.mjs'
+      - 'car02-v474-disposable-inbox-quarantine-pg17.sql'
+      - 'car02-v474-quarantine-offline-contract.json'
+      - '.github/workflows/car02-v474-inbox-quarantine-pg17-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-synthetic-webhook-quarantine:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      pg17:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: v474_disposable_only
+        ports:
+          - 55474:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGPASSWORD: v474_disposable_only
+    steps:
+      - name: Checkout review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Assert no production secrets, R52 immutable lock and correct paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for name in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!name:-}" || { echo V474_REFUSED_PRODUCTION_CREDENTIAL >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for file in car02-inbox-quarantine-review-r474.mjs car02-inbox-quarantine-review-r474.test.mjs car02-v474-disposable-inbox-quarantine-pg17.sql car02-v474-quarantine-offline-contract.json car02-v473-disposable-worker-lease-pg17.sql car02-v472-disposable-webhook-inbox-pg17.sql car02-v471-disposable-line-webhook-pg17.sql; do test -s "$file"; done
+          test -s .github/workflows/car02-v474-inbox-quarantine-pg17-qa.yml
+          test ! -e car02-v474-inbox-quarantine-pg17-qa.yml
+          echo V474_ORIGINAL_R52_LOCK_NO_PROVIDER_AND_CORRECT_PATHS_PASS
+      - name: Run complete minimum 783 Node regression tests and hard NO_GO contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-inbox-quarantine-review-r474.mjs
+          node --check car02-inbox-quarantine-review-r474.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v474-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v474-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v474-node.log")
+          test "$tests" -ge 783
+          test "$passed" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v474-node.log"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V474_RELEASE_LOCK,CAR02_V474_REASONS} from './car02-inbox-quarantine-review-r474.mjs';
+          const c=JSON.parse(readFileSync('car02-v474-quarantine-offline-contract.json','utf8'));
+          assert.equal(CAR02_V474_RELEASE_LOCK,true);
+          for(const key of ['releasePermitted','realWebhookAcknowledged','jobDispatched','lineDeliveryProven','realSupabaseUsed','realBusinessWrites','liveProviderCredentialsUsed','eventActuallyProcessed'])assert.equal(c[key],false);
+          assert.deepEqual(c.allowedQuarantineReasons,CAR02_V474_REASONS);
+          assert.equal(c.unverifiedCommercialConditions.length,7);
+          console.log('V474_NODE_QUARANTINE_FAIL_CLOSED_783_PLUS_PASS');
+          NODE
+      - name: Disposable PG17 quarantine fencing, rollback and eight concurrent idem claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg(){ docker run --rm --network host -e PGPASSWORD="$PGPASSWORD" -v "$GITHUB_WORKSPACE:/workspace:ro" postgres:17 psql -X -Atq -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 55474 -U postgres "$@"; }
+          pg -d postgres -c 'CREATE DATABASE car02_v474_disposable' >/dev/null
+          pg -d car02_v474_disposable -f /workspace/car02-v471-disposable-line-webhook-pg17.sql > "$RUNNER_TEMP/v474-base471.log"
+          grep -Fxq 'V471_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v474-base471.log"
+          pg -d car02_v474_disposable -f /workspace/car02-v472-disposable-webhook-inbox-pg17.sql > "$RUNNER_TEMP/v474-base472.log"
+          grep -Fxq 'V472_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v474-base472.log"
+          pg -d car02_v474_disposable -f /workspace/car02-v473-disposable-worker-lease-pg17.sql > "$RUNNER_TEMP/v474-base473.log"
+          grep -Fxq 'V473_FINAL_RELEASE_NO_GO_HOLD_TRUE' "$RUNNER_TEMP/v474-base473.log"
+          pg -d car02_v474_disposable -f /workspace/car02-v474-disposable-inbox-quarantine-pg17.sql | tee "$RUNNER_TEMP/v474-pg.log"
+          for mark in V474_PG17_PRIVATE_QUARANTINE_ROLES_FUNCTIONS_DENIED_PASS V474_PG17_TENANT_DIGEST_STALE_LEASE_REASON_AND_EXPIRY_DENIED_PASS V474_PG17_QUARANTINE_IDEMPOTENT_AND_PENDING_NOT_PROCESSED_PASS V474_PG17_ROLLBACK_RESTORES_PENDING_NO_DELIVERY_PASS V474_FINAL_RELEASE_NO_GO_HOLD_TRUE; do
+            grep -Fxq "$mark" "$RUNNER_TEMP/v474-pg.log"
+          done
+          pids=()
+          for n in 1 2 3 4 5 6 7 8; do
+            (pg -d car02_v474_disposable -c "SELECT v474_private.qa_quarantine('qa_shop_a','01ARZ3NDEKTSV4RRFFQ69G5FAZ',repeat('c',64),'worker_a',repeat('d',64),1,'manual_hold',1800000000001)" > "$RUNNER_TEMP/v474-race-$n") &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          wins=0;duplicates=0
+          for n in 1 2 3 4 5 6 7 8; do
+            result=$(cat "$RUNNER_TEMP/v474-race-$n")
+            if [ "$result" = 'quarantined_mock' ]; then wins=$((wins+1));
+            elif [ "$result" = 'already_quarantined' ]; then duplicates=$((duplicates+1));
+            else echo "V474_UNEXPECTED_QUARANTINE_RESULT: $result" >&2; exit 1; fi
+          done
+          test "$wins" -eq 1
+          test "$duplicates" -eq 7
+          test "$(pg -d car02_v474_disposable -c 'SELECT count(*) FROM v474_private.qa_quarantines')" = '2'
+          test "$(pg -d car02_v474_disposable -c 'SELECT count(*) FROM v474_private.qa_quarantines WHERE review_state='\''quarantined_review_only'\''')" = '2'
+          test "$(pg -d car02_v474_disposable -c 'SELECT count(*) FROM v472_private.qa_inbox')" = '3'
+          echo V474_PG17_EIGHT_RACING_QUARANTINES_SINGLE_WINNER_PASS
+          echo V474_FINAL_RELEASE_NO_GO_HOLD_TRUE
