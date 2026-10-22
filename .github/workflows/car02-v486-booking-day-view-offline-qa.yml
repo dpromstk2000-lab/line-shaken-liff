@@ -1,0 +1,115 @@
+name: CAR02 V4.86 Booking Day View Offline QA Only (NO_GO HOLD)
+# Isolated synthetic fixtures only. Never create a booking or use providers.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-booking-day-view-r486.mjs'
+      - 'car02-booking-day-view-r486.test.mjs'
+      - 'car02-v486-day-view-contract.json'
+      - 'CAR02_V486_BOOKING_DAY_VIEW_OFFLINE.md'
+      - '.github/workflows/car02-v486-booking-day-view-offline-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-day-projection:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review-only sources without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin V4.85 and R52 originals and refuse provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V486_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-booking-calendar-policy-r485.mjs)" = 'e31633ec854b61b5fa1fb257f98080832cea6cbc'
+          test "$(git hash-object car02-booking-calendar-policy-r485.test.mjs)" = '96e7da70f238e5069699ca8de7b345e662e02e5a'
+          test "$(git hash-object car02-v485-booking-calendar-contract.json)" = '2e580fbb577c544f149d0b72e403e9c4f631b6ce'
+          test "$(git hash-object CAR02_V485_ONE_YEAR_CLOSED_DAYS_OFFLINE.md)" = '59f0559bc4038edff9a79093ce23bcd24357e749'
+          test "$(git hash-object .github/workflows/car02-v485-one-year-closed-days-offline-qa.yml)" = '6af66b549165237204580420fbe65e9b7aaec1ae'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-booking-day-view-r486.mjs car02-booking-day-view-r486.test.mjs car02-v486-day-view-contract.json CAR02_V486_BOOKING_DAY_VIEW_OFFLINE.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v486-booking-day-view-offline-qa.yml
+          echo V486_V485_ORIGINAL_PINNED_R52_RELEASE_LOCK_TRUE_NO_SECRETS
+      - name: Run all repository tests and require 1288 or more with zero failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-booking-day-view-r486.mjs
+          node --check car02-booking-day-view-r486.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v486-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v486-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v486-node.log")
+          test "$tests" -ge 1288
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v486-node.log"
+          echo V486_ALL_1288_PLUS_NODE_TESTS_PASS
+      - name: Assert UI rows are only read-only V4.85 synthetic candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {evaluateCar02BookingCalendarR485} from './car02-booking-calendar-policy-r485.mjs';
+          import {CAR02_V486_RELEASE_LOCK,CAR02_V486_SLOT_COUNT,
+            buildCar02BookingDayViewR486} from './car02-booking-day-view-r486.mjs';
+          const c=JSON.parse(readFileSync('car02-v486-day-view-contract.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');
+          assert.equal(c.version,'V4.86');
+          assert.equal(c.branch,'car02-v434-review-only');
+          assert.equal(c.baselineV485Run,39735698096);
+          assert.equal(c.baselineV485Commit,'08d28631c6013cf700776a1a8a68af5185879644');
+          assert.equal(c.baselineV485NodeTests,1244);
+          assert.equal(c.expectedNewNodeTests,44);
+          assert.equal(c.expectedMinimumNodeTests,1288);
+          assert.equal(c.existingQaBookingWindowDays,60);
+          assert.equal(c.slotsPerDay,18);
+          assert.equal(c.slotMinutes,30);
+          assert.equal(CAR02_V486_RELEASE_LOCK,true);
+          assert.equal(CAR02_V486_SLOT_COUNT,18);
+          for(const key of ['providerCredentialsRequired','providerConnectionAllowed',
+            'projectCreationAllowed','billingChangeAllowed','databaseMutationAllowed',
+            'lineDispatchAllowed','bookingCreationAllowed','commercialReleaseAllowed',
+            'nationalHolidayProviderChecked','realBookingCapacityVerified'])
+            assert.equal(c[key],false,key);
+          assert.equal(c.verifiedCommercialProviderProofs,0);
+          assert.equal(c.requiredCommercialProviderProofs,7);
+          assert.equal(c.releaseLock,true);
+          assert.equal(c.commercialDecision,'NO_GO_HOLD');
+
+          const now=new Date('2026-10-22T01:10:00Z');
+          const calendar={systemCode:'CAR02',environment:'isolated_qa',
+            coverageThrough:'2027-10-22',closedDays:['2026-11-03'],
+            occupiedSlots:['2026-11-05T10:30']};
+          const day='2026-11-05';
+          const view=buildCar02BookingDayViewR486({day,calendar,now});
+          assert.equal(view.slots.length,18);
+          assert.equal(view.candidateCount,17);
+          assert.equal(view.bookingCreationAllowed,false);
+          assert.equal(view.ownerCalendarApprovalVerified,false);
+          assert.equal(view.decision,'HOLD');
+          for(const slot of view.slots) {
+            const result=evaluateCar02BookingCalendarR485({
+              selection:{day,time:slot.time},calendar,now});
+            assert.equal(slot.selectableInOfflineUi,result.candidateAvailableInOfflineUi);
+            assert.equal(result.bookingCreationAllowed,false);
+          }
+          const closed=buildCar02BookingDayViewR486({day:'2026-11-03',calendar,now});
+          assert.equal(closed.candidateCount,0);
+          assert.equal(closed.slots.length,0);
+          const bad=buildCar02BookingDayViewR486({day,calendar:{...calendar,environment:'production'},now});
+          assert.equal(bad.candidateCount,0);
+          assert.equal(bad.decision,'HOLD');
+          console.log('V486_DAY_VIEW_SOURCE_PARITY_18_SLOTS_PASS');
+          console.log('V486_ISOLATED_READONLY_NO_PROVIDER_NO_GO_HOLD_TRUE');
+          NODE
