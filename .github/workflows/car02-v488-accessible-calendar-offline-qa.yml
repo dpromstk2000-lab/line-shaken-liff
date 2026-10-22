@@ -1,0 +1,112 @@
+name: CAR02 V4.88 Accessible Read-Only Calendar QA (NO_GO HOLD)
+# No external connections, deployment, checkout, secrets, database or LINE dispatch.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-booking-calendar-accessible-r488.mjs'
+      - 'car02-booking-calendar-accessible-r488.test.mjs'
+      - 'CAR02_V488_ACCESSIBLE_BOOKING_CALENDAR_READONLY_PREVIEW.html'
+      - 'car02-v488-accessible-calendar-contract.json'
+      - 'CAR02_V488_ACCESSIBLE_CALENDAR_OFFLINE.md'
+      - '.github/workflows/car02-v488-accessible-calendar-offline-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-accessible-calendar:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review branch without retained credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin R52 V4.86 and official V4.87 originals; prohibit provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V488_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-booking-day-view-r486.mjs)" = '56217a205c4606e4c4bf63480243fa7f4529807b'
+          test "$(git hash-object car02-booking-month-grid-r487.mjs)" = 'ad2fcd04d78ded2ff62061c7a9440e035ff29ee9'
+          test "$(git hash-object car02-booking-month-grid-r487.test.mjs)" = '6b1297b3b83e9c281043d0ed2d68f72d686d6036'
+          test "$(git hash-object car02-booking-calendar-preview-r487.mjs)" = 'c0d10c44fa6b33695c258f6051a5d40aab476142'
+          test "$(git hash-object CAR02_V487_BOOKING_CALENDAR_READONLY_PREVIEW.html)" = 'ea71b8790e2abcb2c9299ef4534a0bac0d7398e4'
+          test "$(git hash-object car02-v487-calendar-ui-contract.json)" = '5b3653fe62dafa859aab5c5d524095da3d63cfa5'
+          test "$(git hash-object CAR02_V487_CALENDAR_UI_OFFLINE.md)" = 'abea3f0e5a9f0b4cc55db067b697fae7fab4a043'
+          test "$(git hash-object .github/workflows/car02-v487-booking-calendar-ui-offline-qa.yml)" = '629c0e9265a2b54d2df4f8117e3dea605b11f32a'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-booking-calendar-accessible-r488.mjs car02-booking-calendar-accessible-r488.test.mjs CAR02_V488_ACCESSIBLE_BOOKING_CALENDAR_READONLY_PREVIEW.html car02-v488-accessible-calendar-contract.json CAR02_V488_ACCESSIBLE_CALENDAR_OFFLINE.md; do
+            test -s "$f"
+          done
+          test -s .github/workflows/car02-v488-accessible-calendar-offline-qa.yml
+          echo V488_R52_V486_V487_PINNED_NO_SECRETS_RELEASE_LOCK_TRUE
+      - name: Test all repository components and require at least 1356 passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-booking-calendar-accessible-r488.mjs
+          node --check car02-booking-calendar-accessible-r488.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v488-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v488-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v488-node.log")
+          test "$tests" -ge 1356
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v488-node.log"
+          echo V488_ALL_1356_PLUS_NODE_TESTS_PASS
+      - name: Verify navigation and strict no-booking no-network contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V488_RELEASE_LOCK} from './car02-booking-calendar-accessible-r488.mjs';
+          import {CAR02_V487_RELEASE_LOCK} from './car02-booking-month-grid-r487.mjs';
+          import {CAR02_V486_RELEASE_LOCK} from './car02-booking-day-view-r486.mjs';
+          const contract=JSON.parse(readFileSync('car02-v488-accessible-calendar-contract.json','utf8'));
+          assert.equal(contract.systemCode,'CAR02');
+          assert.equal(contract.version,'V4.88');
+          assert.equal(contract.branch,'car02-v434-review-only');
+          assert.equal(contract.baselineV487Run,39739191331);
+          assert.equal(contract.baselineV487Commit,'f41c5ae28ec2753804d4c357beaef64629e80f31');
+          assert.equal(contract.baselineV487NodeTests,1330);
+          assert.equal(contract.newNodeTests,26);
+          assert.equal(contract.expectedMinimumNodeTests,1356);
+          assert.equal(contract.bookingHorizonDays,60);
+          assert.equal(contract.slotMinutes,30);
+          for(const flag of ['keyboardArrowNavigation','keyboardHomeEndNavigation',
+            'rovingSingleTabStop','preserveFocusedSelectedDateButton',
+            'preserveFocusedSelectedTimeButton','revalidateAfterElapsedTime',
+            'screenReaderStatusLive','responsivePreview','syntheticOnly','releaseLock'])
+            assert.equal(contract[flag],true,flag);
+          for(const flag of ['providerCredentialsRequired','providerConnectionAllowed',
+            'projectCreationAllowed','billingChangeAllowed','databaseMutationAllowed',
+            'lineDispatchAllowed','bookingCreationAllowed','commercialReleaseAllowed',
+            'serverDeploymentPerformed','realOwnerHolidayInventoryVerified',
+            'realBookingCapacityVerified','authenticatedStaffOrCustomerVerified'])
+            assert.equal(contract[flag],false,flag);
+          assert.equal(contract.verifiedCommercialProviderProofs,0);
+          assert.equal(contract.requiredCommercialProviderProofs,7);
+          assert.equal(contract.commercialDecision,'NO_GO_HOLD');
+          assert.equal(CAR02_V486_RELEASE_LOCK,true);
+          assert.equal(CAR02_V487_RELEASE_LOCK,true);
+          assert.equal(CAR02_V488_RELEASE_LOCK,true);
+          const html=readFileSync(contract.previewFile,'utf8');
+          const controller=readFileSync(contract.controllerFile,'utf8');
+          assert.ok(html.includes("connect-src 'none'"));
+          assert.ok(html.includes('noindex,nofollow'));
+          assert.ok(html.includes('data-car02-r488-preview'));
+          assert.ok(html.includes('aria-live="polite"'));
+          assert.ok(!/<form\b|<input\b/i.test(html));
+          for(const re of [/\bfetch\s*\(/,/\bXMLHttpRequest\b/,/\bWebSocket\b/,
+            /\blocalStorage\b/,/\bsessionStorage\b/])
+            assert.ok(!re.test(controller));
+          console.log('V488_FOCUS_ROVING_NAVIGATION_AND_STALE_SLOT_GUARD_PASS');
+          console.log('V488_NO_NETWORK_NO_PROVIDER_NO_BOOKING_NO_GO_HOLD_TRUE');
+          NODE
