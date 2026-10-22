@@ -1,0 +1,17 @@
+{
+  "version": "V4.73",
+  "mode": "disposable_synthetic_webhook_worker_lease_qa_only",
+  "reviewBranch": "car02-v434-review-only",
+  "prerequisite": "V472 committed pending inbox receipt, never a production webhook acknowledgement",
+  "tested": ["trusted isolated worker identity", "pending receipt digest and tenant matching", "non-reusable ephemeral lease token hash", "bounded lease TTL", "lease expiry and epoch fencing", "PostgreSQL advisory-free row lock single claimant", "stale worker completion refused", "rollback and private schema access denied"],
+  "unverifiedCommercialConditions": ["actual Supabase Auth sessions", "production operator and worker IAM", "post-commit business transaction generation fence", "real LINE send and delivery ambiguity", "external immutable evidence custody", "independent signing key custody", "staging end-to-end integration"],
+  "releasePermitted": false,
+  "jobDispatched": false,
+  "realWebhookAcknowledged": false,
+  "realWorkerVerified": false,
+  "lineDeliveryProven": false,
+  "realSupabaseUsed": false,
+  "realBusinessWrites": false,
+  "liveProviderCredentialsUsed": false,
+  "hardReleaseLock": "car02-edge-entry-r52.ts:CAR02_RELEASE_LOCK=true"
+}
