@@ -1,0 +1,35 @@
+{
+  "systemCode": "CAR02",
+  "version": "V4.82",
+  "evidenceClass": "github_actions_run_job_step_metadata_only",
+  "branch": "car02-v434-review-only",
+  "baselineV481Run": 39722231225,
+  "baselineV481Commit": "135762874c46c984332581f145d6d833edf562b6",
+  "baselineV481NodeTests": 1062,
+  "baselineV481Failed": 0,
+  "expectedNewTests": 46,
+  "expectedTotalNodeTests": 1108,
+  "runPin": {
+    "runId": 39722231225,
+    "workflowId": 392467505,
+    "headSha": "135762874c46c984332581f145d6d833edf562b6",
+    "runName": "CAR02 V4.81 Actual GitHub Ten Jobs and Mandatory Steps Read-Only (NO_GO HOLD)",
+    "workflowPath": ".github/workflows/car02-v481-actual-github-job-step-qa.yml",
+    "jobId": 119638086357,
+    "jobName": "read-only-real-ci-step-attestation",
+    "requiredSteps": [
+      "Set up job",
+      "Checkout restricted review branch without persisted credentials",
+      "Pin R52 and V480 real sources and reject provider credentials",
+      "Run all 1062 or more Node tests, no failures",
+      "Read the ten actual historical GitHub jobs and required steps, never authorize release",
+      "Post Checkout restricted review branch without persisted credentials",
+      "Complete job"
+    ]
+  },
+  "releasePermitted": false,
+  "realProviderProofsVerified": 0,
+  "realOwnerApprovalVerified": false,
+  "businessWritesAuthorized": false,
+  "lineDispatchAllowed": false
+}
