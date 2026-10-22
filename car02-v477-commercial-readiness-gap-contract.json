@@ -1,0 +1,26 @@
+{
+  "version": "V4.77",
+  "reviewBranch": "car02-v434-review-only",
+  "baselineV476CI": 39708691820,
+  "baselineV476Commit": "06528f1c5533895bfa40d01e655b1ea57b854782",
+  "baselineNodeTests": 849,
+  "releasePermitted": false,
+  "realSupabaseAuthVerified": false,
+  "realWorkerIAMVerified": false,
+  "realBookingTransactionVerified": false,
+  "realLineDeliveryVerified": false,
+  "realIndependentWORMVerified": false,
+  "realKeyCustodyVerified": false,
+  "realStagingOwnerApproved": false,
+  "proofKeys": [
+    "provider_session_revocation",
+    "staff_and_reviewer_identity",
+    "transaction_final_auth_fence",
+    "line_webhook_send_and_delivery",
+    "independent_immutable_evidence",
+    "independent_key_custody",
+    "owner_approved_isolated_staging_acceptance"
+  ],
+  "assessment": "OFFLINE_MOCK_CLAIMS_ONLY_NO_GO",
+  "note": "V4.76 official review branch CI passed. No mock claim is a real-world proof. Real provider/owner acceptance unverified."
+}
