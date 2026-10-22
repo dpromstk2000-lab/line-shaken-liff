@@ -1,0 +1,98 @@
+name: CAR02 V4.80 Actual GitHub Actions Ten-Run Provenance Read-Only (NO_GO HOLD)
+# Restricted review branch, GitHub API reads only. No production IAM/LINE/Supabase/Worker.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-ci-provenance-audit-r480.mjs'
+      - 'car02-ci-provenance-audit-r480.test.mjs'
+      - 'car02-v480-ci-run-provenance-contract.json'
+      - 'CAR02_V480_REAL_CI_PROVENANCE.md'
+      - '.github/workflows/car02-v480-actual-github-provenance-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-only-historical-ci-provenance:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout review-only branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify original R52 V477 V478 V479 sources and forbid provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo 'V480_LIVE_PROVIDER_CREDENTIAL_DENIED' >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-commercial-gap-audit-r477.mjs)" = '8daa4cf58ae872e9cdc09e56383ac2007a3992bf'
+          test "$(git hash-object car02-staging-boundary-preflight-r478.mjs)" = 'a8fd17937bc1e274ff571c8eb1691327c7cc505a'
+          test "$(git hash-object car02-staging-evidence-chain-r479.mjs)" = '55930328674fa691da23b418b8ecb1fdbbfa3481'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for p in car02-ci-provenance-audit-r480.mjs car02-ci-provenance-audit-r480.test.mjs car02-v480-ci-run-provenance-contract.json CAR02_V480_REAL_CI_PROVENANCE.md; do test -s "$p"; done
+          test -s .github/workflows/car02-v480-actual-github-provenance-qa.yml
+          test ! -e car02-v480-actual-github-provenance-qa.yml
+          echo V480_R52_R477_R478_R479_GENUINE_SOURCE_PINS_PASS
+      - name: Run all 1022 plus Node tests without failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-ci-provenance-audit-r480.mjs
+          node --check car02-ci-provenance-audit-r480.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v480-node.log"
+          count=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v480-node.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v480-node.log")
+          test "$count" -ge 1022
+          test "$passed" = "$count"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v480-node.log"
+          echo V480_NODE_ALL_1022_PLUS_REGRESSION_PASS
+      - name: Query the ten REAL prior GitHub CI runs READ ONLY and keep NO_GO
+        shell: bash
+        env:
+          CAR02_READ_ONLY_ACTIONS_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "${CAR02_READ_ONLY_ACTIONS_TOKEN:-}"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V480_RELEASE_LOCK,CAR02_V480_REPOSITORY,CAR02_V480_RUN_PINS,
+            createCar02ReadOnlyCIProvenanceAuditorR480} from './car02-ci-provenance-audit-r480.mjs';
+          const c=JSON.parse(readFileSync('car02-v480-ci-run-provenance-contract.json','utf8'));
+          assert.equal(CAR02_V480_RELEASE_LOCK,true);
+          assert.equal(c.releasePermitted,false);
+          assert.equal(c.realProviderProofCount,0);
+          assert.equal(CAR02_V480_RUN_PINS.length,10);
+          assert.deepEqual(c.actualRunPins,CAR02_V480_RUN_PINS);
+          const permittedRunIds=new Set(CAR02_V480_RUN_PINS.map(x=>x.runId));
+          const auditor=createCar02ReadOnlyCIProvenanceAuditorR480({
+            authorizeAuditor:async()=>({verified:true,role:'ci_provenance_auditor',mode:'isolated_qa',shopCode:'qa_shop_a'}),
+            inspectIsolation:async()=>({verified:true,testOnly:true,environment:'read_only_github_ci',providerCallsEnabled:false}),
+            readRun:async({runId,repository})=>{
+              assert.equal(repository,CAR02_V480_REPOSITORY);
+              assert.ok(permittedRunIds.has(runId));
+              const url=`https://api.github.com/repos/${CAR02_V480_REPOSITORY}/actions/runs/${runId}`;
+              const response=await fetch(url,{headers:{
+                Authorization:`Bearer ${process.env.CAR02_READ_ONLY_ACTIONS_TOKEN}`,
+                Accept:'application/vnd.github+json',
+                'X-GitHub-Api-Version':'2022-11-28'},signal:AbortSignal.timeout(15000)});
+              assert.equal(response.status,200,'GitHub run API must return HTTP 200');
+              return response.json();
+            }});
+          const result=await auditor.inspect();
+          assert.equal(result.reason,'ten_real_github_ci_runs_verified_still_no_commercial_proofs');
+          assert.equal(result.checkedActualGithubRuns,10);
+          assert.equal(result.releasePermitted,false);
+          assert.equal(result.realProviderProofsVerified,0);
+          assert.equal(result.businessWritesAuthorized,false);
+          console.log('V480_ACTUAL_GITHUB_API_TEN_PINNED_CI_RUNS_READ_ONLY_PASS');
+          console.log('V480_GITHUB_CI_PROVENANCE_IS_NOT_PROVIDER_OR_OWNER_PROOF_PASS');
+          NODE
+          echo V480_FINAL_RELEASE_NO_GO_HOLD_TRUE
