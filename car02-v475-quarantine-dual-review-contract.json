@@ -1,0 +1,26 @@
+{
+  "version": "V4.75",
+  "reviewBranch": "car02-v434-review-only",
+  "releasePermitted": false,
+  "quarantineLifted": false,
+  "realBusinessWrites": false,
+  "jobDispatched": false,
+  "lineDeliveryProven": false,
+  "realWebhookAcknowledged": false,
+  "actualDualHumanReviewProven": false,
+  "usesRealSupabase": false,
+  "usesRealLine": false,
+  "reviewersAreRealPeopleVerified": false,
+  "scope": "disposable offline dual-review attestation against synthetic quarantine evidence only",
+  "backend": "isolated_mock_readers and disposable PostgreSQL 17 fixture",
+  "requiresIndependentReviewers": 2,
+  "unverifiedCommercialConditions": [
+    "Real Supabase Auth and revocation binding",
+    "Real operator and worker IAM",
+    "In-transaction postcommit membership fencing",
+    "Actual LINE delivery and webhook receipt semantics",
+    "External immutable evidence retention",
+    "Independent production signing key custody",
+    "Staging end-to-end acceptance and explicit GO authority"
+  ]
+}
