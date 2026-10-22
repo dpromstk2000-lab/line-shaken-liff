@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>DPRO CAR02 V4.88 | キーボード対応・予約カレンダー隔離プレビュー</title>
+  <style>
+    :root {color-scheme:light;--navy:#172d46;--ink:#203850;--muted:#51687c;--line:#d5e1eb;--surface:#fff;--canvas:#f2f6fa;--blue:#145f9a;--pale:#e9f4ff;--warn:#94600c;font:17px/1.6 system-ui,-apple-system,"Noto Sans JP",Meiryo,sans-serif}
+    *{box-sizing:border-box}html,body{max-width:100%;margin:0}body{background:var(--canvas);color:var(--ink)}button{font:inherit;min-height:48px;cursor:pointer}button:disabled{cursor:not-allowed}button:focus-visible{outline:3px solid #e5a53b;outline-offset:2px}h1,h2,p{margin-top:0}h1{font-size:clamp(25px,3.4vw,34px);line-height:1.4;margin-bottom:7px}h2{font-size:21px;line-height:1.4;margin-bottom:8px}
+    .banner{background:#fff0d0;border-bottom:1px solid #e9d2a0;color:#72501a;text-align:center;padding:12px 18px;font-weight:850;font-size:15px}.top{background:var(--navy);color:#fff;padding:17px max(16px,calc((100vw - 1180px)/2));display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center}.brand{font-size:22px;font-weight:900}.brand small{display:block;font-size:13px;font-weight:600;color:#d0e0ef}.pill{border:1px solid #dbb66a;border-radius:100px;color:#ffe7a5;padding:6px 12px;font-size:13px;font-weight:850}
+    .wrap{max-width:1200px;margin:0 auto;padding:29px 18px 66px}.lead{color:var(--muted);font-size:16px}.layout{display:grid;grid-template-columns:minmax(0,1.26fr) minmax(0,.9fr);align-items:start;gap:18px}.stack{display:grid;gap:17px;min-width:0}.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;min-width:0;box-shadow:0 4px 16px #1e3b5810}.note{padding:14px 17px;background:#e6f3ff;color:#154c76;border-radius:11px;margin:0 0 20px;border:1px solid #c3ddee}.warn{padding:13px 15px;border-radius:11px;background:#fff5e2;border:1px solid #efdbb4;color:#78521b;font-weight:700;font-size:15px}
+    .monthbar{display:flex;justify-content:space-between;gap:7px;align-items:center;margin:17px 0}.monthbar strong{font-size:23px;text-align:center}.nav{width:56px;border:1px solid #bfcfdf;border-radius:10px;background:#fff;color:#155b8e;font-weight:900}.nav:disabled{opacity:.35}.week,.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.week span{text-align:center;font-size:13px;font-weight:850;color:#4e647a}.week span:last-child{color:#a65345}.calendar-day{width:100%;min-width:0;border:1px solid #b9d1e4;background:#fff;color:#175984;border-radius:9px;font-size:17px;font-weight:900;padding:8px 1px}.calendar-day:disabled{background:#eff2f6;color:#8795a2;border-color:#e1e7ed}.calendar-day[aria-pressed="true"]{background:#155f98;color:#fff}.calendar-day[aria-current="date"]{box-shadow:inset 0 0 0 2px #bb8a37}.empty{min-height:48px}.legend{font-size:13px;color:#557088;margin:13px 0 0}
+    .times{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:14px 0}.time{width:100%;min-width:0;background:#e9f4ff;border:1px solid #98c0df;border-radius:10px;color:#155487;font-weight:850;padding:7px 3px}.time:disabled{background:#f0f2f5;border-color:#e0e4e7;color:#8795a2;opacity:1}.time[aria-pressed="true"]{background:#155f98;color:#fff}.small{font-size:14px;color:var(--muted)}.rows{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0}.rows>*{padding:12px 0;border-bottom:1px solid #e5ebf0;overflow-wrap:anywhere}.rows span{color:var(--muted)}.rows strong{font-size:18px}.action{width:100%;border:none;background:#155f98;color:#fff;border-radius:11px;padding:13px 18px;font-weight:900;margin-top:18px}.action:disabled{background:#dce6ee;color:#60798c}.status{margin-top:16px;padding:14px 17px;border-radius:11px;background:#e8f4ff;border:1px solid #c6dff2;color:#20577e;min-height:70px;font-size:15px;font-weight:750}.footer{margin-top:28px;font-size:13px;color:#667b8e;text-align:center}
+    @media(max-width:850px){.layout{grid-template-columns:1fr}.wrap{padding:23px 14px 55px}.card{padding:20px}.top{padding:15px}}@media(max-width:480px){:root{font-size:16px}.card{padding:15px}.wrap{padding:17px 10px 47px}.week,.days{gap:4px}.calendar-day{font-size:16px;min-height:47px}.times{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.rows{grid-template-columns:80px minmax(0,1fr)}.monthbar strong{font-size:20px}.nav{width:48px}}
+  </style>
+</head>
+  <body data-car02-r488-preview>
+  <div class="banner">隔離デモ：表示される予約枠はすべて架空です。予約・仮確保・通知は成立しません。</div>
+  <header class="top"><div class="brand">DPRO CAR02<small>V4.88 キーボード対応カレンダー／UI確認用</small></div><span class="pill">REVIEW ONLY · NO_GO</span></header>
+  <main class="wrap">
+    <h1>車検・点検の予約日時を選択</h1>
+    <p class="lead">日付と30分単位の時間候補を選ぶ操作を確認できます。店舗の正式な空き状況ではありません。</p>
+    <div class="note">日付の受付範囲は本日から60日先まで。日曜と検査用休業日は選択できません。表示は日本時間です。</div>
+    <div class="layout">
+      <div class="stack">
+        <section class="card" aria-labelledby="heading-day">
+          <h2 id="heading-day">① 日付を選択</h2>
+          <div class="monthbar"><button class="nav" id="prev-month" aria-label="前の月" type="button">◀</button><strong id="month-title" aria-live="polite">—</strong><button class="nav" id="next-month" aria-label="次の月" type="button">▶</button></div>
+          <div class="week" aria-hidden="true"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div>
+          <div class="days" id="days" role="group" aria-label="隔離カレンダーの日付"></div>
+          <p class="legend">青文字：デモ候補あり ／ 灰色：選択不可 ／ 青背景：選択中</p>
+          <p class="legend">キーボード：Tabで日付へ移動、矢印キーで日付間を移動、Enterで選択。Home／Endで週の先頭・末尾へ移動します。</p>
+        </section>
+        <section class="card" aria-labelledby="heading-time">
+          <h2 id="heading-time">② 時間を選択</h2>
+          <p id="slot-description" class="small">日付を選ぶと30分単位の時間候補が表示されます。</p>
+          <div class="times" id="slots" role="group" aria-label="隔離30分枠"></div>
+        </section>
+      </div>
+      <div class="stack">
+        <section class="card" aria-labelledby="heading-summary">
+          <h2 id="heading-summary">③ 選択内容の確認</h2>
+          <p class="warn">実際の氏名・電話番号・車両情報は入力しないでください。この画面では保存を行いません。</p>
+          <div class="rows"><span>日付</span><strong id="chosen-day">未選択</strong><span>時間</span><strong id="chosen-time">未選択</strong><span>予約状況</span><strong>未予約（画面確認のみ）</strong></div>
+          <button id="confirm-preview" class="action" type="button" disabled>選択内容を画面で確認する</button>
+          <div id="notice" class="status" role="status" aria-live="polite">安全な隔離プレビューです。</div>
+        </section>
+        <section class="card"><h2>安全性について</h2><p class="small">V4.85の休日・時刻判定とV4.86の候補時間判定を使用しています。ブラウザからLINE・Supabase・本番Worker・外部サービスへ通信しません。</p><p class="small">店休日は合成データで、実際の店舗承認や祝日連携は未確認です。将来の販売・運用には正式な接続検査が必要です。</p></section>
+      </div>
+    </div>
+    <p class="footer">DPRO CAR02 V4.88 | ACCESSIBLE ISOLATED UI | NO NETWORK | NO DATABASE | NO LINE | NO BILLING | NO_GO/HOLD</p>
+  </main>
+  <script type="module" src="./car02-booking-calendar-accessible-r488.mjs"></script>
+</body>
+</html>
