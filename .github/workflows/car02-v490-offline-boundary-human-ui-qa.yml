@@ -1,0 +1,111 @@
+name: CAR02 V4.90 Offline Boundary and Human UI QA (NO_GO HOLD)
+# Review-only, synthetic-readonly QA. No deployment, real booking or provider calls.
+'on':
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-booking-boundary-sweep-r490.mjs'
+      - 'car02-booking-boundary-sweep-r490.test.mjs'
+      - 'car02-v490-offline-boundary-contract.json'
+      - 'CAR02_V490_BOUNDARY_AND_HUMAN_UI_QA.md'
+      - '.github/workflows/car02-v490-offline-boundary-human-ui-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-boundary-audit:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preserve R52 lock and immutability of the V4.89 accepted screen
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V490_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$(git hash-object CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html)" = '927221d54fce04dbdf246d85bb5d3809a65ab820'
+          test "$(sha256sum CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html | awk '{print $1}')" = '6b07eacfb56aaf2004fdf4bbddb2e40563a3e957304fad3c9abcd763a5ebbc38'
+          test "$(git hash-object .github/workflows/car02-v489-standalone-offline-preview-qa.yml)" = '8ae62a0dcd1a4fd9458c3ccc61415e78523461b8'
+          for f in car02-booking-boundary-sweep-r490.mjs car02-booking-boundary-sweep-r490.test.mjs car02-v490-offline-boundary-contract.json CAR02_V490_BOUNDARY_AND_HUMAN_UI_QA.md .github/workflows/car02-v490-offline-boundary-human-ui-qa.yml; do test -s "$f"; done
+          echo V490_R52_V489_FROZEN_REVIEW_ONLY_HARD_LOCK_PASS
+      - name: Execute deterministic Japanese-time boundary sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-booking-boundary-sweep-r490.mjs
+          node --check car02-booking-boundary-sweep-r490.test.mjs
+          node car02-booking-boundary-sweep-r490.mjs | tee "$RUNNER_TEMP/v490-boundary.json"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const c=JSON.parse(readFileSync('car02-v490-offline-boundary-contract.json','utf8'));
+          const r=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/v490-boundary.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');assert.equal(c.version,'V4.90');
+          assert.equal(c.branch,'car02-v434-review-only');
+          assert.equal(c.baseRunId,39741937815);assert.equal(c.baseNodeTests,1371);
+          assert.equal(c.newNodeTests,25);assert.equal(c.expectedMinimumNodeTests,1371);
+          assert.equal(c.humanUiReview.verificationClass,'visual_review_only');
+          assert.equal(c.humanUiReview.realPhoneHardwareTested,false);
+          assert.equal(c.humanUiReview.actualBookingTested,false);
+          assert.equal(c.humanUiReview.providerProof,false);
+          assert.deepEqual([r.checkedClocks,r.checkedDays,r.checkedSlots,r.checkedMonths],[8,496,8928,25]);
+          assert.equal(r.boundaryVerified,true);assert.deepEqual(r.findings,[]);
+          for(const x of [r,c]){
+            assert.equal(x.releaseLock,true);
+            assert.equal(x.commercialDecision,'NO_GO_HOLD');
+            assert.equal(x.bookingCreationAllowed,false);
+          }
+          assert.equal(r.providerProofsVerified,0);
+          assert.equal(c.verifiedCommercialProviderProofs,0);
+          assert.equal(c.requiredCommercialProviderProofs,7);
+          console.log('V490_496_DAYS_8928_HALFHOURS_25_MONTHS_BOUNDARY_PASS');
+          console.log('V490_HUMAN_UI_OBSERVATION_NOT_PROVIDER_OR_PHONE_PROOF_PASS');
+          NODE
+      - name: Verify 25 new tests independently with TAP before repository suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test-reporter=tap car02-booking-boundary-sweep-r490.test.mjs | tee "$RUNNER_TEMP/v490-new-tests.log"
+          new_total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v490-new-tests.log")
+          new_pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v490-new-tests.log")
+          test "$new_total" = '25'
+          test "$new_pass" = "$new_total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v490-new-tests.log"
+          echo V490_NEW_25_TAP_TESTS_PASS
+      - name: Run all repository Node tests and preserve baseline minimum
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v490-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v490-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v490-node.log")
+          test "$tests" -ge 1371
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v490-node.log"
+          echo V490_ALL_REPOSITORY_TESTS_BASELINE_1371_PLUS_PASS
+      - name: Maintain commercial NO_GO HOLD and zero real-provider proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const c=JSON.parse(readFileSync('car02-v490-offline-boundary-contract.json','utf8'));
+          assert.equal(c.productionDeployAllowed,false);
+          assert.equal(c.databaseMutationAllowed,false);
+          assert.equal(c.providerConnectionAllowed,false);
+          assert.equal(c.lineDispatchAllowed,false);
+          assert.equal(c.billingChangeAllowed,false);
+          assert.equal(c.verifiedCommercialProviderProofs,0);
+          assert.equal(c.commercialDecision,'NO_GO_HOLD');
+          console.log('V490_NO_GO_HOLD_RELEASE_LOCK_ZERO_OF_SEVEN_TRUE');
+          NODE
