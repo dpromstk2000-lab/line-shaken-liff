@@ -1,0 +1,91 @@
+name: CAR02 V4.83 Synthetic Supabase Staging Capacity Gate Only (NO_GO HOLD)
+# No Supabase project connection, provider token, database call, SQL, deploy, or release.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-staging-capacity-gate-r483.mjs'
+      - 'car02-staging-capacity-gate-r483.test.mjs'
+      - 'car02-v483-staging-capacity-contract.json'
+      - 'CAR02_V483_STAGING_CAPACITY_READONLY.md'
+      - '.github/workflows/car02-v483-supabase-capacity-preflight-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-free-plan-capacity-gate:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review-only branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin R52 and V482 originals and reject provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V483_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-ci-run-verdict-audit-r482.mjs)" = '1f66f5def53c4caddeadf50216f9c7ff6560877a'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-staging-capacity-gate-r483.mjs car02-staging-capacity-gate-r483.test.mjs car02-v483-staging-capacity-contract.json CAR02_V483_STAGING_CAPACITY_READONLY.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v483-supabase-capacity-preflight-qa.yml
+          echo V483_ORIGINALS_PINNED_RELEASE_LOCKED_NO_PROVIDER_SECRETS_PASS
+      - name: Run all Node tests and at least 1143 passing
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-staging-capacity-gate-r483.mjs
+          node --check car02-staging-capacity-gate-r483.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v483-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v483-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v483-node.log")
+          test "$tests" -ge 1143
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v483-node.log"
+          echo V483_ALL_1143_PLUS_NODE_TESTS_PASS
+      - name: Verify synthetic-only metadata and non-waivable HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V483_RELEASE_LOCK,CAR02_V483_FREE_ACTIVE_PROJECT_LIMIT,
+            evaluateCar02StagingCapacityR483} from './car02-staging-capacity-gate-r483.mjs';
+          const contract=JSON.parse(readFileSync('car02-v483-staging-capacity-contract.json','utf8'));
+          assert.equal(contract.systemCode,'CAR02');
+          assert.equal(contract.version,'V4.83');
+          assert.equal(contract.baselineV482Run,39724209237);
+          assert.equal(contract.baselineV482Commit,'82b749a7511287e13993235311f8bb651ad8d337');
+          assert.equal(contract.baselineV482NodeTests,1108);
+          assert.equal(contract.expectedNewNodeTests,35);
+          assert.equal(contract.expectedMinimumNodeTests,1143);
+          assert.equal(contract.freeActiveProjectLimit,CAR02_V483_FREE_ACTIVE_PROJECT_LIMIT);
+          assert.equal(CAR02_V483_RELEASE_LOCK,true);
+          for(const key of ['providerCredentialsRequired','projectCreationAllowed',
+            'existingProjectReuseAllowed','billingChangeAllowed','databaseAccessAllowed',
+            'commercialReleaseAllowed','realOwnerApprovalVerified'])assert.equal(contract[key],false);
+          assert.equal(contract.verifiedCommercialProviderProofs,0);
+          assert.equal(contract.requiredCommercialProviderProofs,7);
+          const r=evaluateCar02StagingCapacityR483({
+            organizations:[{id:'mock_only'}],
+            organizationDetails:[{id:'mock_only',plan:'free'}],
+            projects:[{id:'mock_one',organization_id:'mock_only',status:'ACTIVE_HEALTHY'},
+              {id:'mock_two',organization_id:'mock_only',status:'ACTIVE_HEALTHY'}]
+          });
+          assert.equal(r.reason,'free_capacity_exhausted');
+          assert.equal(r.freeSlotsUpperBound,0);
+          assert.equal(r.projectCreationAllowed,false);
+          assert.equal(r.existingProjectReuseAllowed,false);
+          assert.equal(r.commercialReleaseAllowed,false);
+          assert.equal(r.commercialProviderProofsVerified,0);
+          console.log('V483_TWO_FREE_ACTIVE_PROJECTS_ZERO_CAPACITY_HOLD_PASS');
+          console.log('V483_NO_REAL_SUPABASE_PROJECT_ACCESS_IN_CI_PASS');
+          console.log('V483_FINAL_COMMERCIAL_NO_GO_HOLD_TRUE');
+          NODE
