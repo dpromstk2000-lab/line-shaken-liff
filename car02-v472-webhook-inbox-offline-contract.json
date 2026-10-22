@@ -1,0 +1,28 @@
+{
+  "version": "V4.72",
+  "scope": "review_branch_and_disposable_postgresql17_only",
+  "reviewBranch": "car02-v434-review-only",
+  "releasePermitted": false,
+  "realWebhookAcknowledged": false,
+  "realLineProviderVerified": false,
+  "lineMessageDeliveryProven": false,
+  "realSupabaseUsed": false,
+  "customerDataAccessed": false,
+  "realBusinessWrites": false,
+  "keyCustodyProven": false,
+  "dependencies": [
+    "V4.71 raw bytes HMAC verification and event id collision review",
+    "trusted review-only shop binding from independent configuration",
+    "separate single-event synthetic inbox atomic claim and read-after-claim",
+    "PostgreSQL17 disposable role and concurrent unique event id checks"
+  ],
+  "unsupported": [
+    "batch-level transactional ingest: more than one event is refused",
+    "real HTTP 2xx ACK after commit",
+    "real Supabase session and tenant IAM",
+    "sending a LINE reply or push message",
+    "processing a real reservation update",
+    "external immutable evidence store"
+  ],
+  "nextGate": "Isolated staging project and independent end-to-end review required before real webhook can be acknowledged"
+}
