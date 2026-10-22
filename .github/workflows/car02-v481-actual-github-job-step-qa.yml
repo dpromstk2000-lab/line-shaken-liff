@@ -1,0 +1,105 @@
+name: CAR02 V4.81 Actual GitHub Ten Jobs and Mandatory Steps Read-Only (NO_GO HOLD)
+# Strictly READ ONLY GitHub Actions API, no real LINE, Supabase, Worker, WORM or owner approval.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-ci-job-step-audit-r481.mjs'
+      - 'car02-ci-job-step-audit-r481.test.mjs'
+      - 'car02-v481-ci-job-step-provenance-contract.json'
+      - 'CAR02_V481_JOB_STEP_PROVENANCE.md'
+      - '.github/workflows/car02-v481-actual-github-job-step-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-only-real-ci-step-attestation:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout restricted review branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin R52 and V480 real sources and reject provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V481_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-ci-provenance-audit-r480.mjs)" = 'f22b19c3c7fc1ef33538ca21b25c8abe13f1632c'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-ci-job-step-audit-r481.mjs car02-ci-job-step-audit-r481.test.mjs car02-v481-ci-job-step-provenance-contract.json CAR02_V481_JOB_STEP_PROVENANCE.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v481-actual-github-job-step-qa.yml
+          test ! -e car02-v481-actual-github-job-step-qa.yml
+          echo V481_GENUINE_R52_R480_PINS_AND_NO_PROVIDER_CREDENTIALS_PASS
+      - name: Run all 1062 or more Node tests, no failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-ci-job-step-audit-r481.mjs
+          node --check car02-ci-job-step-audit-r481.test.mjs
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v481-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v481-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v481-node.log")
+          test "$tests" -ge 1062
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v481-node.log"
+          echo V481_ALL_NODE_1062_PLUS_TESTS_PASS
+      - name: Read the ten actual historical GitHub jobs and required steps, never authorize release
+        shell: bash
+        env:
+          CAR02_ACTIONS_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "${CAR02_ACTIONS_READ_TOKEN:-}"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {CAR02_V480_REPOSITORY,CAR02_V480_RUN_PINS} from './car02-ci-provenance-audit-r480.mjs';
+          import {CAR02_V481_RELEASE_LOCK,CAR02_V481_JOB_PINS,
+           createCar02ReadOnlyJobStepAuditorR481} from './car02-ci-job-step-audit-r481.mjs';
+          const contract=JSON.parse(readFileSync('car02-v481-ci-job-step-provenance-contract.json','utf8'));
+          assert.equal(CAR02_V481_RELEASE_LOCK,true);
+          assert.equal(contract.releasePermitted,false);
+          assert.equal(contract.baselineV480Run,39716324419);
+          assert.equal(contract.baselineV480Commit,'b14a016cc9207e20227be1359d4114f8c5b1e4cc');
+          assert.equal(contract.expectedJobCount,10);
+          assert.equal(contract.expectedEssentialSteps,30);
+          assert.equal(contract.expectedDisposablePg17Runs,7);
+          assert.deepEqual(contract.jobPins,CAR02_V481_JOB_PINS);
+          assert.equal(CAR02_V480_RUN_PINS.length,10);
+          const allowed=new Set(CAR02_V481_JOB_PINS.map(x=>x.runId));
+          const auditor=createCar02ReadOnlyJobStepAuditorR481({
+            authorizeAuditor:async()=>({verified:true,role:'ci_job_auditor',mode:'isolated_qa',shopCode:'qa_shop_a'}),
+            inspectIsolation:async()=>({verified:true,testOnly:true,environment:'read_only_github_ci',providerCallsEnabled:false}),
+            readJobs:async({repository,runId})=>{
+              assert.equal(repository,CAR02_V480_REPOSITORY);
+              assert.ok(allowed.has(runId));
+              const url=`https://api.github.com/repos/${CAR02_V480_REPOSITORY}/actions/runs/${runId}/jobs?per_page=100`;
+              const response=await fetch(url,{method:'GET',headers:{
+                Authorization:`Bearer ${process.env.CAR02_ACTIONS_READ_TOKEN}`,
+                Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
+                signal:AbortSignal.timeout(15000)});
+              assert.equal(response.status,200,'GitHub jobs API must return HTTP 200');
+              return response.json();
+            }});
+          const result=await auditor.inspect();
+          assert.equal(result.reason,'ten_real_github_jobs_and_mandatory_steps_verified_still_no_go');
+          assert.equal(result.checkedActualGithubJobs,10);
+          assert.equal(result.verifiedMandatorySteps,30);
+          assert.equal(result.verifiedPriorDisposablePg17Jobs,7);
+          assert.equal(result.realProviderProofsVerified,0);
+          assert.equal(result.releasePermitted,false);
+          assert.equal(result.businessWritesAuthorized,false);
+          assert.equal(result.lineDispatchAllowed,false);
+          console.log('V481_ACTUAL_GITHUB_TEN_JOBS_THIRTY_MANDATORY_STEPS_PASS');
+          console.log('V481_SEVEN_DISPOSABLE_PG17_JOBS_ACTUALLY_COMPLETED_PASS');
+          console.log('V481_GITHUB_JOB_STEPS_ARE_NOT_COMMERCIAL_PROVIDER_PROOFS_PASS');
+          NODE
+          echo V481_FINAL_RELEASE_NO_GO_HOLD_TRUE
