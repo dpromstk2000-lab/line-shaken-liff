@@ -1,0 +1,112 @@
+name: CAR02 V4.89 Standalone Offline Preview QA (NO_GO HOLD)
+# Review-only build/reproducibility test; never deploy, bill, connect or book.
+on:
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-standalone-preview-builder-r489.mjs'
+      - 'car02-standalone-preview-builder-r489.test.mjs'
+      - 'CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html'
+      - 'car02-v489-standalone-offline-contract.json'
+      - 'CAR02_V489_STANDALONE_OFFLINE_PREVIEW.md'
+      - '.github/workflows/car02-v489-standalone-offline-preview-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-standalone-preview:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review branch without retained credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin R52 and approved V4.85-V4.88 sources, reject provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V489_PROVIDER_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          test "$(git hash-object car02-booking-calendar-policy-r485.mjs)" = 'e31633ec854b61b5fa1fb257f98080832cea6cbc'
+          test "$(git hash-object car02-booking-day-view-r486.mjs)" = '56217a205c4606e4c4bf63480243fa7f4529807b'
+          test "$(git hash-object car02-booking-month-grid-r487.mjs)" = 'ad2fcd04d78ded2ff62061c7a9440e035ff29ee9'
+          test "$(git hash-object car02-booking-calendar-preview-r487.mjs)" = 'c0d10c44fa6b33695c258f6051a5d40aab476142'
+          test "$(git hash-object car02-booking-calendar-accessible-r488.mjs)" = 'c2965465ab51c9311c9f5f9f8a4b0821e608a2d2'
+          test "$(git hash-object CAR02_V488_ACCESSIBLE_BOOKING_CALENDAR_READONLY_PREVIEW.html)" = '55ae3817ce5f6af53f3b37d936af93664cf716a9'
+          test "$(git hash-object .github/workflows/car02-v488-accessible-calendar-offline-qa.yml)" = 'c00f2fa22dfa2e350bb4ef637bfd0a56a5a55c1a'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          for f in car02-standalone-preview-builder-r489.mjs car02-standalone-preview-builder-r489.test.mjs CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html car02-v489-standalone-offline-contract.json CAR02_V489_STANDALONE_OFFLINE_PREVIEW.md; do test -s "$f"; done
+          test -s .github/workflows/car02-v489-standalone-offline-preview-qa.yml
+          echo V489_R52_R485_TO_R488_PINNED_NO_SECRETS_RELEASE_LOCK_TRUE
+      - name: Rebuild portable HTML and require exact byte-for-byte identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-standalone-preview-builder-r489.mjs
+          node --check car02-standalone-preview-builder-r489.test.mjs
+          test "$(sha256sum CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html | awk '{print $1}')" = '6b07eacfb56aaf2004fdf4bbddb2e40563a3e957304fad3c9abcd763a5ebbc38'
+          node car02-standalone-preview-builder-r489.mjs
+          git diff --exit-code -- CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html
+          echo V489_STANDALONE_SINGLE_HTML_REPRODUCIBLE_SHA256_CSP_PASS
+      - name: Run all repository Node tests, require 1371 plus zero failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v489-node.log"
+          tests=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v489-node.log")
+          pass=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v489-node.log")
+          test "$tests" -ge 1371
+          test "$pass" = "$tests"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v489-node.log"
+          echo V489_ALL_1371_PLUS_NODE_TESTS_PASS
+      - name: Check no-network standalone and preserve commercial HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {CAR02_V489_RELEASE_LOCK,CAR02_V489_INPUTS,
+            buildCar02StandaloneHtmlR489} from './car02-standalone-preview-builder-r489.mjs';
+          const c=JSON.parse(readFileSync('car02-v489-standalone-offline-contract.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');assert.equal(c.version,'V4.89');
+          assert.equal(c.branch,'car02-v434-review-only');
+          assert.equal(c.baselineV488Run,39740405022);
+          assert.equal(c.baselineV488Commit,'983a748795ace5ce54fe79cb2da73414b37d4807');
+          assert.equal(c.baselineV488NodeTests,1356);
+          assert.equal(c.newNodeTests,15);
+          assert.equal(c.expectedMinimumNodeTests,1371);
+          assert.equal(c.sourceModulesPinned,5);
+          assert.equal(c.sourceHtmlPinned,1);
+          assert.equal(CAR02_V489_INPUTS.length,6);
+          assert.equal(CAR02_V489_RELEASE_LOCK,true);
+          for(const k of ['singleHtmlFile','standaloneDoubleClickFile','cspInlineScriptSha256Pinned',
+            'noBrowserServerRequired','deterministicRebuild','previewOnlyNoRealAvailability','releaseLock'])
+            assert.equal(c[k],true,k);
+          for(const k of ['externalNetworkRequestsAllowed','serverDeploymentPerformed','providerConnectionAllowed',
+            'projectCreationAllowed','billingChangeAllowed','databaseMutationAllowed',
+            'lineDispatchAllowed','bookingCreationAllowed','commercialReleaseAllowed'])
+            assert.equal(c[k],false,k);
+          assert.equal(c.externalJavaScriptFiles,0);
+          assert.equal(c.externalCssFiles,0);
+          assert.equal(c.verifiedCommercialProviderProofs,0);
+          assert.equal(c.requiredCommercialProviderProofs,7);
+          assert.equal(c.commercialDecision,'NO_GO_HOLD');
+          const html=readFileSync(c.standalonePreviewFile,'utf8');
+          assert.equal(html,buildCar02StandaloneHtmlR489());
+          assert.ok(html.includes("connect-src 'none'"));
+          assert.ok(html.includes("default-src 'none'"));
+          assert.ok(!/<script\b[^>]*\bsrc\s*=/i.test(html));
+          assert.ok(!/<form\b|<input\b/i.test(html));
+          const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+          const digest=createHash('sha256').update(script).digest('base64');
+          assert.ok(html.includes(`script-src 'sha256-${digest}'`));
+          console.log('V489_OFFLINE_DOUBLECLICK_NO_SERVER_NO_NETWORK_PASS');
+          console.log('V489_NO_BOOKING_NO_PROVIDER_NO_GO_HOLD_ZERO_OF_SEVEN_TRUE');
+          NODE
