@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/K5ZG5M7sEcUp5yxtoxQdnkk2venkJqqKY+gwkg1saw='; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>DPRO CAR02 V4.97 | 表示ラベル統一・オフライン予約画面デモ</title>
+  <style>
+    :root {color-scheme:light;--navy:#172d46;--ink:#203850;--muted:#51687c;--line:#d5e1eb;--surface:#fff;--canvas:#f2f6fa;--blue:#145f9a;--pale:#e9f4ff;--warn:#94600c;font:17px/1.6 system-ui,-apple-system,"Noto Sans JP",Meiryo,sans-serif}
+    *{box-sizing:border-box}html,body{max-width:100%;margin:0}body{background:var(--canvas);color:var(--ink)}button{font:inherit;min-height:48px;cursor:pointer}button:disabled{cursor:not-allowed}button:focus-visible{outline:3px solid #e5a53b;outline-offset:2px}h1,h2,p{margin-top:0}h1{font-size:clamp(25px,3.4vw,34px);line-height:1.4;margin-bottom:7px}h2{font-size:21px;line-height:1.4;margin-bottom:8px}
+    .banner{background:#fff0d0;border-bottom:1px solid #e9d2a0;color:#72501a;text-align:center;padding:12px 18px;font-weight:850;font-size:15px}.top{background:var(--navy);color:#fff;padding:17px max(16px,calc((100vw - 1180px)/2));display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center}.brand{font-size:22px;font-weight:900}.brand small{display:block;font-size:13px;font-weight:600;color:#d0e0ef}.pill{border:1px solid #dbb66a;border-radius:100px;color:#ffe7a5;padding:6px 12px;font-size:13px;font-weight:850}
+    .wrap{max-width:1200px;margin:0 auto;padding:29px 18px 66px}.lead{color:var(--muted);font-size:16px}.layout{display:grid;grid-template-columns:minmax(0,1.26fr) minmax(0,.9fr);align-items:start;gap:18px}.stack{display:grid;gap:17px;min-width:0}.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;min-width:0;box-shadow:0 4px 16px #1e3b5810}.note{padding:14px 17px;background:#e6f3ff;color:#154c76;border-radius:11px;margin:0 0 20px;border:1px solid #c3ddee}.warn{padding:13px 15px;border-radius:11px;background:#fff5e2;border:1px solid #efdbb4;color:#78521b;font-weight:700;font-size:15px}
+    .monthbar{display:flex;justify-content:space-between;gap:7px;align-items:center;margin:17px 0}.monthbar strong{font-size:23px;text-align:center}.nav{width:56px;border:1px solid #bfcfdf;border-radius:10px;background:#fff;color:#155b8e;font-weight:900}.nav:disabled{opacity:.35}.week,.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.week span{text-align:center;font-size:13px;font-weight:850;color:#4e647a}.week span:last-child{color:#a65345}.calendar-day{width:100%;min-width:0;border:1px solid #b9d1e4;background:#fff;color:#175984;border-radius:9px;font-size:17px;font-weight:900;padding:8px 1px}.calendar-day:disabled{background:#eff2f6;color:#8795a2;border-color:#e1e7ed}.calendar-day[aria-pressed="true"]{background:#155f98;color:#fff}.calendar-day[aria-current="date"]{box-shadow:inset 0 0 0 2px #bb8a37}.empty{min-height:48px}.legend{font-size:13px;color:#557088;margin:13px 0 0}
+    .times{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:14px 0}.time{width:100%;min-width:0;background:#e9f4ff;border:1px solid #98c0df;border-radius:10px;color:#155487;font-weight:850;padding:7px 3px}.time:disabled{background:#f0f2f5;border-color:#e0e4e7;color:#8795a2;opacity:1}.time[aria-pressed="true"]{background:#155f98;color:#fff}.small{font-size:14px;color:var(--muted)}.rows{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0}.rows>*{padding:12px 0;border-bottom:1px solid #e5ebf0;overflow-wrap:anywhere}.rows span{color:var(--muted)}.rows strong{font-size:18px}.action{width:100%;border:none;background:#155f98;color:#fff;border-radius:11px;padding:13px 18px;font-weight:900;margin-top:18px}.action:disabled{background:#dce6ee;color:#60798c}.status{margin-top:16px;padding:14px 17px;border-radius:11px;background:#e8f4ff;border:1px solid #c6dff2;color:#20577e;min-height:70px;font-size:15px;font-weight:750}.footer{margin-top:28px;font-size:13px;color:#667b8e;text-align:center}
+    @media(max-width:850px){.layout{grid-template-columns:1fr}.wrap{padding:23px 14px 55px}.card{padding:20px}.top{padding:15px}}@media(max-width:480px){:root{font-size:16px}.card{padding:15px}.wrap{padding:17px 10px 47px}.week,.days{gap:4px}.calendar-day{font-size:16px;min-height:47px}.times{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.rows{grid-template-columns:80px minmax(0,1fr)}.monthbar strong{font-size:20px}.nav{width:48px}}
+  
+    /* V4.94: readable touch targets, disabled states and narrow screens */
+    :root{font-size:18px}
+    .banner{font-size:17px;line-height:1.65}
+    .lead,.small,.legend,.footer{font-size:16px;line-height:1.65}
+    .week span{font-size:15px}
+    .pill,.brand small{font-size:15px}
+    .calendar-day,.time{min-height:52px;font-size:18px}
+    .calendar-day:disabled{color:#536477;border-color:#bdcbd8;background:#edf1f5}
+    .time:disabled{color:#536477;border-color:#bdcbd8;background:#edf1f5}
+    .nav:disabled{opacity:1;background:#edf1f5;color:#536477}
+    .action:disabled{background:#dce6ee;color:#435b71}
+    .status,.warn{font-size:17px;line-height:1.7}
+    button:focus-visible{outline:4px solid #a36605;outline-offset:3px}
+    @media(max-width:480px){
+      :root{font-size:17px}
+      .calendar-day,.time{min-height:50px;font-size:17px}
+      .wrap{padding-bottom:72px}
+      .legend,.small,.lead,.footer{font-size:15px}
+    }
+    @media(max-width:380px){
+      .times{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .monthbar strong{font-size:18px}
+      .week,.days{gap:3px}
+    }
+  </style>
+</head>
+  <body data-car02-r493-preview data-car02-r493-standalone>
+  <div class="banner">隔離デモ：表示される予約枠はすべて架空です。予約・仮確保・通知は成立しません。</div>
+  <header class="top"><div class="brand">DPRO CAR02<small>V4.97 表示ラベル統一・オフラインUI確認用</small></div><span class="pill">REVIEW ONLY · NO_GO</span></header>
+  <main class="wrap">
+    <h1>車検・点検の予約日時を選択</h1>
+    <p class="lead">日付と30分単位の時間候補を選ぶ操作を確認できます。店舗の正式な空き状況ではありません。</p>
+    <div class="note">日付の受付範囲は本日から60日先まで。日曜と検査用休業日は選択できません。表示は日本時間です。</div>
+    <div class="layout">
+      <div class="stack">
+        <section class="card" aria-labelledby="heading-day">
+          <h2 id="heading-day">① 日付を選択</h2>
+          <div class="monthbar"><button class="nav" id="prev-month" aria-label="前の月" type="button">◀</button><strong id="month-title" aria-live="polite">—</strong><button class="nav" id="next-month" aria-label="次の月" type="button">▶</button></div>
+          <div class="week" aria-hidden="true"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div>
+          <div class="days" id="days" role="group" aria-label="隔離カレンダーの日付"></div>
+          <p class="legend">青文字：デモ候補あり ／ 灰色：選択不可 ／ 青背景：選択中</p>
+          <p class="legend">キーボード：Tabで日付へ移動、矢印キーで日付間を移動、Enterで選択。Home／Endで週の先頭・末尾へ移動します。</p>
+        </section>
+        <section class="card" aria-labelledby="heading-time">
+          <h2 id="heading-time">② 時間を選択</h2>
+          <p id="slot-description" class="small">日付を選ぶと30分単位の時間候補が表示されます。</p>
+          <div class="times" id="slots" role="group" aria-label="隔離30分枠"></div>
+        </section>
+      </div>
+      <div class="stack">
+        <section class="card" aria-labelledby="heading-summary">
+          <h2 id="heading-summary">③ 選択内容の確認</h2>
+          <p class="warn">実際の氏名・電話番号・車両情報は入力しないでください。この画面では保存を行いません。</p>
+          <div class="rows"><span>日付</span><strong id="chosen-day">未選択</strong><span>時間</span><strong id="chosen-time">未選択</strong><span>予約状況</span><strong>未予約（画面確認のみ）</strong></div>
+          <button id="confirm-preview" class="action" type="button" disabled>選択内容を画面で確認する</button>
+          <div id="notice" class="status" role="status" aria-live="polite">安全な隔離プレビューです。</div>
+        </section>
+        <section class="card"><h2>安全性について</h2><p class="small">V4.85の休日・時刻判定、V4.86の候補時間判定、V4.91の入力防御をすべて通過した架空候補のみ表示し、V4.93では異常時に安全停止します。ブラウザからLINE・Supabase・本番Worker・外部サービスへ通信しません。</p><p class="small">店休日は合成データで、実際の店舗承認や祝日連携は未確認です。将来の販売・運用には正式な接続検査が必要です。</p></section>
+      </div>
+    </div>
+    <p class="footer">DPRO CAR02 V4.97 | LABEL-CONSISTENT OFFLINE DEMO | NO NETWORK | NO DATABASE | NO LINE | NO BILLING | NO_GO/HOLD</p>
+  </main>
+  <script>/* DPRO CAR02 V4.89: LOCAL OFFLINE-ONLY DEMO; NO REAL BOOKINGS */
+const __car02_m0=(()=>{'use strict';
+/**
+ * CAR02 V4.85 — synthetic Japanese booking/calendar policy only.
+ * Produces a UI candidate decision. Never authenticates, reserves a slot,
+ * writes to a database, sends LINE, or authorizes a commercial booking.
+ * Schedule values are untrusted local fixtures, NOT owner-approved holidays.
+ */
+const CAR02_V485_RELEASE_LOCK = true;
+const CAR02_V485_MAX_BOOKING_DAYS = 60;
+const CAR02_V485_SLOT_MINUTES = 30;
+const CAR02_V485_REQUIRED_HOLIDAY_YEARS = 1;
+
+const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
+const timePattern = /^([01]\d|2[0-3]):(00|30)$/;
+const slotPattern = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):(00|30)$/;
+const policyFields = new Set(['systemCode','environment','coverageThrough','closedDays','occupiedSlots']);
+const requestFields = new Set(['day','time']);
+const isPlain = v => v!==null&&typeof v==='object'&&!Array.isArray(v)&&
+  (Object.getPrototypeOf(v)===Object.prototype||Object.getPrototypeOf(v)===null);
+const safeFields=(v,keys) => isPlain(v) && Object.keys(v).length===keys.size &&
+  Object.keys(v).every(k=>keys.has(k)) &&
+  Object.values(Object.getOwnPropertyDescriptors(v)).every(desc=>Object.hasOwn(desc,'value'));
+
+function dayEpoch(day) {
+  if(typeof day!=='string'||!dayPattern.test(day)) return NaN;
+  const d=new Date(`${day}T00:00:00.000Z`);
+  return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===day ? d.getTime():NaN;
+}
+function jstNow(date) {
+  const fields=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+  }).formatToParts(date).filter(part=>part.type!=='literal').map(part=>[part.type,Number(part.value)]));
+  const today=`${fields.year}-${String(fields.month).padStart(2,'0')}-${String(fields.day).padStart(2,'0')}`;
+  return {today,minutes:fields.hour*60+fields.minute};
+}
+function nextYearDayUtc(today) {
+  const [y,m,d]=today.split('-').map(Number);
+  const maxDay=new Date(Date.UTC(y+1,m,0)).getUTCDate();
+  return Date.UTC(y+1,m-1,Math.min(d,maxDay));
+}
+function hold(reason,candidateAvailable=false) {
+  return Object.freeze({
+    systemCode:'CAR02',version:'V4.85',decision:'HOLD',commercialDecision:'NO_GO_HOLD',
+    releaseLock:true,reason,candidateAvailableInOfflineUi:candidateAvailable,
+    bookingCreationAllowed:false,realCalendarOwnershipVerified:false,
+    liveHolidayProviderChecked:false,staffIdentityVerified:false,
+    databaseMutationAllowed:false,lineDispatchAllowed:false,
+    commercialProviderProofsVerified:0,requiredCommercialProviderProofs:7
+  });
+}
+
+/** Pure policy evaluator; all calendar data is untrusted and synthetic. */
+function evaluateCar02BookingCalendarR485({selection,calendar,now}={}) {
+  if(!(now instanceof Date)||!Number.isFinite(now.getTime())) return hold('clock_invalid');
+  if(!safeFields(selection,requestFields)) return hold('selection_shape_invalid');
+  if(!safeFields(calendar,policyFields)||calendar.systemCode!=='CAR02'||
+      calendar.environment!=='isolated_qa'||!Array.isArray(calendar.closedDays)||
+      !Array.isArray(calendar.occupiedSlots)||calendar.closedDays.length>366||
+      calendar.occupiedSlots.length>10000) return hold('calendar_shape_or_isolation_invalid');
+  const {today,minutes:nowMinute}=jstNow(now);
+  const todayMs=dayEpoch(today);
+  const yearEndMs=nextYearDayUtc(today);
+  const coveredMs=dayEpoch(calendar.coverageThrough);
+  if(!Number.isFinite(coveredMs)||coveredMs<yearEndMs)
+    return hold('one_year_calendar_coverage_missing');
+
+  const closures=new Set();
+  for(const day of calendar.closedDays) {
+    const ms=dayEpoch(day);
+    if(!Number.isFinite(ms)||ms<todayMs||ms>coveredMs||closures.has(day))
+      return hold('closed_day_inventory_invalid');
+    closures.add(day);
+  }
+  const occupied=new Set();
+  for(const slot of calendar.occupiedSlots) {
+    if(typeof slot!=='string') return hold('occupied_slot_inventory_invalid');
+    const match=slotPattern.exec(slot);
+    if(!match) return hold('occupied_slot_inventory_invalid');
+    const ms=dayEpoch(match[1]);
+    const hour=Number(slot.slice(11,13)),minute=Number(slot.slice(14,16));
+    const total=hour*60+minute;
+    if(!Number.isFinite(ms)||ms<todayMs||ms>coveredMs||total<540||total>1050||occupied.has(slot))
+      return hold('occupied_slot_inventory_invalid');
+    occupied.add(slot);
+  }
+  const ms=dayEpoch(selection.day);
+  if(!Number.isFinite(ms)) return hold('selected_day_invalid');
+  if(typeof selection.time!=='string'||!timePattern.test(selection.time))
+    return hold('selected_time_not_half_hour');
+  const hour=Number(selection.time.slice(0,2)),minute=Number(selection.time.slice(3,5));
+  const total=hour*60+minute;
+  if(total<540||total>1050) return hold('outside_business_hours');
+  const distance=(ms-todayMs)/86400000;
+  if(distance<0||distance>CAR02_V485_MAX_BOOKING_DAYS||
+     (distance===0&&total<=nowMinute)) return hold('booking_date_outside_open_window');
+  if(new Date(ms).getUTCDay()===0) return hold('sunday_closed');
+  if(closures.has(selection.day)) return hold('owner_declared_closed_day');
+  if(occupied.has(`${selection.day}T${selection.time}`)) return hold('synthetic_slot_occupied');
+  return hold('candidate_available_offline_only',true);
+}
+
+return {CAR02_V485_RELEASE_LOCK,CAR02_V485_MAX_BOOKING_DAYS,CAR02_V485_SLOT_MINUTES,CAR02_V485_REQUIRED_HOLIDAY_YEARS,evaluateCar02BookingCalendarR485};
+})();
+
+const __car02_m1=(()=>{'use strict';
+const {CAR02_V485_RELEASE_LOCK,CAR02_V485_MAX_BOOKING_DAYS,CAR02_V485_SLOT_MINUTES,evaluateCar02BookingCalendarR485}={...__car02_m0};
+/**
+ * CAR02 V4.86 — bounded, synthetic, read-only booking-day view model.
+ * It projects the exact V4.85 candidate rule into UI time rows; it does not
+ * grant booking authority or query any real calendars or external services.
+ */
+
+const CAR02_V486_RELEASE_LOCK = true;
+const CAR02_V486_SLOT_COUNT = 18;
+const CAR02_V486_FIRST_SLOT = '09:00';
+const CAR02_V486_LAST_SLOT = '17:30';
+
+const expectedKeys = new Set(['day', 'calendar', 'now']);
+const allowedResultReasons = new Set([
+  'candidate_available_offline_only',
+  'synthetic_slot_occupied',
+  'booking_date_outside_open_window'
+]);
+const formatTime = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+const TIMES = Object.freeze(Array.from({length: CAR02_V486_SLOT_COUNT}, (_, i) => formatTime(540 + i * 30)));
+
+function hold(reason) {
+  return Object.freeze({
+    systemCode: 'CAR02', version: 'V4.86', environment: 'isolated_qa',
+    decision: 'HOLD', commercialDecision: 'NO_GO_HOLD', releaseLock: true,
+    reason, day: null, slots: Object.freeze([]), candidateTimes: Object.freeze([]),
+    candidateCount: 0, displayCandidateSlots: false,
+    bookingCreationAllowed: false, authenticatedCapacityVerified: false,
+    nationalHolidayProviderChecked: false, ownerCalendarApprovalVerified: false,
+    databaseMutationAllowed: false, lineDispatchAllowed: false,
+    commercialProviderProofsVerified: 0, requiredCommercialProviderProofs: 7
+  });
+}
+
+function completed(day, slots, candidateTimes) {
+  return Object.freeze({
+    systemCode: 'CAR02', version: 'V4.86', environment: 'isolated_qa',
+    decision: 'HOLD', commercialDecision: 'NO_GO_HOLD', releaseLock: true,
+    reason: 'synthetic_day_projection_only', day,
+    slots: Object.freeze(slots), candidateTimes: Object.freeze(candidateTimes),
+    candidateCount: candidateTimes.length, displayCandidateSlots: candidateTimes.length > 0,
+    bookingCreationAllowed: false, authenticatedCapacityVerified: false,
+    nationalHolidayProviderChecked: false, ownerCalendarApprovalVerified: false,
+    databaseMutationAllowed: false, lineDispatchAllowed: false,
+    commercialProviderProofsVerified: 0, requiredCommercialProviderProofs: 7
+  });
+}
+
+function isSafeOptions(input) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input) ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(input))) return false;
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(input));
+  return entries.length === expectedKeys.size &&
+    entries.every(([key, desc]) => expectedKeys.has(key) && Object.hasOwn(desc, 'value'));
+}
+
+/** Returns only synthetic display candidates. Never executes a booking. */
+function buildCar02BookingDayViewR486(input) {
+  try {
+    if (!isSafeOptions(input)) return hold('input_shape_invalid');
+    const {day, calendar, now} = input;
+    if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day))
+      return hold('day_shape_invalid');
+    if (!(now instanceof Date) || Object.getPrototypeOf(now) !== Date.prototype ||
+        Object.keys(now).length !== 0 || !Number.isFinite(Date.prototype.getTime.call(now)))
+      return hold('clock_invalid');
+    if (CAR02_V486_RELEASE_LOCK !== true || CAR02_V485_RELEASE_LOCK !== true ||
+        CAR02_V485_SLOT_MINUTES !== 30 || CAR02_V485_MAX_BOOKING_DAYS !== 60)
+      return hold('baseline_rule_unpinned');
+
+    const slots = [], candidateTimes = [];
+    for (const time of TIMES) {
+      const result = evaluateCar02BookingCalendarR485({selection: {day, time}, calendar, now});
+      if (result.releaseLock !== true || result.bookingCreationAllowed !== false ||
+          result.commercialDecision !== 'NO_GO_HOLD' ||
+          !allowedResultReasons.has(result.reason)) return hold(result.reason || 'baseline_denied');
+
+      const state = result.reason === 'candidate_available_offline_only' ? 'candidate' :
+        result.reason === 'synthetic_slot_occupied' ? 'occupied' : 'elapsed_or_out_of_window';
+      slots.push(Object.freeze({time, state, selectableInOfflineUi: state === 'candidate'}));
+      if (state === 'candidate') candidateTimes.push(time);
+    }
+    // Out-of-window days must not present a plausible calendar grid at all.
+    if (slots.every(slot => slot.state === 'elapsed_or_out_of_window'))
+      return hold('no_future_slots_in_booking_window');
+    return completed(day, slots, candidateTimes);
+  } catch {
+    // A hostile proxy, getter, modified Date or malformed fixture is a HOLD.
+    return hold('untrusted_input_rejected');
+  }
+}
+
+return {CAR02_V486_RELEASE_LOCK,CAR02_V486_SLOT_COUNT,CAR02_V486_FIRST_SLOT,CAR02_V486_LAST_SLOT,buildCar02BookingDayViewR486};
+})();
+
+const __car02_m2=(()=>{'use strict';
+const {buildCar02BookingDayViewR486}={...__car02_m0,...__car02_m1};
+/** CAR02 V4.87 — pure synthetic month grid from the V4.86 daily view. */
+
+const CAR02_V487_RELEASE_LOCK = true;
+const CAR02_V487_BOOKING_HORIZON_DAYS = 60;
+
+const DAY_MS=86400000;
+const stamp=(y,m,d)=>`${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const freezeCells=cells=>Object.freeze(cells.map(cell=>Object.freeze(cell)));
+
+function car02JstTodayR487(now) {
+  if(!(now instanceof Date)||Object.getPrototypeOf(now)!==Date.prototype||
+      Object.keys(now).length!==0||!Number.isFinite(Date.prototype.getTime.call(now))) return null;
+  const fields=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(now).filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]));
+  return stamp(fields.year,fields.month,fields.day);
+}
+function car02PlusUtcDaysR487(day,days) {
+  if(typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||
+      !Number.isInteger(days)||days<0||days>366) return null;
+  const first=new Date(`${day}T00:00:00.000Z`);
+  if(!Number.isFinite(first.getTime())||first.toISOString().slice(0,10)!==day) return null;
+  return new Date(first.getTime()+days*DAY_MS).toISOString().slice(0,10);
+}
+function car02CoverageYearR487(day) {
+  if(typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const date=new Date(`${day}T00:00:00.000Z`);
+  if(!Number.isFinite(date.getTime())||date.toISOString().slice(0,10)!==day) return null;
+  const [year,month,d]=day.split('-').map(Number);
+  const last=new Date(Date.UTC(year+1,month,0)).getUTCDate();
+  return stamp(year+1,month,Math.min(d,last));
+}
+const withheld = reason => Object.freeze({
+  systemCode:'CAR02',version:'V4.87',decision:'HOLD',commercialDecision:'NO_GO_HOLD',
+  releaseLock:true,reason,monthTitle:'',cells:Object.freeze([]),
+  previousMonthAllowed:false,nextMonthAllowed:false,
+  bookingCreationAllowed:false,providerConnected:false,
+  realAvailabilityVerified:false,verifiedCommercialProviderProofs:0,
+  requiredCommercialProviderProofs:7
+});
+
+/** All cells and flags remain read-only synthetic UI projections. */
+function buildCar02MonthGridR487({year,month,calendar,now}={}) {
+  try {
+    if(!Number.isInteger(year)||year<2000||year>2100||
+        !Number.isInteger(month)||month<1||month>12) return withheld('month_invalid');
+    const today=car02JstTodayR487(now);
+    if(!today) return withheld('clock_invalid');
+    const end=car02PlusUtcDaysR487(today,60);
+    const firstOfMonth=stamp(year,month,1);
+    const windowMin=today.slice(0,7),windowMax=end.slice(0,7),selected=firstOfMonth.slice(0,7);
+    if(selected<windowMin||selected>windowMax) return withheld('month_outside_booking_window');
+    const first=new Date(Date.UTC(year,month-1,1));
+    const firstOffset=(first.getUTCDay()+6)%7; // Monday first
+    const length=new Date(Date.UTC(year,month,0)).getUTCDate();
+    const cells=[];
+    for(let i=0;i<firstOffset;i++) cells.push({type:'pad'});
+    for(let d=1;d<=length;d++) {
+      const day=stamp(year,month,d);
+      // The V4.86 policy is the ONLY source of the candidate-day decision.
+      const view=buildCar02BookingDayViewR486({day,calendar,now});
+      if(['calendar_shape_or_isolation_invalid','one_year_calendar_coverage_missing',
+           'closed_day_inventory_invalid','occupied_slot_inventory_invalid',
+           'clock_invalid','input_shape_invalid','untrusted_input_rejected',
+           'baseline_rule_unpinned'].includes(view.reason)) return withheld(view.reason);
+      cells.push({type:'day',day,number:d,selectableInOfflineUi:view.candidateCount>0,
+        candidateCount:view.candidateCount});
+    }
+    while(cells.length%7!==0) cells.push({type:'pad'});
+    const result={systemCode:'CAR02',version:'V4.87',decision:'HOLD',
+      commercialDecision:'NO_GO_HOLD',releaseLock:true,
+      reason:'synthetic_month_projection_only',monthTitle:`${year}年${month}月`,
+      cells:freezeCells(cells),previousMonthAllowed:selected>windowMin,
+      nextMonthAllowed:selected<windowMax,bookingCreationAllowed:false,
+      providerConnected:false,realAvailabilityVerified:false,
+      verifiedCommercialProviderProofs:0,requiredCommercialProviderProofs:7};
+    return Object.freeze(result);
+  } catch {
+    return withheld('untrusted_calendar_rejected');
+  }
+}
+
+return {CAR02_V487_RELEASE_LOCK,CAR02_V487_BOOKING_HORIZON_DAYS,car02JstTodayR487,car02PlusUtcDaysR487,car02CoverageYearR487,buildCar02MonthGridR487};
+})();
+
+const __car02_m3=(()=>{'use strict';
+const {buildCar02BookingDayViewR486,buildCar02MonthGridR487,car02JstTodayR487,car02PlusUtcDaysR487,car02CoverageYearR487}={...__car02_m0,...__car02_m1,...__car02_m2};
+/** CAR02 V4.87 isolated browser-only calendar preview; never books anything. */
+
+
+function createCar02SyntheticCalendarR487(now) {
+  const today=car02JstTodayR487(now);
+  if(!today) return null;
+  const closed=car02PlusUtcDaysR487(today,7);
+  const occupiedA=car02PlusUtcDaysR487(today,4);
+  const occupiedB=car02PlusUtcDaysR487(today,5);
+  return Object.freeze({
+    systemCode:'CAR02', environment:'isolated_qa',
+    coverageThrough:car02CoverageYearR487(today),
+    closedDays:Object.freeze([closed]),
+    occupiedSlots:Object.freeze([`${occupiedA}T10:30`,`${occupiedB}T13:00`])
+  });
+}
+
+/** Call from a same-origin, offline-served HTML module. No globals at import. */
+function mountCar02BookingCalendarPreviewR487(root,clock=()=>new Date()) {
+  const $=id=>root.getElementById(id);
+  const required=['month-title','days','slots','prev-month','next-month',
+    'chosen-day','chosen-time','confirm-preview','notice','slot-description'];
+  if(required.some(id=>!$(id))) throw Error('preview_dom_missing');
+  const now=clock();
+  const today=car02JstTodayR487(now);
+  if(!today) throw Error('preview_clock_invalid');
+  const [initialYear,initialMonth]=today.split('-').map(Number);
+  let year=initialYear,month=initialMonth,chosenDay=null,chosenTime=null;
+  const setText=(id,text)=>{$(id).textContent=text;};
+  const status=text=>setText('notice',text);
+  const makeButton=(label,extraClass='')=>{
+    const b=root.createElement('button');b.type='button';b.className=extraClass;b.textContent=label;
+    return b;
+  };
+  function renderSlots() {
+    const host=$('slots');host.replaceChildren();
+    setText('chosen-day',chosenDay||'未選択');
+    setText('chosen-time',chosenTime||'未選択');
+    $('confirm-preview').disabled=!(chosenDay&&chosenTime);
+    if(!chosenDay){setText('slot-description','日付を選ぶと30分単位の時間候補が表示されます。');return;}
+    const actualNow=clock();
+    const view=buildCar02BookingDayViewR486({day:chosenDay,
+      calendar:createCar02SyntheticCalendarR487(actualNow),now:actualNow});
+    if(view.reason!=='synthetic_day_projection_only'){
+      chosenTime=null;
+      $('confirm-preview').disabled=true;
+      setText('chosen-time','未選択');
+      setText('slot-description','この日は候補時間を表示できません。別の日付を選んでください。');
+      return;
+    }
+    setText('slot-description','青：選択できるデモ候補 ／ 灰色：デモ上の使用不可枠');
+    for(const item of view.slots) {
+      const b=makeButton(item.time,item.selectableInOfflineUi?'time candidate':'time unavailable');
+      b.disabled=!item.selectableInOfflineUi;
+      b.setAttribute('aria-pressed',String(chosenTime===item.time));
+      b.setAttribute('aria-label',`${item.time} ${item.selectableInOfflineUi?'デモ選択可':'選択不可'}`);
+      b.addEventListener('click',()=>{
+        chosenTime=item.time;
+        renderSlots();
+        status(`${chosenDay} ${chosenTime} をデモ候補として選びました。予約は成立していません。`);
+      });
+      host.append(b);
+    }
+  }
+  function renderMonth() {
+    const actualNow=clock();
+    const grid=buildCar02MonthGridR487({year,month,
+      calendar:createCar02SyntheticCalendarR487(actualNow),now:actualNow});
+    const host=$('days');host.replaceChildren();
+    if(grid.reason!=='synthetic_month_projection_only'){
+      chosenDay=null;chosenTime=null;renderSlots();
+      setText('month-title','候補を表示できません');
+      $('prev-month').disabled=true;$('next-month').disabled=true;
+      status('隔離カレンダーを確認できません。実際の予約操作は行えません。');
+      return;
+    }
+    setText('month-title',grid.monthTitle);
+    $('prev-month').disabled=!grid.previousMonthAllowed;
+    $('next-month').disabled=!grid.nextMonthAllowed;
+    for(const cell of grid.cells){
+      if(cell.type==='pad'){
+        const spacer=root.createElement('span');spacer.className='empty';
+        spacer.setAttribute('aria-hidden','true');host.append(spacer);continue;
+      }
+      const button=makeButton(String(cell.number),'calendar-day');
+      button.disabled=!cell.selectableInOfflineUi;
+      button.setAttribute('aria-pressed',String(chosenDay===cell.day));
+      button.setAttribute('aria-label',`${cell.day} ${cell.selectableInOfflineUi?'デモ候補あり':'デモ候補なし'}`);
+      if(cell.day===car02JstTodayR487(actualNow)) button.setAttribute('aria-current','date');
+      button.addEventListener('click',()=>{
+        chosenDay=cell.day;chosenTime=null;
+        renderMonth();renderSlots();
+        status(`${cell.day} を選択しました。時間を選んでください。`);
+      });
+      host.append(button);
+    }
+    renderSlots();
+  }
+  const shiftMonth=difference=>{
+    const next=new Date(Date.UTC(year,month-1+difference,1));
+    year=next.getUTCFullYear();month=next.getUTCMonth()+1;
+    chosenDay=null;chosenTime=null;
+    renderMonth();
+  };
+  $('prev-month').addEventListener('click',()=>shiftMonth(-1));
+  $('next-month').addEventListener('click',()=>shiftMonth(1));
+  $('confirm-preview').addEventListener('click',()=>{
+    if(!(chosenDay&&chosenTime)) return;
+    const liveNow=clock();
+    const checked=buildCar02BookingDayViewR486({day:chosenDay,
+      calendar:createCar02SyntheticCalendarR487(liveNow),now:liveNow});
+    if(!checked.candidateTimes.includes(chosenTime)){
+      chosenTime=null;renderSlots();
+      status('この枠は選択できません。時間を選び直してください。');
+      return;
+    }
+    status(`${chosenDay} ${chosenTime}：画面表示を確認しました。実際の予約登録・仮確保・通知は行いません。`);
+  });
+  renderMonth();
+  status('安全な隔離プレビューです。架空の空き枠のみを表示しています。');
+  return Object.freeze({getSelected:()=>Object.freeze({day:chosenDay,time:chosenTime})});
+}
+
+if(typeof document!=='undefined' && document.body?.hasAttribute('data-car02-r487-preview')) {
+  mountCar02BookingCalendarPreviewR487(document);
+}
+
+return {createCar02SyntheticCalendarR487,mountCar02BookingCalendarPreviewR487};
+})();
+
+const __car02_m4=(()=>{'use strict';
+const {buildCar02BookingDayViewR486,buildCar02MonthGridR487,car02JstTodayR487,createCar02SyntheticCalendarR487}={...__car02_m0,...__car02_m1,...__car02_m2,...__car02_m3};
+/**
+ * CAR02 V4.88 — keyboard-accessible, synthetic-only booking-calendar preview.
+ * No network, storage, booking, hold, checkout, provider or LINE capability.
+ * V4.85-V4.87 policy files remain immutable baseline sources.
+ */
+
+
+
+const CAR02_V488_RELEASE_LOCK=true;
+const ids=['month-title','days','slots','prev-month','next-month',
+  'chosen-day','chosen-time','confirm-preview','notice','slot-description'];
+
+function mountCar02BookingCalendarAccessibleR488(root,clock=()=>new Date()) {
+  if(!root||typeof root.getElementById!=='function'||typeof root.createElement!=='function')
+    throw Error('preview_dom_missing');
+  const $=id=>root.getElementById(id);
+  if(ids.some(id=>!$(id))) throw Error('preview_dom_missing');
+  const today=car02JstTodayR487(clock());
+  if(!today) throw Error('preview_clock_invalid');
+  let [year,month]=today.split('-').map(Number);
+  let selectedDay=null,selectedTime=null,rovingDay=null;
+  let displayedDays=[],monthFirstOffset=0;
+  const text=(id,value)=>{$(id).textContent=value;};
+  const announce=value=>text('notice',value);
+  const makeButton=(label,cls)=>{
+    const b=root.createElement('button');
+    b.type='button';b.className=cls;b.textContent=label;
+    return b;
+  };
+  const selected=()=>Object.freeze({day:selectedDay,time:selectedTime});
+  const updateSummary=()=>{
+    text('chosen-day',selectedDay||'未選択');
+    text('chosen-time',selectedTime||'未選択');
+    $('confirm-preview').disabled=!(selectedDay&&selectedTime);
+  };
+  const dayView=day=>{
+    const now=clock();
+    return buildCar02BookingDayViewR486({day,calendar:createCar02SyntheticCalendarR487(now),now});
+  };
+  function updateDayButtons(){
+    for(const item of displayedDays){
+      item.button.setAttribute('aria-pressed',String(selectedDay===item.day));
+      item.button.tabIndex=item.day===rovingDay?0:-1;
+    }
+  }
+  function moveFocus(sourceDay,key,event){
+    const index=displayedDays.findIndex(item=>item.day===sourceDay);
+    if(index<0) return;
+    const delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[key];
+    let target=-1;
+    if(delta!==undefined){
+      for(let i=index+delta;i>=0&&i<displayedDays.length;i+=delta){
+        if(!displayedDays[i].button.disabled){target=i;break;}
+      }
+    } else if(key==='Home'||key==='End'){
+      const firstOfWeek=Math.floor((monthFirstOffset+index)/7)*7-monthFirstOffset;
+      const indices=Array.from({length:7},(_,i)=>firstOfWeek+i)
+        .filter(i=>i>=0&&i<displayedDays.length&&!displayedDays[i].button.disabled);
+      target=indices.length?(key==='Home'?indices[0]:indices.at(-1)):-1;
+    } else return;
+    event?.preventDefault?.();
+    if(target<0) return;
+    rovingDay=displayedDays[target].day;
+    updateDayButtons();
+    displayedDays[target].button.focus?.();
+  }
+  function updateTimeButtons(){
+    for(const button of $('slots').children){
+      if(button.className.includes('candidate'))
+        button.setAttribute('aria-pressed',String(button.textContent===selectedTime));
+    }
+    updateSummary();
+  }
+  function renderTimes(){
+    const host=$('slots');host.replaceChildren();
+    if(!selectedDay){
+      text('slot-description','日付を選ぶと30分単位の時間候補が表示されます。');
+      updateSummary();return;
+    }
+    const view=dayView(selectedDay);
+    if(view.reason!=='synthetic_day_projection_only'){
+      selectedTime=null;
+      text('slot-description','この日は候補時間を表示できません。別の日付を選んでください。');
+      updateSummary();return;
+    }
+    text('slot-description','選択できるデモ候補は青、選択不可は灰色で表示されます。');
+    if(selectedTime&&!view.candidateTimes.includes(selectedTime)) selectedTime=null;
+    for(const slot of view.slots){
+      const button=makeButton(slot.time,slot.selectableInOfflineUi?'time candidate':'time unavailable');
+      button.disabled=!slot.selectableInOfflineUi;
+      button.setAttribute('aria-label',`${slot.time} ${slot.selectableInOfflineUi?'デモ選択可':'選択不可'}`);
+      button.setAttribute('aria-pressed',String(selectedTime===slot.time));
+      button.addEventListener('click',()=>{
+        // Recheck at click time: the Japanese date or the time window can roll over.
+        const live=dayView(selectedDay);
+        if(!live.candidateTimes.includes(slot.time)){
+          selectedTime=null;renderTimes();
+          announce('時間候補の有効期限が切れました。別の時間を選んでください。');
+          return;
+        }
+        selectedTime=slot.time;
+        // Keep the focused element mounted; replacing it loses keyboard focus.
+        updateTimeButtons();
+        announce(`${selectedDay} ${selectedTime} をデモ候補として選びました。予約は成立していません。`);
+      });
+      host.append(button);
+    }
+    updateSummary();
+  }
+  function renderMonth(){
+    const now=clock();
+    const grid=buildCar02MonthGridR487({year,month,
+      calendar:createCar02SyntheticCalendarR487(now),now});
+    $('days').replaceChildren();displayedDays=[];
+    if(grid.reason!=='synthetic_month_projection_only'){
+      selectedDay=null;selectedTime=null;rovingDay=null;
+      text('month-title','候補を表示できません');
+      $('prev-month').disabled=true;$('next-month').disabled=true;
+      renderTimes();
+      announce('隔離カレンダーを確認できません。実際の予約操作は行えません。');
+      return;
+    }
+    text('month-title',grid.monthTitle);
+    monthFirstOffset=grid.cells.findIndex(cell=>cell.type==='day');
+    $('prev-month').disabled=!grid.previousMonthAllowed;
+    $('next-month').disabled=!grid.nextMonthAllowed;
+    const selectable=grid.cells.filter(cell=>cell.type==='day'&&cell.selectableInOfflineUi);
+    if(!selectable.some(cell=>cell.day===rovingDay)) rovingDay=selectable[0]?.day??null;
+    for(const cell of grid.cells){
+      if(cell.type==='pad'){
+        const pad=root.createElement('span');pad.className='empty';
+        pad.setAttribute('aria-hidden','true');$('days').append(pad);continue;
+      }
+      const b=makeButton(String(cell.number),'calendar-day');
+      b.disabled=!cell.selectableInOfflineUi;
+      b.setAttribute('aria-label',`${cell.day} ${cell.selectableInOfflineUi?'デモ候補あり':'デモ候補なし'}`);
+      if(cell.day===car02JstTodayR487(now)) b.setAttribute('aria-current','date');
+      b.addEventListener('click',()=>{
+        // Do not redraw the month grid: keyboard focus remains on the selected date.
+        selectedDay=cell.day;selectedTime=null;rovingDay=cell.day;
+        updateDayButtons();renderTimes();
+        announce(`${cell.day} を選択しました。時間を選んでください。`);
+      });
+      b.addEventListener('keydown',e=>moveFocus(cell.day,e.key,e));
+      displayedDays.push({day:cell.day,button:b});
+      $('days').append(b);
+    }
+    updateDayButtons();renderTimes();
+  }
+  function shiftMonth(delta){
+    const next=new Date(Date.UTC(year,month-1+delta,1));
+    year=next.getUTCFullYear();month=next.getUTCMonth()+1;
+    selectedDay=null;selectedTime=null;rovingDay=null;
+    renderMonth();
+  }
+  $('prev-month').addEventListener('click',()=>shiftMonth(-1));
+  $('next-month').addEventListener('click',()=>shiftMonth(1));
+  $('confirm-preview').addEventListener('click',()=>{
+    if(!(selectedDay&&selectedTime)) return;
+    const checked=dayView(selectedDay);
+    if(!checked.candidateTimes.includes(selectedTime)){
+      selectedTime=null;renderTimes();
+      announce('この時間は選択できなくなりました。時間を選び直してください。');
+      return;
+    }
+    announce(`${selectedDay} ${selectedTime}：画面表示を確認しました。予約登録・仮確保・通知は行いません。`);
+  });
+  renderMonth();
+  announce('安全な隔離プレビューです。架空の空き枠のみを表示しています。');
+  return Object.freeze({getSelected:selected});
+}
+
+if(typeof document!=='undefined'&&document.body?.hasAttribute('data-car02-r488-preview')){
+  mountCar02BookingCalendarAccessibleR488(document);
+}
+
+return {CAR02_V488_RELEASE_LOCK,mountCar02BookingCalendarAccessibleR488};
+})();
+
+const __car02_m5=(()=>{'use strict';
+const {evaluateCar02BookingCalendarR485}={...__car02_m0,...__car02_m1,...__car02_m2,...__car02_m3,...__car02_m4};
+/**
+ * CAR02 V4.91: strict, OFFLINE-only adapter for untrusted in-memory booking
+ * inputs. Not wired to the accepted UI or any live service.
+ * Never creates a booking, obtains a credential, or relaxes R52.
+ */
+
+const CAR02_V491_RELEASE_LOCK=true;
+const CAR02_V491_BASE_RUN_ID=39748618887;
+const INPUT_KEYS=['selection','calendar','now'];
+const SELECTION_KEYS=['day','time'];
+const CALENDAR_KEYS=['systemCode','environment','coverageThrough','closedDays','occupiedSlots'];
+const ALLOWED_REASONS=new Set([
+  'candidate_available_offline_only','selection_shape_invalid',
+  'calendar_shape_or_isolation_invalid','one_year_calendar_coverage_missing',
+  'closed_day_inventory_invalid','occupied_slot_inventory_invalid',
+  'selected_day_invalid','selected_time_not_half_hour',
+  'outside_business_hours','booking_date_outside_open_window',
+  'sunday_closed','owner_declared_closed_day','synthetic_slot_occupied',
+  'clock_invalid'
+]);
+
+function plainRecordWithOwnDataKeys(value,keys){
+  if(value===null||typeof value!=='object'||Array.isArray(value))return false;
+  const proto=Object.getPrototypeOf(value);
+  if(proto!==Object.prototype&&proto!==null)return false;
+  const own=Reflect.ownKeys(value);
+  if(own.length!==keys.length||own.some(k=>typeof k!=='string'||!keys.includes(k)))return false;
+  for(const key of keys){
+    const desc=Object.getOwnPropertyDescriptor(value,key);
+    if(!desc||!Object.hasOwn(desc,'value'))return false;
+  }
+  return true;
+}
+
+function denseStringArray(value,max){
+  if(!Array.isArray(value)||Object.getPrototypeOf(value)!==Array.prototype||value.length>max)return false;
+  const own=Reflect.ownKeys(value);
+  if(own.length!==value.length+1||!own.includes('length'))return false;
+  for(let i=0;i<value.length;i++){
+    const desc=Object.getOwnPropertyDescriptor(value,String(i));
+    if(!desc||!Object.hasOwn(desc,'value')||typeof desc.value!=='string')return false;
+  }
+  return true;
+}
+
+const locked=(reason,candidate=false)=>Object.freeze({
+  systemCode:'CAR02',version:'V4.91',decision:'HOLD',commercialDecision:'NO_GO_HOLD',
+  releaseLock:true,reason,candidateAvailableInOfflineUi:candidate,
+  bookingCreationAllowed:false,realCalendarOwnershipVerified:false,
+  liveHolidayProviderChecked:false,staffIdentityVerified:false,
+  databaseMutationAllowed:false,lineDispatchAllowed:false,
+  commercialProviderProofsVerified:0,requiredCommercialProviderProofs:7
+});
+
+/** Always returns an immutable, non-authorizing decision; all errors fail closed. */
+function evaluateCar02BookingInputFirewallR491(payload){
+  try {
+    if(!plainRecordWithOwnDataKeys(payload,INPUT_KEYS))return locked('payload_shape_invalid');
+    if(!plainRecordWithOwnDataKeys(payload.selection,SELECTION_KEYS))return locked('selection_shape_invalid');
+    if(!plainRecordWithOwnDataKeys(payload.calendar,CALENDAR_KEYS))return locked('calendar_shape_invalid');
+    if(!denseStringArray(payload.calendar.closedDays,366)||
+       !denseStringArray(payload.calendar.occupiedSlots,10000))
+      return locked('calendar_inventory_shape_invalid');
+    if(!(payload.now instanceof Date)||Object.getPrototypeOf(payload.now)!==Date.prototype||
+       Reflect.ownKeys(payload.now).length!==0||
+       !Number.isFinite(Date.prototype.getTime.call(payload.now)))return locked('clock_invalid');
+
+    const baseline=evaluateCar02BookingCalendarR485(payload);
+    if(!baseline||baseline.systemCode!=='CAR02'||baseline.releaseLock!==true||
+       baseline.decision!=='HOLD'||baseline.commercialDecision!=='NO_GO_HOLD'||
+       baseline.bookingCreationAllowed!==false||baseline.databaseMutationAllowed!==false||
+       baseline.lineDispatchAllowed!==false||baseline.commercialProviderProofsVerified!==0||
+       baseline.requiredCommercialProviderProofs!==7||!ALLOWED_REASONS.has(baseline.reason))
+      return locked('baseline_policy_result_invalid');
+    const candidate=baseline.reason==='candidate_available_offline_only'&&
+      baseline.candidateAvailableInOfflineUi===true;
+    return locked(baseline.reason,candidate);
+  }catch{
+    return locked('malformed_input_failed_closed');
+  }
+}
+
+return {CAR02_V491_RELEASE_LOCK,CAR02_V491_BASE_RUN_ID,evaluateCar02BookingInputFirewallR491};
+})();
+
+const __car02_m6=(()=>{'use strict';
+const {buildCar02BookingDayViewR486,evaluateCar02BookingInputFirewallR491}={...__car02_m0,...__car02_m1,...__car02_m2,...__car02_m3,...__car02_m4,...__car02_m5};
+/**
+ * CAR02 V4.92 — V4.91 firewall projected into a synthetic, offline day view.
+ * The V4.85–V4.91 accepted sources remain unmodified.
+ * Display eligibility is NOT a booking, hold, availability claim or consent.
+ */
+
+
+const CAR02_V492_RELEASE_LOCK=true;
+
+const hold=reason=>Object.freeze({
+  systemCode:'CAR02',version:'V4.92',decision:'HOLD',
+  commercialDecision:'NO_GO_HOLD',releaseLock:true,reason,
+  slots:Object.freeze([]),candidateTimes:Object.freeze([]),candidateCount:0,
+  bookingCreationAllowed:false,databaseMutationAllowed:false,lineDispatchAllowed:false,
+  commercialProviderProofsVerified:0,requiredCommercialProviderProofs:7
+});
+
+/** Every displayed candidate must pass two independent read-only checks. */
+function buildCar02FirewalledDayR492({day,calendar,now}={}){
+  try{
+    const base=buildCar02BookingDayViewR486({day,calendar,now});
+    if(base.reason!=='synthetic_day_projection_only'||base.releaseLock!==true||
+       base.bookingCreationAllowed!==false||base.decision!=='HOLD'||
+       base.commercialDecision!=='NO_GO_HOLD'||base.candidateTimes.length>18||
+       base.slots.length!==18) return hold('baseline_day_refused');
+    const slots=[],candidateTimes=[];
+    for(const slot of base.slots){
+      if(typeof slot.time!=='string'||typeof slot.selectableInOfflineUi!=='boolean')
+        return hold('baseline_slot_shape_invalid');
+      const firewall=evaluateCar02BookingInputFirewallR491({
+        selection:{day,time:slot.time},calendar,now
+      });
+      if(firewall.decision!=='HOLD'||firewall.releaseLock!==true||
+         firewall.commercialDecision!=='NO_GO_HOLD'||
+         firewall.bookingCreationAllowed!==false||
+         firewall.databaseMutationAllowed!==false||
+         firewall.lineDispatchAllowed!==false||
+         firewall.commercialProviderProofsVerified!==0||
+         firewall.requiredCommercialProviderProofs!==7)
+        return hold('firewall_authority_invariant_invalid');
+      const allowed=slot.selectableInOfflineUi&&firewall.candidateAvailableInOfflineUi===true;
+      slots.push(Object.freeze({
+        time:slot.time,state:allowed?'candidate':'unavailable',selectableInOfflineUi:allowed
+      }));
+      if(allowed) candidateTimes.push(slot.time);
+    }
+    if(candidateTimes.length!==base.candidateTimes.length)
+      return hold('baseline_firewall_candidate_disagreement');
+    return Object.freeze({
+      systemCode:'CAR02',version:'V4.92',decision:'HOLD',
+      commercialDecision:'NO_GO_HOLD',releaseLock:true,
+      reason:'synthetic_firewalled_day_projection_only',
+      slots:Object.freeze(slots),candidateTimes:Object.freeze(candidateTimes),
+      candidateCount:candidateTimes.length,bookingCreationAllowed:false,
+      databaseMutationAllowed:false,lineDispatchAllowed:false,
+      commercialProviderProofsVerified:0,requiredCommercialProviderProofs:7
+    });
+  }catch{return hold('malformed_fixture_failed_closed');}
+}
+
+return {CAR02_V492_RELEASE_LOCK,buildCar02FirewalledDayR492};
+})();
+
+const __car02_m7=(()=>{'use strict';
+const {buildCar02FirewalledDayR492,buildCar02MonthGridR487,car02JstTodayR487,createCar02SyntheticCalendarR487,evaluateCar02BookingInputFirewallR491}={...__car02_m0,...__car02_m1,...__car02_m2,...__car02_m3,...__car02_m4,...__car02_m5,...__car02_m6};
+/**
+ * V4.92 isolated UI: keyboard-accessible and V4.91 input-firewall guarded.
+ * No HTTP, storage, customer form, booking, hold, billing or notifications.
+ */
+
+
+
+
+const CAR02_V492_UI_RELEASE_LOCK=true;
+const ids=['month-title','days','slots','prev-month','next-month',
+  'chosen-day','chosen-time','confirm-preview','notice','slot-description'];
+const times=Object.freeze(Array.from({length:18},(_,i)=>{
+  const minutes=540+i*30;
+  return `${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
+}));
+
+/** Optional fixture argument is only for isolated negative testing. */
+function mountCar02BookingCalendarFirewalledR492(
+  root,clock=()=>new Date(),calendarFactory=createCar02SyntheticCalendarR487
+){
+  if(!root||typeof root.getElementById!=='function'||typeof root.createElement!=='function')
+    throw Error('preview_dom_missing');
+  const $=id=>root.getElementById(id);
+  if(ids.some(id=>!$(id))) throw Error('preview_dom_missing');
+  const today=car02JstTodayR487(clock());
+  if(!today) throw Error('preview_clock_invalid');
+  let [year,month]=today.split('-').map(Number);
+  let selectedDay=null,selectedTime=null,rovingDay=null;
+  let displayedDays=[],monthFirstOffset=0;
+  const text=(id,value)=>{$(id).textContent=value;};
+  const announce=value=>text('notice',value);
+  const makeButton=(label,cls)=>{
+    const b=root.createElement('button');b.type='button';b.className=cls;b.textContent=label;
+    return b;
+  };
+  const selected=()=>Object.freeze({day:selectedDay,time:selectedTime});
+  const updateSummary=()=>{
+    text('chosen-day',selectedDay||'未選択');
+    text('chosen-time',selectedTime||'未選択');
+    $('confirm-preview').disabled=!(selectedDay&&selectedTime);
+  };
+  const dayView=day=>{
+    const now=clock();
+    return buildCar02FirewalledDayR492({day,calendar:calendarFactory(now),now});
+  };
+  const validDay=day=>{
+    const view=dayView(day);
+    return view.reason==='synthetic_firewalled_day_projection_only'&&view.candidateCount>0;
+  };
+  const visibleDayCandidate=(day,calendar,now)=>times.some(time=>{
+    const decision=evaluateCar02BookingInputFirewallR491({
+      selection:{day,time},calendar,now
+    });
+    return decision.releaseLock===true&&decision.bookingCreationAllowed===false&&
+      decision.candidateAvailableInOfflineUi===true;
+  });
+  function updateDayButtons(){
+    for(const item of displayedDays){
+      item.button.setAttribute('aria-pressed',String(selectedDay===item.day));
+      item.button.tabIndex=item.day===rovingDay?0:-1;
+    }
+  }
+  function moveFocus(sourceDay,key,event){
+    const index=displayedDays.findIndex(item=>item.day===sourceDay);
+    if(index<0)return;
+    const delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[key];
+    let target=-1;
+    if(delta!==undefined){
+      for(let i=index+delta;i>=0&&i<displayedDays.length;i+=delta){
+        if(!displayedDays[i].button.disabled){target=i;break;}
+      }
+    }else if(key==='Home'||key==='End'){
+      const start=Math.floor((monthFirstOffset+index)/7)*7-monthFirstOffset;
+      const eligible=Array.from({length:7},(_,i)=>start+i)
+        .filter(i=>i>=0&&i<displayedDays.length&&!displayedDays[i].button.disabled);
+      target=eligible.length?(key==='Home'?eligible[0]:eligible.at(-1)):-1;
+    }else return;
+    event?.preventDefault?.();
+    if(target<0)return;
+    rovingDay=displayedDays[target].day;
+    updateDayButtons();displayedDays[target].button.focus?.();
+  }
+  function updateTimeButtons(){
+    for(const b of $('slots').children){
+      if(b.className.includes('candidate'))
+        b.setAttribute('aria-pressed',String(b.textContent===selectedTime));
+    }
+    updateSummary();
+  }
+  function renderTimes(){
+    const host=$('slots');host.replaceChildren();
+    if(!selectedDay){
+      text('slot-description','日付を選ぶと30分単位の時間候補が表示されます。');
+      updateSummary();return;
+    }
+    const view=dayView(selectedDay);
+    if(view.reason!=='synthetic_firewalled_day_projection_only'){
+      selectedTime=null;
+      text('slot-description','入力防御検査により、この日のデモ候補は表示できません。');
+      updateSummary();return;
+    }
+    text('slot-description','青：2段階の入力防御を通過した架空候補 ／ 灰色：選択不可');
+    if(selectedTime&&!view.candidateTimes.includes(selectedTime))selectedTime=null;
+    for(const slot of view.slots){
+      const enabled=slot.selectableInOfflineUi;
+      const b=makeButton(slot.time,enabled?'time candidate':'time unavailable');
+      b.disabled=!enabled;
+      b.setAttribute('aria-label',`${slot.time} ${enabled?'デモ選択可':'選択不可'}`);
+      b.setAttribute('aria-pressed',String(selectedTime===slot.time));
+      b.addEventListener('click',()=>{
+        const live=dayView(selectedDay);
+        if(!live.candidateTimes.includes(slot.time)){
+          selectedTime=null;renderTimes();
+          announce('入力防御検査で候補が失効しました。別の時間を選んでください。');
+          return;
+        }
+        selectedTime=slot.time;
+        updateTimeButtons();
+        announce(`${selectedDay} ${selectedTime} を架空のデモ候補として選びました。予約は成立していません。`);
+      });
+      host.append(b);
+    }
+    updateSummary();
+  }
+  function renderMonth(){
+    const now=clock();
+    const calendar=calendarFactory(now);
+    const grid=buildCar02MonthGridR487({year,month,calendar,now});
+    $('days').replaceChildren();displayedDays=[];
+    if(grid.reason!=='synthetic_month_projection_only'){
+      selectedDay=null;selectedTime=null;rovingDay=null;
+      text('month-title','候補を表示できません');
+      $('prev-month').disabled=true;$('next-month').disabled=true;
+      renderTimes();announce('入力防御検査に通らないためデモを表示できません。');return;
+    }
+    text('month-title',grid.monthTitle);
+    monthFirstOffset=grid.cells.findIndex(cell=>cell.type==='day');
+    $('prev-month').disabled=!grid.previousMonthAllowed;
+    $('next-month').disabled=!grid.nextMonthAllowed;
+    const selectable=grid.cells.filter(cell=>cell.type==='day'&&cell.selectableInOfflineUi&&
+      visibleDayCandidate(cell.day,calendar,now));
+    if(!selectable.some(cell=>cell.day===rovingDay))rovingDay=selectable[0]?.day??null;
+    for(const cell of grid.cells){
+      if(cell.type==='pad'){
+        const pad=root.createElement('span');pad.className='empty';
+        pad.setAttribute('aria-hidden','true');$('days').append(pad);continue;
+      }
+      const enabled=selectable.some(item=>item.day===cell.day);
+      const b=makeButton(String(cell.number),'calendar-day');
+      b.disabled=!enabled;
+      b.setAttribute('aria-label',`${cell.day} ${enabled?'デモ候補あり':'デモ候補なし'}`);
+      if(cell.day===car02JstTodayR487(now))b.setAttribute('aria-current','date');
+      b.addEventListener('click',()=>{
+        if(!validDay(cell.day)){
+          selectedDay=null;selectedTime=null;renderTimes();
+          announce('入力防御検査で日付候補が失効しました。');return;
+        }
+        selectedDay=cell.day;selectedTime=null;rovingDay=cell.day;
+        updateDayButtons();renderTimes();
+        announce(`${cell.day} を選択しました。架空の時間候補を選んでください。`);
+      });
+      b.addEventListener('keydown',e=>moveFocus(cell.day,e.key,e));
+      displayedDays.push({day:cell.day,button:b});$('days').append(b);
+    }
+    updateDayButtons();renderTimes();
+  }
+  function shiftMonth(delta){
+    const next=new Date(Date.UTC(year,month-1+delta,1));
+    year=next.getUTCFullYear();month=next.getUTCMonth()+1;
+    selectedDay=null;selectedTime=null;rovingDay=null;
+    renderMonth();
+  }
+  $('prev-month').addEventListener('click',()=>shiftMonth(-1));
+  $('next-month').addEventListener('click',()=>shiftMonth(1));
+  $('confirm-preview').addEventListener('click',()=>{
+    if(!(selectedDay&&selectedTime))return;
+    const checked=dayView(selectedDay);
+    if(!checked.candidateTimes.includes(selectedTime)){
+      selectedTime=null;renderTimes();
+      announce('入力防御検査により候補が失効しました。時間を選び直してください。');return;
+    }
+    announce(`${selectedDay} ${selectedTime}：架空デモの画面表示のみ確認しました。予約登録・仮確保・通知は行いません。`);
+  });
+  renderMonth();
+  announce('V4.97 安全な隔離プレビューです。すべて架空の候補です。');
+  return Object.freeze({getSelected:selected});
+}
+
+if(typeof document!=='undefined'&&document.body?.hasAttribute('data-car02-r492-preview')){
+  mountCar02BookingCalendarFirewalledR492(document);
+}
+
+return {CAR02_V492_UI_RELEASE_LOCK,mountCar02BookingCalendarFirewalledR492};
+})();
+
+const __car02_m8=(()=>{'use strict';
+const {mountCar02BookingCalendarFirewalledR492,createCar02SyntheticCalendarR487}={...__car02_m0,...__car02_m1,...__car02_m2,...__car02_m3,...__car02_m4,...__car02_m5,...__car02_m6,...__car02_m7};
+/**
+ * V4.93 OFFLINE UI resilience boundary. The V4.92 controller remains immutable.
+ * Hostile/missing fixtures, clock faults and DOM setup faults fail closed.
+ * Never adds booking, network, storage, billing or notification capability.
+ */
+
+
+const CAR02_V493_RELEASE_LOCK=true;
+
+const invalidDate=()=>new Date(NaN);
+const unselected=()=>Object.freeze({day:null,time:null});
+
+function safeClock(clock){
+  try{
+    const d=clock();
+    if(!(d instanceof Date)||Object.getPrototypeOf(d)!==Date.prototype||
+       Reflect.ownKeys(d).length!==0)return invalidDate();
+    const milliseconds=Date.prototype.getTime.call(d);
+    return Number.isFinite(milliseconds)?new Date(milliseconds):invalidDate();
+  }catch{return invalidDate();}
+}
+
+function safeSyntheticFactory(factory,now){
+  try{return factory(now);}catch{return null;}
+}
+
+function fullyLockDom(root){
+  try{
+    if(!root||typeof root.getElementById!=='function')return;
+    for(const id of ['prev-month','next-month','confirm-preview']){
+      const control=root.getElementById(id);
+      if(control)control.disabled=true;
+    }
+    for(const id of ['days','slots'])root.getElementById(id)?.replaceChildren?.();
+    const status=root.getElementById('notice');
+    if(status)status.textContent='入力・時計・画面の検査に失敗しました。表示を停止しました。予約は行いません。';
+    const month=root.getElementById('month-title');
+    if(month)month.textContent='安全確認が必要です';
+    for(const id of ['chosen-day','chosen-time']){
+      const item=root.getElementById(id);
+      if(item)item.textContent='未選択';
+    }
+  }catch{
+    // Root itself may be a hostile test double. No effect escapes this boundary.
+  }
+}
+
+/** Preview-only controller with failure containment and immutable API. */
+function mountCar02BookingCalendarResilientR493(
+  root,clock=()=>new Date(),calendarFactory=createCar02SyntheticCalendarR487
+){
+  try{
+    if(typeof clock!=='function'||typeof calendarFactory!=='function')
+      throw Error('preview_dependencies_invalid');
+    const inner=mountCar02BookingCalendarFirewalledR492(
+      root,()=>safeClock(clock),now=>safeSyntheticFactory(calendarFactory,now)
+    );
+    if(!inner||typeof inner.getSelected!=='function')
+      throw Error('preview_controller_invalid');
+    return Object.freeze({
+      getSelected:()=>inner.getSelected(),
+      releaseLock:true,commercialDecision:'NO_GO_HOLD',
+      bookingCreationAllowed:false
+    });
+  }catch{
+    fullyLockDom(root);
+    return Object.freeze({
+      getSelected:unselected,
+      releaseLock:true,commercialDecision:'NO_GO_HOLD',
+      bookingCreationAllowed:false
+    });
+  }
+}
+
+if(typeof document!=='undefined'&&document.body?.hasAttribute('data-car02-r493-preview')){
+  mountCar02BookingCalendarResilientR493(document);
+}
+
+return {CAR02_V493_RELEASE_LOCK,mountCar02BookingCalendarResilientR493};
+})();
+</script>
+</body>
+</html>
