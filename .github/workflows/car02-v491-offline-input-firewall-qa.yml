@@ -1,0 +1,91 @@
+name: CAR02 V4.91 Strict Offline Input Firewall QA (NO_GO HOLD)
+# Synthetic, read-only verification on the existing review-only branch.
+'on':
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-booking-input-firewall-r491.mjs'
+      - 'car02-booking-input-firewall-r491.test.mjs'
+      - 'car02-v491-offline-input-firewall-contract.json'
+      - 'CAR02_V491_INPUT_FIREWALL_QA.md'
+      - '.github/workflows/car02-v491-offline-input-firewall-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  strict-offline-input-firewall:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review-only branch without stored credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin V4.90 formally accepted baseline and R52 no-release lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V491_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$(git hash-object CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html)" = '927221d54fce04dbdf246d85bb5d3809a65ab820'
+          test "$(sha256sum CAR02_V489_STANDALONE_OFFLINE_BOOKING_PREVIEW.html | awk '{print $1}')" = '6b07eacfb56aaf2004fdf4bbddb2e40563a3e957304fad3c9abcd763a5ebbc38'
+          test "$(git hash-object .github/workflows/car02-v490-offline-boundary-human-ui-qa.yml)" = '957a430722ef272fbe80731ed63740576ca985c7'
+          for f in car02-booking-input-firewall-r491.mjs car02-booking-input-firewall-r491.test.mjs car02-v491-offline-input-firewall-contract.json CAR02_V491_INPUT_FIREWALL_QA.md .github/workflows/car02-v491-offline-input-firewall-qa.yml; do test -s "$f"; done
+          echo V491_V490_ACCEPTED_R52_LOCK_AND_V489_HTML_IMMUTABLE_PASS
+      - name: Run 59 new input firewall TAP tests independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-booking-input-firewall-r491.mjs
+          node --check car02-booking-input-firewall-r491.test.mjs
+          node --test-reporter=tap car02-booking-input-firewall-r491.test.mjs | tee "$RUNNER_TEMP/v491-new-tests.log"
+          total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v491-new-tests.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v491-new-tests.log")
+          test "$total" = 59
+          test "$passed" = "$total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v491-new-tests.log"
+          echo V491_STRICT_INPUT_FIREWALL_59_PASS
+      - name: Verify strictly nonauthorizing and disconnected contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {evaluateCar02BookingInputFirewallR491 as evaluate} from './car02-booking-input-firewall-r491.mjs';
+          const c=JSON.parse(readFileSync('car02-v491-offline-input-firewall-contract.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');assert.equal(c.version,'V4.91');
+          assert.equal(c.branch,'car02-v434-review-only');assert.equal(c.baseVersion,'V4.90');
+          assert.equal(c.baseRunId,39748618887);assert.equal(c.baseNodeTests,1396);
+          assert.equal(c.newNodeTests,59);assert.equal(c.expectedMinimumNodeTests,1455);
+          assert.equal(c.adapterWiredToCustomerUI,false);assert.equal(c.adapterUsedForRealBooking,false);
+          assert.equal(c.acceptedV489HtmlUnmodified,true);assert.equal(c.sourceLogicUnmodified,true);
+          for(const k of ['bookingCreationAllowed','databaseMutationAllowed','lineDispatchAllowed',
+            'providerConnectionAllowed','productionDeployAllowed','billingChangeAllowed'])
+            assert.equal(c[k],false,k);
+          assert.equal(c.releaseLock,true);assert.equal(c.commercialDecision,'NO_GO_HOLD');
+          assert.equal(c.providerProofsVerified,0);assert.equal(c.requiredProviderProofs,7);
+          const r=evaluate({selection:{day:'2026-10-23',time:'10:30'},
+            calendar:{systemCode:'CAR02',environment:'isolated_qa',coverageThrough:'2027-10-22',closedDays:[],occupiedSlots:[]},
+            now:new Date('2026-10-22T01:10:00.000Z')});
+          assert.equal(r.candidateAvailableInOfflineUi,true);
+          assert.equal(r.bookingCreationAllowed,false);assert.equal(r.releaseLock,true);
+          assert.equal(r.commercialDecision,'NO_GO_HOLD');
+          console.log('V491_SYNTHETIC_CANDIDATE_NEVER_LIVE_AUTHORITY_PASS');
+          NODE
+      - name: Run entire repository suite without losing accepted coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v491-all-tests.log"
+          total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v491-all-tests.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v491-all-tests.log")
+          test "$total" -ge 1455
+          test "$passed" = "$total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v491-all-tests.log"
+          echo V491_ALL_TESTS_MINIMUM_1455_PASS
