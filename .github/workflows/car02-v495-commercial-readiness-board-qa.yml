@@ -1,0 +1,103 @@
+name: CAR02 V4.95 Commercial Readiness Board QA (NO_GO HOLD)
+'on':
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-commercial-readiness-board-r495.mjs'
+      - 'car02-commercial-readiness-board-r495.test.mjs'
+      - 'car02-v495-commercial-readiness-contract.json'
+      - 'CAR02_V495_COMMERCIAL_READINESS_OFFLINE_BOARD.html'
+      - 'CAR02_V495_COMMERCIAL_READINESS_OFFLINE_QA.md'
+      - '.github/workflows/car02-v495-commercial-readiness-board-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  commercial-readiness-board:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout review-only branch without credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Freeze R52 and formally accepted V4.94 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V495_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$(git hash-object CAR02_V494_READABLE_STANDALONE_OFFLINE_PREVIEW.html)" = 'ac6a64f187d9c04f31b6810bb03d14428c45a12f'
+          test "$(sha256sum CAR02_V494_READABLE_STANDALONE_OFFLINE_PREVIEW.html | awk '{print $1}')" = 'ac2d04c351892d218894926ea3fd2e45fef399e996b177778f94baadf5be663e'
+          test "$(git hash-object car02-evidence-provenance-gate-r484.mjs)" = '1bf29618aaf14a35f0adebda292078ac9b8baea8'
+          test "$(sha256sum car02-evidence-provenance-gate-r484.mjs | awk '{print $1}')" = '360b92c2756cefbb388b874dc862c7cc2ba8d0be8447050e455e0fff9dcd6309'
+          for f in car02-commercial-readiness-board-r495.mjs car02-commercial-readiness-board-r495.test.mjs car02-v495-commercial-readiness-contract.json CAR02_V495_COMMERCIAL_READINESS_OFFLINE_BOARD.html CAR02_V495_COMMERCIAL_READINESS_OFFLINE_QA.md; do test -s "$f"; done
+          echo V495_V494_ACCEPTED_R52_AND_PROVENANCE_PIN_PASS
+      - name: Run 28 new commercial-readiness isolation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-commercial-readiness-board-r495.mjs
+          node --check car02-commercial-readiness-board-r495.test.mjs
+          node --test-reporter=tap car02-commercial-readiness-board-r495.test.mjs | tee "$RUNNER_TEMP/v495-new-tests.log"
+          total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v495-new-tests.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v495-new-tests.log")
+          test "$total" = 28
+          test "$passed" = "$total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v495-new-tests.log"
+          echo V495_NEW_READINESS_TESTS_28_PASS
+      - name: Regenerate immutable and offline-only readiness board
+        shell: bash
+        run: |
+          set -euo pipefail
+          node car02-commercial-readiness-board-r495.mjs
+          test "$(sha256sum CAR02_V495_COMMERCIAL_READINESS_OFFLINE_BOARD.html | awk '{print $1}')" = '1e6b3a6da1c3145cb733bd4596b3bc5ed65d783afa991e1fb8afcac9c6679b0a'
+          git diff --exit-code -- CAR02_V495_COMMERCIAL_READINESS_OFFLINE_BOARD.html
+          echo V495_DETERMINISTIC_NO_NETWORK_BOARD_PASS
+      - name: Verify report never elevates commercial authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {buildCar02ReadinessBoardR495} from './car02-commercial-readiness-board-r495.mjs';
+          const c=JSON.parse(readFileSync('car02-v495-commercial-readiness-contract.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');assert.equal(c.version,'V4.95');
+          assert.equal(c.acceptedBaseRunId,39886974339);
+          assert.equal(c.acceptedBaseNodeTests,1521);assert.equal(c.newNodeTests,28);
+          assert.equal(c.expectedMinimumNodeTests,1549);
+          assert.equal(c.changeKind,'offline_commercial_readiness_reporting_only');
+          assert.equal(c.acceptedV494JavaScriptUnmodified,true);
+          assert.equal(c.acceptedV494HtmlUnmodified,true);
+          assert.equal(c.humanVisualAcceptanceVerified,false);
+          assert.equal(c.offlineBoardCannotGrantCommercialAuthority,true);
+          assert.equal(c.releaseLock,true);assert.equal(c.commercialDecision,'NO_GO_HOLD');
+          assert.equal(c.independentlyVerifiedRealProviderProofs,0);
+          assert.equal(c.requiredRealProviderProofs,7);
+          for(const k of ['bookingCreationAllowed','productionDeployAllowed','databaseMutationAllowed',
+            'lineDispatchAllowed','providerConnectionAllowed','billingChangeAllowed',
+            'githubMainMutationAllowed'])assert.equal(c[k],false,k);
+          const html=buildCar02ReadinessBoardR495();
+          assert.ok(html.includes('NO_GO / HOLD'));
+          assert.ok(html.includes('0 / 7'));
+          assert.ok(html.includes("script-src 'none'"));
+          assert.ok(html.includes("connect-src 'none'"));
+          console.log('V495_OFFLINE_BOARD_NO_COMMERCIAL_GO_PASS');
+          NODE
+      - name: Run full repository regression retaining V4.94 coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v495-full-tests.log"
+          total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v495-full-tests.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v495-full-tests.log")
+          test "$total" -ge 1549
+          test "$passed" = "$total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v495-full-tests.log"
+          echo V495_FULL_REGRESSION_MINIMUM_1549_PASS
