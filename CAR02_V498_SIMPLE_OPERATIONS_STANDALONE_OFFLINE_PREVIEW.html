@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#152b42">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'">
+<title>DPRO CAR02｜共通基本版 統合プレビュー V1.8.2（隔離）</title>
+<style>
+:root{font-family:system-ui,-apple-system,'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;font-size:16px;color:#172d42;background:#f1f5f9;--navy:#152b42;--sub:#576b7e;--line:#d9e3ec;--gold:#b27823;--light:#f7fafc;--blue:#184d84;--green:#12694b}
+*{box-sizing:border-box}html,body{margin:0;min-width:0;width:100%;max-width:100%;overflow-x:hidden}button,input,select,textarea{font:inherit}button{cursor:pointer;min-height:44px}button:disabled{opacity:.46;cursor:not-allowed}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #dcac51;outline-offset:3px}small{color:var(--sub)}a{color:#16558d}.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--navy);color:white;padding:27px 17px 24px;display:flex;flex-direction:column;gap:24px}.brand{display:flex;align-items:center;gap:11px;padding:5px 4px 14px;border-bottom:1px solid #385066}.mark{background:linear-gradient(145deg,#e2b977,#95611f);color:#fff;border-radius:12px;display:grid;place-items:center;width:46px;height:46px;font-weight:900;font-size:18px;flex-shrink:0}.brand strong{display:block;font-size:18px;letter-spacing:.02em}.brand span{display:block;font-size:12px;color:#bdccda;margin-top:3px}.nav{display:grid;gap:8px}.nav button{border:1px solid transparent;border-radius:11px;padding:12px 14px;background:transparent;color:#dce8f4;text-align:left;font-weight:750;display:flex;align-items:center;gap:12px;width:100%}.nav button[aria-current="page"]{background:#fff;color:var(--navy)}.nav .number{min-width:25px;font-size:12px;opacity:.7}.side-note{margin-top:auto;color:#c1d3e4;font-size:13px;line-height:1.7;padding:12px;border:1px solid #4a647a;border-radius:10px}.main{padding:26px clamp(14px,3vw,36px) 68px;min-width:0;max-width:1480px;width:100%;margin:auto}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;flex-wrap:wrap;margin-bottom:22px}.eyebrow{font-size:12px;color:#916321;font-weight:900;letter-spacing:.13em;margin:0 0 8px}.top h1{font-size:clamp(23px,3vw,31px);margin:0 0 7px}.muted{color:var(--sub);line-height:1.65;margin:0}.tag{display:inline-flex;align-items:center;gap:7px;border:1px solid #eac88c;background:#fff5dc;color:#85510d;border-radius:100px;padding:8px 13px;font-size:12px;font-weight:850}.notice{background:#fff7df;border:1px solid #e5cf9a;border-left:5px solid var(--gold);border-radius:11px;padding:14px 17px;color:#684811;line-height:1.7;margin-bottom:22px;font-size:14px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.stat{padding:18px;border:1px solid var(--line);border-radius:13px;background:#fff}.stat span{display:block;color:var(--sub);font-size:13px;font-weight:700}.stat strong{display:block;margin-top:6px;font-size:29px;line-height:1.2;letter-spacing:-.04em}.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,.85fr);gap:16px;align-items:start}.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:22px;min-width:0;box-shadow:0 6px 18px #18324c07}.panel h2{margin:0 0 13px;font-size:19px}.panel h3{font-size:16px;margin:18px 0 10px}.panel .desc{color:var(--sub);font-size:14px;line-height:1.7;margin:0 0 16px}.panel + .panel{margin-top:16px}.field{display:grid;gap:7px;margin-bottom:14px}.field label{font-size:14px;font-weight:800}.field input,.field select,.field textarea{width:100%;padding:12px;min-height:46px;border:1px solid #a9bdce;border-radius:9px;color:#203b53;background:#fff;font-size:16px;min-width:0}.field textarea{min-height:100px;resize:vertical}.twocol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:1px solid transparent;border-radius:10px;background:#ebf1f6;color:#24435d;font-weight:800;padding:10px 16px}.btn.primary{background:#21558a;color:white}.btn.gold{background:#ad6d25;color:white}.btn.danger{background:#a4483c;color:white}.btn.ghost{background:white;border-color:#c4d4e0}.list{display:grid;gap:9px}.item{display:block;width:100%;text-align:left;padding:13px;border-radius:10px;border:1px solid #d6e2eb;background:#f9fbfd;color:#18334a}.item.selected{background:#ecf5ff;border-color:#5e96c8;box-shadow:0 0 0 1px #5e96c8 inset}.item strong{font-size:15px}.item small{display:block;margin-top:6px;font-size:12px}.pill{padding:4px 8px;border-radius:40px;font-size:12px;font-weight:850;background:#eaf2fb;color:#1d5184;white-space:nowrap}.pill.ok{background:#e7f6ee;color:#116747}.pill.wait{background:#fff1d9;color:#85500e}.pill.off{background:#fbece9;color:#8c3d36}.detail{display:grid;gap:10px}.detailrow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;padding-bottom:10px;border-bottom:1px solid #e7edf2;font-size:14px}.detailrow dt{color:var(--sub)}.detailrow dd{margin:0;font-weight:750;overflow-wrap:anywhere}.amount{font-size:29px;font-weight:900;color:#163e63;letter-spacing:-.03em}.timeline{padding:0 0 0 22px;line-height:1.9}.timeline li{padding:0 0 5px;color:#29475f}.empty{border:1px dashed #bed0de;padding:20px;border-radius:10px;color:var(--sub);background:#f8fbfe;line-height:1.7}.toast{padding:12px 15px;margin:12px 0 0;border-radius:10px;font-size:14px;background:#e8f5ec;color:#1c6b49;font-weight:750;min-height:48px}.toast.error{background:#fff0ed;color:#a13228}.view[hidden]{display:none!important}.spaced{display:grid;gap:16px}.tablewrap{overflow-x:auto}.compact{border-collapse:collapse;width:100%;min-width:460px;font-size:14px}.compact th,.compact td{border-bottom:1px solid #dce6ee;padding:12px;text-align:left}.compact th{color:var(--sub);background:#f4f8fc}.label-note{font-size:12px;color:#627489;line-height:1.6}.footer{margin-top:25px;padding-top:16px;border-top:1px solid #dbe5ed;font-size:13px;color:#62788b;line-height:1.65}@media(max-width:1060px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.app{grid-template-columns:1fr}.sidebar{padding:13px 14px;gap:11px}.brand{padding:2px 3px 10px}.side-note{display:none}.nav{display:flex;overflow-x:auto;gap:6px;padding-bottom:2px}.nav button{white-space:nowrap;width:auto;padding:10px 13px;border:1px solid #39516a}.nav .number{display:none}.main{padding:17px 13px 42px}.stats{gap:8px}.stat{padding:13px}.stat strong{font-size:24px}.panel{padding:18px}.twocol{grid-template-columns:1fr}.top{margin-bottom:14px}.top h1{font-size:24px}.detailrow{grid-template-columns:92px minmax(0,1fr)}}
+
+/* R258 basic-version reservation calendar; synthetic preview, not a live availability API. */
+.calendar-box{border:1px solid #d5e3ed;border-radius:13px;padding:16px;background:#f9fbfe;margin:10px 0 16px}
+.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.calendar-head strong{font-size:19px;text-align:center}
+.calendar-head button{background:white;border:1px solid #b8cbdc;border-radius:9px;min-width:48px;min-height:44px;color:#1a4c79;font-weight:900;font-size:18px}
+.cal-week,.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.cal-week span{text-align:center;color:#47617c;font-weight:800;font-size:12px;padding:4px 0}
+.cal-week span:last-child{color:#9c4c40}
+.cal-day{width:100%;min-width:0;min-height:48px;padding:2px 1px;border:1px solid #d3e2ed;border-radius:8px;background:white;color:#194263;font-size:15px;font-weight:850}
+.cal-day[aria-pressed="true"]{background:#1c5688;border-color:#1c5688;color:white}
+.cal-day:disabled{background:#edf1f6;color:#7b8895;border-color:#e0e6ed;opacity:1;cursor:not-allowed}
+.cal-empty{min-height:48px}
+.cal-day .today-dot{display:block;font-size:9px;font-weight:800}
+.cal-slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.cal-slot{border:1px solid #bfd5e5;border-radius:9px;background:white;color:#154976;padding:9px 2px;min-height:46px;font-weight:850;font-size:15px}
+.cal-slot[aria-pressed="true"]{background:#1c5688;color:white;border-color:#1c5688}
+.cal-slot:disabled{background:#edf1f5;color:#7b8895;border-color:#e1e6ec;opacity:1}
+.cal-legend{display:flex;gap:13px;flex-wrap:wrap;font-size:12px;color:#5d6f7f;line-height:1.6;margin:12px 0}
+.cal-selection{margin:9px 0 13px;background:#e6f1fb;color:#174c77;padding:11px 12px;border-radius:9px;line-height:1.6;font-weight:800}
+@media(max-width:680px){.calendar-box{padding:11px}.cal-week,.cal-grid{gap:3px}.cal-day,.cal-empty{min-height:43px}.cal-slots{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.app{grid-template-columns:minmax(0,1fr)}.sidebar,.main{min-width:0;max-width:100%;width:100%}.nav{min-width:0;max-width:100%;overflow-x:auto}.top .tag{max-width:100%}}
+
+.staff-qa-box{margin-top:22px;padding:18px;border-radius:12px;border:1px solid #a9c7d9;background:#f3f9ff}
+.staff-qa-box h3{margin:0 0 9px;color:#174d79}
+.staff-qa-box .label-note{overflow-wrap:anywhere;margin-top:10px}
+@media(max-width:720px){.staff-qa-box{padding:13px}.staff-qa-box .actions{display:grid}.staff-qa-box .btn{width:100%}}
+
+/* V1.8.2 — legibility/accessibility pass, synthetic demo only. */
+.owner-table-hint{display:none}
+@media(max-width:720px){.owner-table-hint{display:block}}
+/* Keep the five-column owner table readable at medium widths. It scrolls only inside its panel on narrow devices. */
+#view-owner .compact{min-width:670px}
+#view-owner .compact th{white-space:nowrap}
+@media(max-width:1450px){#view-owner .layout{grid-template-columns:minmax(0,1fr)}}
+
+.brand span{font-size:13px}
+.nav button{font-size:16px;line-height:1.5}
+.side-note{font-size:14px}
+.eyebrow,.tag,.nav .number{font-size:13px}
+.notice{font-size:15px}
+.panel .desc,.field label,.detailrow,.compact,.toast,.label-note,.footer,.cal-legend,.cal-selection,.timeline{font-size:15px;line-height:1.75}
+.stat span{font-size:15px}
+.item strong{font-size:16px}
+.item small{font-size:14px}
+.pill{font-size:13px}
+.compact th,.compact td{padding:13px}
+.panel .desc,.detailrow dd,.label-note,.notice,.footer,.item{overflow-wrap:anywhere}
+.demo-steps{padding:12px 14px;margin:0 0 16px;border:1px solid #c9ddeb;border-left:4px solid #21558a;border-radius:10px;background:#f5faff;color:#24465f;font-size:15px;line-height:1.75}
+.demo-steps strong{color:#173a5e}
+@media(max-width:720px){
+ .brand span{font-size:13px}.nav button{font-size:15px}
+ .panel .desc,.field label,.detailrow,.toast,.label-note,.footer,.cal-legend,.cal-selection,.timeline{font-size:14px}
+ .notice,.demo-steps{font-size:14px}
+ .stat span{font-size:14px}
+ .item small{font-size:13px}
+}
+.owner-case-link{border:1px solid #b8cadc;border-radius:9px;padding:7px 11px;background:#f1f7fc;color:#16486e;font-weight:800;min-height:44px;white-space:nowrap}
+.owner-case-link:hover{background:#e0eff9}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar"><div class="brand"><div class="mark">DP</div><div><strong>DPRO CAR02</strong><span>共通基本版／隔離プレビュー</span></div></div><nav class="nav" aria-label="業務メニュー">
+<button type="button" data-tab="dashboard" aria-current="page"><span class="number">01</span>業務ダッシュボード</button>
+<button type="button" data-tab="booking"><span class="number">02</span>予約WEB</button>
+<button type="button" data-tab="staff"><span class="number">03</span>スタッフ整備</button>
+<button type="button" data-tab="customer"><span class="number">04</span>お客様確認</button>
+<button type="button" data-tab="owner"><span class="number">05</span>オーナー管理</button>
+</nav><div class="side-note">実際の店舗・お客様情報は入力しないでください。すべて架空データで動作するブラウザ内プレビューです。</div></aside>
+<main class="main"><div class="top"><div><p class="eyebrow">DPRO CAR02 / BASIC PRODUCT PREVIEW</p><h1 id="pageTitle">業務ダッシュボード</h1><p class="muted" id="pageLead">予約と整備案件の進捗を1つの画面で確認します。</p></div><span class="tag">隔離デモ · 本番 NO_GO · DB HOLD</span></div>
+<div class="notice"><strong>操作できる共通画面の試作版です。</strong> 予約・顧客・車両・整備・見積・承認をブラウザ内で確認できます。スタッフ受付の架空予約UUIDを整備案件に紐付けて表示しますが、実予約、LINE認証、実DB、写真Storage、Workerには接続せず、更新すると内容は消えます。</div>
+<div class="stats" aria-label="業務件数"><div class="stat"><span>予約案件</span><strong id="stat-all">0</strong></div><div class="stat"><span>整備報告待ち</span><strong id="stat-booked">0</strong></div><div class="stat"><span>お客様の承認待ち</span><strong id="stat-pending">0</strong></div><div class="stat"><span>作業完了</span><strong id="stat-completed">0</strong></div></div>
+<section id="view-dashboard" class="view"><div class="layout"><div class="panel"><h2>案件一覧</h2><p class="desc">案件を選ぶと、スタッフ整備とお客様確認の両方へ引き継がれます。</p><div class="list" id="dashboard-list"></div></div><div class="panel"><h2>選択中の案件</h2><div id="dashboard-detail"></div><div class="actions" style="margin-top:18px"><button class="btn primary" id="dashboard-go-staff">スタッフ画面へ</button><button class="btn ghost" id="dashboard-go-customer">お客様画面へ</button></div></div></div></section>
+<section id="view-booking" class="view" hidden><div class="layout"><div class="panel"><h2>予約WEB・受付画面（共通統合 V4.98）</h2><p class="demo-steps"><strong>操作ガイド：</strong>①日付を選ぶ → ②空いている時間を選ぶ → ③下の「架空予約を登録」またはスタッフ代行受付を押します。実際の予約は入りません。</p><p class="desc">架空顧客と車両を登録し、30分単位の日時で予約します。重複予約と過去日時は拒否されます。</p><div class="twocol"><div class="field"><label for="b-customer">お客様表示名（架空）</label><input id="b-customer" maxlength="80" value="架空顧客C"></div><div class="field"><label for="b-vehicle">車両表示名（架空）</label><input id="b-vehicle" maxlength="80" value="デモ車両C"></div></div><div class="calendar-box" aria-label="予約日時の選択（隔離プレビュー）"><div class="calendar-head"><button type="button" id="cal-prev" aria-label="前の月">◀</button><strong id="cal-month">—</strong><button type="button" id="cal-next" aria-label="次の月">▶</button></div><div class="cal-week"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div><div class="cal-grid" id="cal-days" aria-label="予約可能日"></div><div class="cal-legend"><span>日曜日：休業（仮設定）</span><span>受付：本日〜60日先</span><span>30分単位・9:00〜17:30開始（仮設定）</span></div><h3>時間を選択</h3><div id="cal-slots" class="cal-slots" aria-label="予約可能な時間枠"></div><p class="cal-selection" id="cal-selection" aria-live="polite">日付と時間を選んでください。</p><input id="b-date" type="hidden" value=""></div><button class="btn primary" id="booking-create" disabled>架空予約を登録</button><p class="label-note">ここでは顧客ID・車両ID・予約IDを発行しません。既存R13/R45への実接続は別工程です。</p><p id="booking-result" class="toast" aria-live="polite" hidden></p>
+<div class="staff-qa-box" aria-label="スタッフ受付HTTP形式の架空検証">
+<h3>スタッフ代行受付｜V1.6接続検証</h3>
+<p class="desc">上の30分カレンダーで日時を選び、架空のお客様を指定します。V1.6のHTTP送信契約を使いますが、通信はページ内の模擬処理だけです。ここで生成した架空予約UUIDが整備・見積・承認画面に引き継がれます。</p>
+<div class="field"><label for="staff-customer">受付する架空顧客</label><select id="staff-customer"><option value="11111111-1111-4111-8111-111111111111">架空顧客A ／ デモ車両A</option><option value="33333333-3333-4333-8333-333333333333">架空顧客B ／ デモ車両B</option></select></div>
+<div class="actions"><button type="button" class="btn gold" id="booking-staff-create" disabled>スタッフ受付として登録（架空）</button><button type="button" class="btn ghost" id="booking-staff-retry" disabled>直前の受付を再送</button></div>
+<div class="label-note" id="staff-uuid" aria-live="polite">架空予約UUID：まだ登録されていません。</div>
+<p class="label-note">画面内だけの合成認証です。実店舗・実顧客情報やパスワードは入力しないでください。</p>
+</div>
+</div><div class="panel"><h2>受付済みの予約</h2><p class="desc">変更・取消する案件を選択してください。</p><div id="booking-list" class="list"></div><h3 style="margin-top:20px">予約を変更・キャンセル</h3><p class="desc" id="booking-selected-info">変更する案件を選択してください。</p><p class="label-note">日時変更：左のカレンダーで新しい空き枠を選び、ボタンを押します。キャンセルした枠は再び予約できます。</p><div class="actions"><button type="button" class="btn gold" id="booking-reschedule" disabled>選んだ日時に変更</button><button type="button" class="btn danger" id="booking-cancel" disabled>予約をキャンセル</button></div><p id="booking-edit-result" class="toast" aria-live="polite" hidden></p></div></div></section>
+<section id="view-staff" class="view" hidden><div class="layout"><div class="spaced"><div class="panel"><h2>スタッフ｜整備報告</h2><p class="demo-steps"><strong>操作ガイド：</strong>①整備報告を記録 → ②追加見積を提示 → ③「お客様確認」で承認 → ④スタッフ画面に戻って作業完了を登録します。</p><p class="desc">選択案件の整備内容を記録します。報告済み案件のみ見積へ進めます。</p><div class="field"><label for="s-observation">点検・整備内容</label><textarea id="s-observation">ブレーキの摩耗を確認。部品交換をご提案します。</textarea></div><button class="btn primary" id="staff-report">整備報告を記録</button></div><div class="panel"><h2>スタッフ｜追加見積</h2><div class="twocol"><div class="field"><label for="s-item">作業項目</label><input id="s-item" value="ブレーキ点検"></div><div class="field"><label for="s-price">金額（円・税込計算なし）</label><input id="s-price" type="number" min="0" step="1" value="3000"></div></div><p class="desc">今回の隔離モデルの金額表示は合計であり、正式な消費税計算ではありません。</p><button class="btn gold" id="staff-quote">見積をお客様へ提示（デモ）</button></div><div class="panel"><h2>スタッフ｜作業完了</h2><p class="desc">お客様が承認した案件だけ完了処理できます。</p><button class="btn primary" id="staff-complete">作業完了を登録</button></div></div><div class="spaced"><div class="panel"><h2>対象案件を選択</h2><div class="list" id="staff-list"></div></div><div class="panel"><h2>案件の状態</h2><div id="staff-detail"></div><p id="staff-result" class="toast" hidden aria-live="polite"></p></div></div></div></section>
+<section id="view-customer" class="view" hidden><div class="layout"><div class="panel"><h2>お客様｜見積内容の確認</h2><p class="demo-steps"><strong>操作ガイド：</strong>スタッフが整備報告・見積提示を行うと、ここで承認・見送りを選択できます。本人認証を行う画面ではありません。</p><p class="desc">本来はLINE本人認証済みの顧客のみ閲覧・承認できる画面です。ここでは架空のお客様として操作します。</p><div id="customer-quote"></div><div class="actions" style="margin-top:17px"><button class="btn primary" id="customer-approve">この見積を承認</button><button class="btn danger" id="customer-decline">今回は見送る</button></div><p id="customer-result" class="toast" hidden aria-live="polite"></p></div><div class="spaced"><div class="panel"><h2>確認する案件</h2><div class="list" id="customer-list"></div></div><div class="panel"><h2>予約・作業の履歴</h2><div id="customer-history"></div></div></div></div></section>
+<section id="view-owner" class="view" hidden><div class="layout"><div class="panel"><h2>オーナー｜業務一覧</h2><p class="desc">共通版の業務状態を確認します。これは顧客別の本番権限管理画面ではありません。</p><p class="label-note owner-table-hint">案件番号を押すと予約画面へ移動します。スマートフォンでは表を左右にスワイプして確認できます。</p><div class="tablewrap"><table class="compact"><thead><tr><th>案件</th><th>架空予約UUID</th><th>顧客（架空）</th><th>予約日時</th><th>状態</th></tr></thead><tbody id="owner-table"></tbody></table></div></div><div class="panel"><h2>環境・安全状態</h2><div class="detail"><div class="detailrow"><dt>公開</dt><dd>NO_GO（維持）</dd></div><div class="detailrow"><dt>DB移行</dt><dd>HOLD（維持）</dd></div><div class="detailrow"><dt>本番認証</dt><dd>未接続</dd></div><div class="detailrow"><dt>写真Storage</dt><dd>未接続</dd></div><div class="detailrow"><dt>実店舗RLS</dt><dd>受入待ち</dd></div><div class="detailrow"><dt>データ保存</dt><dd>ブラウザ内の一時状態のみ</dd></div></div><h3>デモの初期化</h3><p class="desc">架空データを初期状態へ戻します。実システムへ変更は加えません。</p><button class="btn ghost" id="owner-reset">架空データを初期化</button><p id="owner-result" class="toast" hidden aria-live="polite"></p></div></div></section>
+<div class="footer">DPRO CAR02 統合プレビュー V4.98（予約変更・キャンセル追加）。V1.6 HTTP形式の架空予約UUIDはスタッフ／お客様／オーナー画面に共有されます。R258合格・実DB検査とは別のブラウザ内試作です。権限の表示切替は本人認証の代替ではありません。実顧客情報、秘密情報は入力しないでください。</div>
+</main></div>
+<script type="module">
+// R498 isolated demo, embedded dependencies for one-file offline preview. NO_GO/HOLD.
+/** CAR02 customer journey in-memory acceptance model. Synthetic test data ONLY.
+ * NOT a production API, database, authentication, tenant RLS or release proof.
+ */
+const DELIVERY_MODE = Object.freeze({environment:'isolated_demo',release:'NO_GO',migration:'HOLD',externalAccess:false,photoStorage:false});
+const error=(code)=>{const e=new Error(code);e.code=code;throw e};
+const requireText=(v,max=160)=>typeof v==='string'&&v.trim().length>0&&v.trim().length<=max;
+// Local wall-clock datetime: reject rollover (e.g. February 30) and off-grid times.
+const validDate=(v)=>{
+ if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:(00|30)$/.test(v))return false;
+ const [year,month,day,hour,minute]=v.match(/\d+/g).map(Number);
+ const d=new Date(year,month-1,day,hour,minute,0,0);
+ return year>=2000&&year<=9999&&d.getFullYear()===year&&d.getMonth()===month-1&&
+  d.getDate()===day&&d.getHours()===hour&&d.getMinutes()===minute;
+};
+function makeCar02Demo({now=()=>new Date()}={}) {
+  const cases=new Map();let seq=0;
+  function requireCase(id,shop){let c=cases.get(id);if(!c)error('CASE_NOT_FOUND');if(c.shop!==shop)error('TENANT_DENIED');return c;}
+  const roles={create:['staff','owner'],reschedule:['staff','owner'],cancel:['staff','owner'],report:['staff','owner'],quote:['staff','owner'],decision:['customer'],complete:['staff','owner']};
+  function role(action,actor){if(!actor||!requireText(actor.shop,80)||!roles[action].includes(actor.role))error('ROLE_DENIED')}
+  function version(c,expected){if(!Number.isSafeInteger(expected)||expected!==c.version)error('VERSION_CONFLICT')}
+  const copy=(c)=>structuredClone(c);
+  return Object.freeze({
+    create(actor,data){role('create',actor);if(!data||!requireText(data.customer,80)||!requireText(data.vehicle,80)||!validDate(data.start)||new Date(data.start).getTime()<=now().getTime())error('BOOKING_INVALID');
+      // Conservative model: one reservation per store/time slot. Real DB must enforce atomic uniqueness.
+      if([...cases.values()].some(c=>c.shop===actor.shop&&c.status!=='cancelled'&&c.start===data.start))error('BOOKING_SLOT_OCCUPIED');
+      const id=`DEMO-${String(++seq).padStart(4,'0')}`;let c={id,shop:actor.shop,customer:data.customer.trim(),vehicle:data.vehicle.trim(),start:data.start,status:'booked',report:'',quote:[],decision:null,version:1,history:['予約作成']};cases.set(id,c);return copy(c)},
+    view(actor,id){if(!actor||!requireText(actor.shop,80))error('ROLE_DENIED');const c=requireCase(id,actor.shop);if(actor.role==='customer'&&actor.customer!==c.customer)error('CUSTOMER_DENIED');if(!['customer','staff','owner'].includes(actor.role))error('ROLE_DENIED');return copy(c)},
+    act(actor,id,action,data={}){if(!(action in roles))error('ACTION_DENIED');role(action,actor);const c=requireCase(id,actor.shop);version(c,data.expectedVersion);
+      const previousStart=c.start;
+      if(action==='reschedule'){if(c.status!=='booked')error('TRANSITION_DENIED');if(!validDate(data.start)||new Date(data.start).getTime()<=now().getTime())error('BOOKING_INVALID');if(c.start===data.start)error('BOOKING_UNCHANGED');if([...cases.values()].some(other=>other.id!==c.id&&other.shop===c.shop&&other.status!=='cancelled'&&other.start===data.start))error('BOOKING_SLOT_OCCUPIED');c.start=data.start}
+      if(action==='cancel'){if(c.status!=='booked')error('TRANSITION_DENIED');c.status='cancelled'}
+      if(action==='report'){if(c.status!=='booked'||!requireText(data.observation,10000))error('TRANSITION_DENIED');c.report=data.observation.trim();c.status='reported'}
+      if(action==='quote'){if(c.status!=='reported'||!Array.isArray(data.items)||data.items.length<1||data.items.length>30||!data.items.every(x=>requireText(x.name)&&Number.isSafeInteger(x.price)&&x.price>=0&&x.price<=100000000))error('TRANSITION_DENIED');c.quote=data.items.map(x=>({name:x.name.trim(),price:x.price}));c.status='awaiting_approval'}
+      if(action==='decision'){if(c.status!=='awaiting_approval'||actor.customer!==c.customer||!['approved','declined'].includes(data.decision))error('TRANSITION_DENIED');c.decision=data.decision;c.status=data.decision==='approved'?'approved':'declined'}
+      if(action==='complete'){if(c.status!=='approved')error('TRANSITION_DENIED');c.status='completed'}
+      c.version++;c.history.push(action==='reschedule'?`予約変更 ${previousStart.replace('T',' ')} → ${c.start.replace('T',' ')}`:action==='cancel'?'予約キャンセル':({report:'整備報告',quote:'見積作成',decision:'顧客'+(c.decision==='approved'?'承認':'否認'),complete:'作業完了'})[action]);return copy(c)
+    },
+    count:()=>cases.size
+  });
+}
+
+/** DPRO CAR02 V1.6 — staff-assisted booking browser transport candidate.
+ * ISOLATED QA ONLY. It accepts ONLY the reserved .invalid host and an injected
+ * transport. It cannot access any real API, mint an identity, or bypass R52.
+ * Not used by the public five-screen demo and not a customer self-booking API.
+ */
+const CAR02_STAFF_BOOKING_BROWSER_MODE=Object.freeze({
+ environment:'isolated_qa',productionReady:false,release:'NO_GO',migration:'HOLD',
+ deployable:false,realAuth:false,customerSelfBooking:false,realEndpoint:false
+});
+const URL_QA='https://car02-booking-qa.invalid/api/car02/booking';
+const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+const KEY=/^[A-Za-z0-9_-]{12,100}$/;
+const EXACT=['customerId','vehicleId','day','time'];
+const ERROR_CODES=new Set([
+ 'CAR02_NOT_RELEASED','CAR02_BOOKING_ORIGIN_DENIED','CAR02_BOOKING_UNAUTHORIZED',
+ 'CAR02_BOOKING_STAFF_REQUIRED','CAR02_BOOKING_REQUEST_KEY_INVALID','CAR02_BOOKING_MEDIA_TYPE',
+ 'CAR02_BOOKING_FIELDS_INVALID','CAR02_BOOKING_DATE_INVALID','CAR02_BOOKING_CLOSED_DAY',
+ 'CAR02_BOOKING_TIME_INVALID','CAR02_BOOKING_BUSINESS_HOURS','CAR02_BOOKING_WINDOW_INVALID',
+ 'CAR02_BOOKING_REFERENCE_SCOPE_MISMATCH','CAR02_BOOKING_SLOT_OCCUPIED',
+ 'CAR02_BOOKING_IDEMPOTENCY_CONFLICT','CAR02_BOOKING_QA_UNAVAILABLE'
+]);
+class Car02BookingBrowserError extends Error{
+ constructor(code,status=0){super(code);this.name='Car02BookingBrowserError';this.code=code;this.status=status;}
+}
+const fail=(code,status=0)=>{throw new Car02BookingBrowserError(code,status)};
+const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.getPrototypeOf(x)===Object.prototype;
+const exact=(x,keys)=>plain(x)&&Object.keys(x).sort().join('|')===keys.slice().sort().join('|');
+const isUuid=x=>typeof x==='string'&&UUID.test(x);
+function jstNow(now){
+ const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).filter(x=>x.type!=='literal').map(x=>[x.type,Number(x.value)]));
+ return {date:`${p.year}-${String(p.month).padStart(2,'0')}-${String(p.day).padStart(2,'0')}`,minutes:p.hour*60+p.minute};
+}
+function validateStaffBookingBrowserInput(input,{now=new Date()}={}){
+ if(!exact(input,EXACT))fail('CAR02_BOOKING_UI_FIELDS_INVALID');
+ if(!isUuid(input.customerId)||!isUuid(input.vehicleId))fail('CAR02_BOOKING_UI_REFERENCE_INVALID');
+ if(typeof input.day!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(input.day))fail('CAR02_BOOKING_UI_DATE_INVALID');
+ const d=new Date(input.day+'T00:00:00.000Z');
+ if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==input.day)fail('CAR02_BOOKING_UI_DATE_INVALID');
+ if(d.getUTCDay()===0)fail('CAR02_BOOKING_UI_CLOSED_DAY');
+ if(typeof input.time!=='string'||!/^([01][0-9]|2[0-3]):(00|30)$/.test(input.time))fail('CAR02_BOOKING_UI_TIME_INVALID');
+ const [h,m]=input.time.split(':').map(Number),minute=h*60+m;
+ if(minute<540||minute>1050)fail('CAR02_BOOKING_UI_HOURS_INVALID');
+ const nowJst=jstNow(now);const distance=(d.getTime()-new Date(nowJst.date+'T00:00:00Z').getTime())/86400000;
+ if(distance<0||distance>60||(distance===0&&minute<=nowJst.minutes))fail('CAR02_BOOKING_UI_WINDOW_INVALID');
+ return Object.freeze({...input});
+}
+function safeError(response,body){
+ const code=plain(body)&&ERROR_CODES.has(body.code)?body.code:'CAR02_BOOKING_UI_HTTP_ERROR';
+ fail(code,response.status);
+}
+async function decode(response,input){
+ const type=response?.headers?.get?.('content-type')||'';
+ if(!type.toLowerCase().includes('application/json'))fail('CAR02_BOOKING_UI_RESPONSE_INVALID');
+ const length=Number(response.headers.get('content-length')||0);
+ if(length>4096)fail('CAR02_BOOKING_UI_RESPONSE_TOO_LARGE');
+ let raw;try{raw=await response.text()}catch{fail('CAR02_BOOKING_UI_RESPONSE_INVALID')}
+ if(raw.length>4096)fail('CAR02_BOOKING_UI_RESPONSE_TOO_LARGE');
+ let parsed;try{parsed=JSON.parse(raw)}catch{fail('CAR02_BOOKING_UI_RESPONSE_INVALID')}
+ if(response.status!==201||parsed?.ok!==true)safeError(response,parsed);
+ if(!plain(parsed)||!exact(parsed.data,['reservationId','day','time','syntheticOnly'])||
+   !isUuid(parsed.data.reservationId)||parsed.data.syntheticOnly!==true||
+   parsed.data.day!==input.day||parsed.data.time!==input.time)
+   fail('CAR02_BOOKING_UI_RESPONSE_INVALID');
+ return Object.freeze({reservationId:parsed.data.reservationId,day:parsed.data.day,time:parsed.data.time,syntheticOnly:true});
+}
+function createCar02StaffBookingBrowserIsolated({
+ environment,allowIsolatedQa=false,connectionEnabled=false,
+ endpoint=URL_QA,credentials,fetchImpl,now=()=>new Date(),randomUUID
+}={}){
+ if(environment!=='isolated_qa'||allowIsolatedQa!==true||endpoint!==URL_QA||
+    typeof credentials!=='function'||typeof fetchImpl!=='function'||typeof now!=='function'||
+    typeof randomUUID!=='function')fail('CAR02_BOOKING_UI_ISOLATION_REQUIRED');
+ return Object.freeze({
+  async create(input,{requestKey}={}){
+   if(connectionEnabled!==true)fail('CAR02_BOOKING_UI_CLOSED');
+   const validated=validateStaffBookingBrowserInput(input,{now:now()});
+   const key=requestKey??('qa-booking-'+randomUUID());
+   if(typeof key!=='string'||!KEY.test(key))fail('CAR02_BOOKING_UI_KEY_INVALID');
+   let auth;try{auth=await credentials()}catch{fail('CAR02_BOOKING_UI_IDENTITY_REQUIRED')}
+   if(!plain(auth)||auth.kind!=='staff'||typeof auth.token!=='string'||
+     auth.token.length<8||auth.token.length>8192||/\s/.test(auth.token))fail('CAR02_BOOKING_UI_IDENTITY_REQUIRED');
+   const headers=new Headers({'Accept':'application/json','Content-Type':'application/json',
+     'Authorization':'Bearer '+auth.token,'Idempotency-Key':key});
+   let response;
+   try{
+    response=await fetchImpl(URL_QA,{method:'POST',headers,body:JSON.stringify(validated),
+       redirect:'error',cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',
+       signal:AbortSignal.timeout(12000)});
+   }catch{fail('CAR02_BOOKING_UI_TRANSPORT_UNAVAILABLE')}
+   if(!response||typeof response.status!=='number')fail('CAR02_BOOKING_UI_RESPONSE_INVALID');
+   return decode(response,validated);
+  }
+ });
+}
+
+const $=id=>document.getElementById(id);
+const labels={dashboard:['業務ダッシュボード','予約と整備案件の進捗を1つの画面で確認します。'],booking:['予約WEB','架空の予約受付フローを確認します。'],staff:['スタッフ整備','報告・見積・作業完了まで操作します。'],customer:['お客様確認','追加見積の確認と承認を体験します。'],owner:['オーナー管理','業務一覧と安全状態を確認します。']};
+const statusText={booked:'整備報告待ち',reported:'見積作成待ち',awaiting_approval:'承認待ち',approved:'承認済み',declined:'見送り',completed:'作業完了',cancelled:'キャンセル済み'};
+const state={model:null,ids:[],selected:null,tab:'dashboard'};
+const calendar={year:0,month:0,day:'',slot:''};
+// V1.8: ONE shared in-memory dataset across the booking, staff, customer and owner views.
+// Neither the test server nor the V1.6 browser contract calls any network resource.
+const QA_CLIENTS=Object.freeze({
+ '11111111-1111-4111-8111-111111111111':{customer:'架空顧客A',vehicle:'デモ車両A',vehicleId:'22222222-2222-4222-8222-222222222222'},
+ '33333333-3333-4333-8333-333333333333':{customer:'架空顧客B',vehicle:'デモ車両B',vehicleId:'44444444-4444-4444-8444-444444444444'}
+});
+const staffRequests=new Map(),staffSlots=new Map(),staffRefs=new Map();
+let staffLast=null,staffBusy=false;
+const responseJson=(data,status)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
+function fakeStaffBookingHttp(url,req){
+ if(url!=='https://car02-booking-qa.invalid/api/car02/booking'||req.method!=='POST')return responseJson({ok:false,code:'CAR02_BOOKING_QA_UNAVAILABLE'},503);
+ if(new Headers(req.headers).get('Authorization')!=='Bearer qa-v18-synthetic-staff-only')return responseJson({ok:false,code:'CAR02_BOOKING_UNAUTHORIZED'},401);
+ let data;try{data=JSON.parse(req.body)}catch{return responseJson({ok:false,code:'CAR02_BOOKING_FIELDS_INVALID'},422)}
+ const client=QA_CLIENTS[data.customerId];
+ if(!client||client.vehicleId!==data.vehicleId)return responseJson({ok:false,code:'CAR02_BOOKING_REFERENCE_SCOPE_MISMATCH'},403);
+ const key=new Headers(req.headers).get('Idempotency-Key'),payload=JSON.stringify(data),prior=staffRequests.get(key);
+ if(prior)return prior.payload===payload?responseJson({ok:true,data:prior.result},201):responseJson({ok:false,code:'CAR02_BOOKING_IDEMPOTENCY_CONFLICT'},409);
+ const start=data.day+'T'+data.time;
+ if(calBooked(start))return responseJson({ok:false,code:'CAR02_BOOKING_SLOT_OCCUPIED'},409);
+ // Create the case BEFORE committing the synthetic UUID, to avoid a demo orphan.
+ let record;try{record=state.model.create(actor('staff'),{customer:client.customer,vehicle:client.vehicle,start})}
+ catch{return responseJson({ok:false,code:'CAR02_BOOKING_SLOT_OCCUPIED'},409)}
+ const result={reservationId:crypto.randomUUID(),day:data.day,time:data.time,syntheticOnly:true};
+ staffRefs.set(record.id,result.reservationId);staffSlots.set(start,record.id);
+ staffRequests.set(key,{payload,result,caseId:record.id});
+ if(!state.ids.includes(record.id))state.ids.unshift(record.id);
+ state.selected=record.id;
+ return responseJson({ok:true,data:result},201);
+}
+const staffBookingClient=createCar02StaffBookingBrowserIsolated({environment:'isolated_qa',allowIsolatedQa:true,connectionEnabled:true,
+ credentials:async()=>({kind:'staff',token:'qa-v18-synthetic-staff-only'}),
+ fetchImpl:async(url,req)=>fakeStaffBookingHttp(url,req),randomUUID:()=>crypto.randomUUID()});
+async function submitStaffBooking(retry=false){
+ if(staffBusy)return;
+ let request;
+ if(retry){if(!staffLast)return;request=staffLast}
+ else{
+  if(!calendar.day||!calendar.slot||!calSlotEnabled(calendar.day,calendar.slot)){
+   notice('booking-result','予約可能な時間を選択してください。',true);return;
+  }
+  const customerId=$('staff-customer').value,client=QA_CLIENTS[customerId];
+  if(!client){notice('booking-result','架空顧客を選んでください。',true);return}
+  request={input:{customerId,vehicleId:client.vehicleId,day:calendar.day,time:calendar.slot},requestKey:'qa-v18-'+crypto.randomUUID()};
+ }
+ staffBusy=true;renderCalendar();
+ try{
+  const r=await staffBookingClient.create(request.input,{requestKey:request.requestKey});
+  staffLast=request;
+  const record=staffRequests.get(request.requestKey);
+  if(!record||record.result.reservationId!==r.reservationId)throw Error('CAR02_V18_SYNTHETIC_MAPPING_FAILED');
+  state.selected=record.caseId;
+  $('staff-uuid').textContent='架空予約UUID：'+r.reservationId+' ／ 案件番号：'+record.caseId;
+  render();notice('booking-result',retry?'同一キーで再送済み。予約・案件は増えていません。':'架空予約UUIDを発行し、整備・お客様・オーナー画面に連動しました。');
+ }catch(err){notice('booking-result','受付失敗（架空）：'+String(err.code||err.message),true)}
+ finally{staffBusy=false;renderCalendar()}
+}
+
+const actor=(role,record)=>({shop:'demo_shop',role,...(role==='customer'?{customer:record?.customer}:{})});
+const localDate=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+function future(days,hour=10,minute=30){const d=new Date();d.setDate(d.getDate()+days);d.setHours(hour,minute,0,0);return localDate(d)}
+function cases(){return state.ids.map(id=>{try{return state.model.view(actor('owner'),id)}catch{return null}}).filter(Boolean)}
+
+const calIso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const calStart=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+function calWindow(day){
+ const base=calStart(new Date()), target=calStart(day);
+ const distance=Math.round((target-base)/86400000);
+ return distance>=0&&distance<=60&&target.getDay()!==0;
+}
+function calBooked(start){return cases().some(r=>r.status!=='cancelled'&&r.start===start)}
+function calSlotEnabled(day,time){
+ const date=new Date(day+'T'+time);const d=new Date(day+'T00:00');
+ return calWindow(d) && Number.isFinite(date.getTime())&&date.getTime()>Date.now() && !calBooked(day+'T'+time);
+}
+function calMonthKey(y,m){return y*12+m}
+function calendarInit(){
+ const today=new Date();calendar.year=today.getFullYear();calendar.month=today.getMonth();calendar.day='';calendar.slot='';
+ const day=new Date(today);day.setDate(day.getDate()+1);
+ for(let i=0;i<8;i++){if(calWindow(day)){calendar.day=calIso(day);break}day.setDate(day.getDate()+1)}
+ if(calendar.day){const d=new Date(calendar.day+'T00:00');calendar.year=d.getFullYear();calendar.month=d.getMonth()}
+}
+function renderCalendar(){
+ const today=new Date(),end=new Date(today);end.setDate(end.getDate()+60);
+ const minKey=calMonthKey(today.getFullYear(),today.getMonth()),maxKey=calMonthKey(end.getFullYear(),end.getMonth());
+ $('cal-prev').disabled=calMonthKey(calendar.year,calendar.month)<=minKey;
+ $('cal-next').disabled=calMonthKey(calendar.year,calendar.month)>=maxKey;
+ $('cal-month').textContent=`${calendar.year}年 ${calendar.month+1}月`;
+ const days=$('cal-days');days.replaceChildren();
+ const first=new Date(calendar.year,calendar.month,1);
+ for(let i=0;i<(first.getDay()+6)%7;i++)days.append(el('span','cal-empty'));
+ const last=new Date(calendar.year,calendar.month+1,0).getDate();
+ for(let d=1;d<=last;d++){
+  const date=new Date(calendar.year,calendar.month,d), iso=calIso(date),can=calWindow(date);
+  const b=el('button','cal-day',String(d));b.type='button';b.disabled=!can;b.dataset.date=iso;b.setAttribute('aria-label',`${iso}${can?'':' 選択不可'}`);
+  b.setAttribute('aria-pressed',String(calendar.day===iso));
+  if(iso===calIso(today))b.append(el('span','today-dot','今日'));
+  if(can)b.addEventListener('click',()=>{calendar.day=iso;calendar.slot='';renderCalendar()});
+  days.append(b);
+ }
+ const slots=$('cal-slots');slots.replaceChildren();
+ if(calendar.day){
+  for(let minutes=9*60;minutes<=17*60+30;minutes+=30){
+   const time=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
+   const b=el('button','cal-slot',time);b.type='button';b.dataset.slot=time;
+   b.disabled=!calSlotEnabled(calendar.day,time);b.setAttribute('aria-pressed',String(calendar.slot===time));
+   b.setAttribute('aria-label',time+(b.disabled?' 受付不可・予約済み':''));
+   if(!b.disabled)b.addEventListener('click',()=>{calendar.slot=time;renderCalendar()});
+   slots.append(b);
+  }
+ } else slots.append(el('span','label-note','予約日を選択してください。'));
+ const selected=calendar.day&&calendar.slot&&calSlotEnabled(calendar.day,calendar.slot);
+ $('b-date').value=selected?calendar.day+'T'+calendar.slot:'';
+ $('booking-create').disabled=!selected;
+ $('booking-staff-create').disabled=!selected||staffBusy;
+ $('booking-staff-retry').disabled=!staffLast||staffBusy;
+ const editRecord=selected();$('booking-reschedule').disabled=!selected||!editRecord||editRecord.status!=='booked';$('booking-cancel').disabled=!editRecord||editRecord.status!=='booked';
+ $('cal-selection').textContent=selected?`選択中：${calendar.day.replaceAll('-','/')} ${calendar.slot}〜（30分）`:'予約日と空いている時間を選択してください。';
+}
+function calendarMonth(delta){const next=new Date(calendar.year,calendar.month+delta,1);calendar.year=next.getFullYear();calendar.month=next.getMonth();calendar.day='';calendar.slot='';renderCalendar()}
+
+function selected(){return cases().find(x=>x.id===state.selected)||null}
+function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=String(text);return node}
+function notice(where,message,isError=false){const n=$(where);n.textContent=message;n.hidden=false;n.classList.toggle('error',isError)}
+function clearNotices(){for(const id of ['booking-result','booking-edit-result','staff-result','customer-result','owner-result']){$(id).hidden=true;$(id).textContent=''}}
+function appendDetail(target,r){const root=$(target);root.replaceChildren();if(!r){root.append(el('div','empty','対象案件がありません。予約WEBから架空予約を作成してください。'));return}
+ const dl=el('dl','detail');const rows=[['案件番号',r.id],...(staffRefs.has(r.id)?[['架空予約UUID',staffRefs.get(r.id)]]:[]),['お客様',r.customer],['車両',r.vehicle],['予約日時',r.start.replace('T',' ')],['状態',statusText[r.status]||r.status],['見積合計',r.quote.reduce((s,x)=>s+x.price,0).toLocaleString('ja-JP')+'円'],['データ版',r.version]];
+ for(const [k,v] of rows){const d=el('div','detailrow');d.append(el('dt','',k),el('dd','',v));dl.append(d)}root.append(dl)
+}
+function makeList(target,recs){const root=$(target);root.replaceChildren();if(!recs.length){root.append(el('div','empty','まだ案件がありません。'));return}for(const r of recs){const b=el('button','item'+(r.id===state.selected?' selected':''));b.type='button';b.setAttribute('aria-pressed',String(r.id===state.selected));const line=el('div','');line.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px';line.append(el('strong','',r.customer+' ／ '+r.vehicle));const pill=el('span','pill'+(r.status==='completed'?' ok':r.status==='awaiting_approval'?' wait':r.status==='declined'?' off':''),statusText[r.status]||r.status);line.append(pill);b.append(line,el('small','',r.start.replace('T',' ')+' · '+r.id));b.addEventListener('click',()=>{state.selected=r.id;render()});root.append(b)}}
+function renderStats(recs){$('stat-all').textContent=recs.length;$('stat-booked').textContent=recs.filter(x=>x.status==='booked').length;$('stat-pending').textContent=recs.filter(x=>x.status==='awaiting_approval').length;$('stat-completed').textContent=recs.filter(x=>x.status==='completed').length}
+function renderCustomer(r){const root=$('customer-quote');root.replaceChildren();$('customer-history').replaceChildren();if(!r){root.append(el('div','empty','対象案件がありません。'));$('customer-history').append(el('div','empty','履歴はありません。'));return}
+ root.append(el('p','muted','お客様：'+r.customer+'　／　車両：'+r.vehicle));if(r.quote.length){root.append(el('h3','','お見積り内容'));for(const item of r.quote){const d=el('div','detailrow');d.append(el('dt','',item.name),el('dd','',item.price.toLocaleString('ja-JP')+'円'));root.append(d)}root.append(el('p','amount',r.quote.reduce((s,x)=>s+x.price,0).toLocaleString('ja-JP')+'円'))}else root.append(el('div','empty','見積はまだ提示されていません。'));root.append(el('p','muted','状態：'+statusText[r.status]));if(staffRefs.has(r.id))root.append(el('p','label-note','架空予約UUID：'+staffRefs.get(r.id)));const history=el('ol','timeline');for(const h of r.history)history.append(el('li','',h));$('customer-history').append(history)
+}
+function renderOwner(recs){const body=$('owner-table');body.replaceChildren();for(const r of recs){const tr=el('tr','');const idCell=el('td','');const link=el('button','owner-case-link',r.id);link.type='button';link.setAttribute('aria-label',r.id+' の予約を確認・変更');link.addEventListener('click',()=>{state.selected=r.id;navigate('booking')});idCell.append(link);tr.append(idCell);for(const v of [staffRefs.get(r.id)||'—',r.customer,r.start.replace('T',' '),statusText[r.status]||r.status])tr.append(el('td','',v));body.append(tr)}if(!recs.length){const tr=el('tr','');const td=el('td','','予約はありません。');td.colSpan=5;tr.append(td);body.append(tr)}}
+function render(){const recs=cases();if(state.selected&&!recs.some(x=>x.id===state.selected))state.selected=recs[0]?.id||null;const r=selected();renderStats(recs);for(const t of ['dashboard','booking','staff','customer'])makeList(t+'-list',recs);appendDetail('dashboard-detail',r);appendDetail('staff-detail',r);renderCustomer(r);renderOwner(recs);
+ renderCalendar();$('booking-selected-info').textContent=r?`選択中：${r.customer} ／ ${r.start.replace('T',' ')} ／ ${statusText[r.status]||r.status}`:'右の一覧で変更する架空予約を選択してください。';$('dashboard-go-staff').disabled=!r;$('dashboard-go-customer').disabled=!r;$('staff-report').disabled=!r||r.status!=='booked';$('staff-quote').disabled=!r||r.status!=='reported';$('staff-complete').disabled=!r||r.status!=='approved';$('customer-approve').disabled=!r||r.status!=='awaiting_approval';$('customer-decline').disabled=!r||r.status!=='awaiting_approval';}
+function navigate(tab){if(!labels[tab])return;state.tab=tab;for(const b of document.querySelectorAll('[data-tab]')){if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}for(const v of document.querySelectorAll('.view'))v.hidden=v.id!=='view-'+tab;$('pageTitle').textContent=labels[tab][0];$('pageLead').textContent=labels[tab][1];clearNotices();render();window.scrollTo({top:0,behavior:'instant'})}
+function operation(fn,location){try{const r=fn();if(r&&typeof r==='object'&&r.id&&!state.ids.includes(r.id))state.ids.unshift(r.id);if(r?.id)state.selected=r.id;render();notice(location,'操作完了（ブラウザ内の架空データ）')}catch(e){notice(location,'操作できません：'+(e.code||e.message),true)}}
+function init(){staffRequests.clear();staffSlots.clear();staffRefs.clear();staffLast=null;staffBusy=false;$('staff-uuid').textContent='架空予約UUID：まだ登録されていません。';state.model=makeCar02Demo();state.ids=[];state.selected=null;const samples=[['架空顧客A','デモ車両A',future(1)],['架空顧客B','デモ車両B',future(2)]];for(const [customer,vehicle,start]of samples){const record=state.model.create(actor('staff'),{customer,vehicle,start});state.ids.push(record.id)}state.selected=state.ids[0];calendarInit();render()}
+for(const b of document.querySelectorAll('[data-tab]'))b.addEventListener('click',()=>navigate(b.dataset.tab));
+$('dashboard-go-staff').addEventListener('click',()=>navigate('staff'));$('dashboard-go-customer').addEventListener('click',()=>navigate('customer'));
+$('booking-staff-create').addEventListener('click',()=>submitStaffBooking(false));
+$('booking-staff-retry').addEventListener('click',()=>submitStaffBooking(true));
+$('booking-create').addEventListener('click',()=>{const date=$('b-date').value;if(!date||!calSlotEnabled(calendar.day,calendar.slot)){notice('booking-result','空いている予約枠を選択してください。',true);return}operation(()=>state.model.create(actor('staff'),{customer:$('b-customer').value,vehicle:$('b-vehicle').value,start:date}),'booking-result')});
+$('booking-reschedule').addEventListener('click',()=>{const r=selected();if(!r||r.status!=='booked'||!calendar.day||!calendar.slot||!calSlotEnabled(calendar.day,calendar.slot)){notice('booking-edit-result','変更する予約と新しい空き枠を選んでください。',true);return}const start=calendar.day+'T'+calendar.slot;operation(()=>{const updated=state.model.act(actor('staff'),r.id,'reschedule',{start,expectedVersion:r.version});if(staffSlots.get(r.start)===r.id){staffSlots.delete(r.start);staffSlots.set(start,r.id)}calendar.slot='';return updated},'booking-edit-result')});
+$('booking-cancel').addEventListener('click',()=>{const r=selected();if(!r||r.status!=='booked')return;if(!window.confirm(`${r.customer} 様の ${r.start.replace('T',' ')} の架空予約をキャンセルしますか？`))return;operation(()=>{const updated=state.model.act(actor('staff'),r.id,'cancel',{expectedVersion:r.version});if(staffSlots.get(r.start)===r.id)staffSlots.delete(r.start);calendar.slot='';return updated},'booking-edit-result')});
+$('cal-prev').addEventListener('click',()=>calendarMonth(-1));
+$('cal-next').addEventListener('click',()=>calendarMonth(1));
+$('staff-report').addEventListener('click',()=>operation(()=>{const r=selected();return state.model.act(actor('staff'),r.id,'report',{observation:$('s-observation').value,expectedVersion:r.version})},'staff-result'));
+$('staff-quote').addEventListener('click',()=>operation(()=>{const r=selected();return state.model.act(actor('staff'),r.id,'quote',{items:[{name:$('s-item').value,price:Number($('s-price').value)}],expectedVersion:r.version})},'staff-result'));
+$('staff-complete').addEventListener('click',()=>operation(()=>{const r=selected();return state.model.act(actor('staff'),r.id,'complete',{expectedVersion:r.version})},'staff-result'));
+$('customer-approve').addEventListener('click',()=>operation(()=>{const r=selected();return state.model.act(actor('customer',r),r.id,'decision',{decision:'approved',expectedVersion:r.version})},'customer-result'));
+$('customer-decline').addEventListener('click',()=>operation(()=>{const r=selected();return state.model.act(actor('customer',r),r.id,'decision',{decision:'declined',expectedVersion:r.version})},'customer-result'));
+$('owner-reset').addEventListener('click',()=>{init();navigate('owner');notice('owner-result','架空データを初期化しました')});
+init();navigate('dashboard');
+
+</script>
+</body>
+</html>
+
