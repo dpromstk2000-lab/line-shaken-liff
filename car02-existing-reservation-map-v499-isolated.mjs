@@ -26,7 +26,10 @@ function validDay(day) {
 }
 
 function normalizeHalfHour(value) {
-  if (typeof value !== 'string') fail('CAR02_RESERVATION_TIME_REQUIRED');
+  // A provisional reservation can have no time yet. Keep it visible to the
+  // owner, but never synthesize an available slot or an editable booking.
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') fail('CAR02_RESERVATION_TIME_INVALID');
   const match = /^(\d{2}):(\d{2})(?::00)?$/.exec(value);
   if (!match) fail('CAR02_RESERVATION_TIME_INVALID');
   const hour = Number(match[1]);
@@ -56,9 +59,13 @@ export function mapExistingReservationForOwner({row, trustedShopCode} = {}) {
     customerId: row.customer_id,
     vehicleId: row.vehicle_id ?? null,
     shopCode: trustedShopCode,
-    customerLabel: safeText(row.customer?.name || ''),
-    vehicleLabel: safeText(row.vehicle?.car_name || ''),
-    start: `${row.reservation_date}T${time}`,
+    customerLabel: safeText(row.customer?.name || row.customer_name || ''),
+    vehicleLabel: safeText(row.vehicle?.car_name || row.vehicle_name || row.car_name || ''),
+    day: row.reservation_date,
+    time,
+    start: time === null ? null : `${row.reservation_date}T${time}`,
+    displayStart: time === null ? `${row.reservation_date} 時間未定` : `${row.reservation_date} ${time}`,
+    timeNeedsConfirmation: time === null,
     workType: safeText(row.work_type || '', 80),
     status: safeText(row.status || '', 40),
     readOnly: true,
