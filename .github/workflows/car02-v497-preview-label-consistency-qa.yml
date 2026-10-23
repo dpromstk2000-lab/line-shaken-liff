@@ -1,0 +1,88 @@
+name: CAR02 V4.97 Offline Calendar Label Consistency QA (NO_GO HOLD)
+'on':
+  push:
+    branches: [car02-v434-review-only]
+    paths:
+      - 'car02-preview-label-consistency-r497.mjs'
+      - 'car02-preview-label-consistency-r497.test.mjs'
+      - 'car02-v497-preview-label-contract.json'
+      - 'CAR02_V497_LABEL_CONSISTENT_STANDALONE_OFFLINE_PREVIEW.html'
+      - 'CAR02_V497_PREVIEW_LABEL_QA.md'
+      - '.github/workflows/car02-v497-preview-label-consistency-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-label-qa:
+    if: github.ref == 'refs/heads/car02-v434-review-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated review branch without credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin R52 and accepted immutable V4.94 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF:-}" = 'refs/heads/car02-v434-review-only'
+          for k in CAR02_DATABASE_URL DATABASE_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY LINE_CHANNEL_ACCESS_TOKEN LINE_CHANNEL_SECRET; do
+            test -z "${!k:-}" || { echo V497_CREDENTIAL_REFUSED >&2; exit 1; }
+          done
+          test "$(git hash-object car02-edge-entry-r52.ts)" = 'f0e31fb9f9d98524519d01dffd3489893d3d3302'
+          grep -Eq 'const[[:space:]]+CAR02_RELEASE_LOCK=true;' car02-edge-entry-r52.ts
+          test "$(git hash-object CAR02_V494_READABLE_STANDALONE_OFFLINE_PREVIEW.html)" = 'ac6a64f187d9c04f31b6810bb03d14428c45a12f'
+          test "$(sha256sum CAR02_V494_READABLE_STANDALONE_OFFLINE_PREVIEW.html | awk '{print $1}')" = 'ac2d04c351892d218894926ea3fd2e45fef399e996b177778f94baadf5be663e'
+          test "$(git hash-object car02-standalone-preview-builder-r494.mjs)" = 'f0b0e336ce1e500550f5357f5a56514d5662f736'
+          for f in car02-preview-label-consistency-r497.mjs car02-preview-label-consistency-r497.test.mjs car02-v497-preview-label-contract.json CAR02_V497_LABEL_CONSISTENT_STANDALONE_OFFLINE_PREVIEW.html CAR02_V497_PREVIEW_LABEL_QA.md; do test -s "$f"; done
+          echo V497_R52_ACCEPTED_V494_PIN_PASS
+      - name: Run 30 dedicated offline-label tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check car02-preview-label-consistency-r497.mjs
+          node --check car02-preview-label-consistency-r497.test.mjs
+          node --test --test-reporter=tap car02-preview-label-consistency-r497.test.mjs | tee "$RUNNER_TEMP/v497-new-tests.log"
+          total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v497-new-tests.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v497-new-tests.log")
+          test "$total" = 30
+          test "$passed" = "$total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v497-new-tests.log"
+          echo V497_NEW_LABEL_TESTS_30_PASS
+      - name: Verify deterministic CSP-pinned, immutable offline page
+        shell: bash
+        run: |
+          set -euo pipefail
+          node car02-preview-label-consistency-r497.mjs
+          test "$(sha256sum CAR02_V497_LABEL_CONSISTENT_STANDALONE_OFFLINE_PREVIEW.html | awk '{print $1}')" = '406ac21e84de128a00d4bcbe636e6186eb89897a243c2b0a820fb5258ba3dc3e'
+          git diff --exit-code -- CAR02_V497_LABEL_CONSISTENT_STANDALONE_OFFLINE_PREVIEW.html
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const c=JSON.parse(readFileSync('car02-v497-preview-label-contract.json','utf8'));
+          assert.equal(c.systemCode,'CAR02');assert.equal(c.version,'V4.97');
+          assert.equal(c.acceptedBaseRunId,39890429319);
+          assert.equal(c.acceptedBaseNodeTests,1577);assert.equal(c.newNodeTests,30);
+          assert.equal(c.expectedMinimumNodeTests,1607);
+          assert.equal(c.releaseLock,true);assert.equal(c.commercialDecision,'NO_GO_HOLD');
+          assert.equal(c.pcCalendarBasicHumanQa,'PASS_2026-10-23');
+          assert.equal(c.smartphoneRealDeviceAcceptanceVerified,false);
+          assert.equal(c.realBookingE2EVerified,false);
+          assert.equal(c.independentlyVerifiedRealProviderProofs,0);assert.equal(c.requiredRealProviderProofs,7);
+          for(const k of ['bookingCreationAllowed','productionDeployAllowed','databaseMutationAllowed',
+            'lineDispatchAllowed','providerConnectionAllowed','billingChangeAllowed','githubMainMutationAllowed'])
+            assert.equal(c[k],false,k);
+          console.log('V497_NO_GO_HOLD_CSP_BOUNDARY_PASS');
+          NODE
+      - name: Full regression retains 1577 accepted tests and adds 30
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test car02-*.test.mjs | tee "$RUNNER_TEMP/v497-full-tests.log"
+          total=$(awk '/^# tests / {print $3}' "$RUNNER_TEMP/v497-full-tests.log")
+          passed=$(awk '/^# pass / {print $3}' "$RUNNER_TEMP/v497-full-tests.log")
+          test "$total" -ge 1607
+          test "$passed" = "$total"
+          grep -Fxq '# fail 0' "$RUNNER_TEMP/v497-full-tests.log"
+          echo V497_FULL_REGRESSION_MINIMUM_1607_PASS
