@@ -77,7 +77,7 @@ test('05 backend refuses row from another shop even if response was injected', a
 
 test('06 provisional, cancelled, missing time, off-grid and invalid date are not linked', async () => {
   for (const changed of [
-    {status: '仮入庫'}, {status: 'キャンセル'}, {reservation_time: null},
+    {status: '仮入庫'}, {status: '作業完了'}, {status: 'キャンセル'}, {reservation_time: null},
     {reservation_time: '10:15'}, {reservation_date: '2026-02-30'},
   ]) {
     const {wrapped, calls} = rig({resolveReservationForShop: async () => ({...row, ...changed})});
@@ -139,4 +139,14 @@ test('14 route receives the shared R43-compatible error class and HTTP status', 
   const {wrapped} = rig({releaseEnabled: async () => false});
   await assert.rejects(() => wrapped.create(input()), err =>
     err instanceof TestCar02Error && err.code === 'CAR02_NOT_RELEASED' && err.status === 503);
+});
+
+test('15 current KSH DB status 入庫済み is accepted as a confirmed arrival', async () => {
+  const {wrapped, calls} = rig({resolveReservationForShop: async () => ({...row, status: '入庫済み'})});
+  const result = await wrapped.create(input());
+  assert.equal(result.reservationId, R);
+  assert.equal(result.customerId, C);
+  assert.equal(result.vehicleId, V);
+  // This test overrides the resolver directly, so it does not log 'lookup'.
+  assert.deepEqual(calls.map(x => x[0]), ['release', 'unique', 'linked', 'create']);
 });
