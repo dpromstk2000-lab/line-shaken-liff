@@ -7,7 +7,7 @@ import {
 } from './car02-ksh-existing-reservation-resolver-v502-isolated.mjs';
 import {
   bindExistingReservationCaseService,
-} from '../car02_v501_reservation_case_connector/car02-existing-reservation-case-service-v501-isolated.mjs';
+} from './car02-existing-reservation-case-service-v501-isolated.mjs';
 
 const shopCode = 'street_house_kitsuki';
 const reservationId = '11111111-1111-4111-8111-111111111111';
